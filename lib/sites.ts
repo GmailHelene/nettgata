@@ -8,7 +8,16 @@ import { publishPage } from "@/lib/publishing";
 
 export class SiteError extends Error {}
 
-const RESERVED_SLUGS = new Set(["www", "app", "api", "studio", "admin", "mail", "post", "status", "hjelp", "demo"]);
+/**
+ * Underdomener av plattformdomenet (<navn>.nettgata.no) som aldri kan bli en kundes gratisadresse:
+ * plattformens egne sider, domenekoblingen (kunder, fallback), e-post og drift.
+ */
+const RESERVED_SLUGS = new Set([
+  ...["www", "app", "api", "studio", "admin", "status", "hjelp", "support", "kundeservice", "demo", "blogg", "docs", "info", "kontakt"],
+  ...["kunder", "fallback", "cdn", "media", "static", "dev", "test", "staging"],
+  ...["mail", "post", "smtp", "imap", "pop", "webmail", "autodiscover", "autoconfig", "ftp", "ns1", "ns2"],
+  ...["konto", "minside", "faktura", "betaling"],
+]);
 
 /** Lager en gyldig underdomene-slug av et firmanavn: «Rørlegger Hansen AS» blir «rorlegger-hansen». */
 export function slugify(name: string): string {

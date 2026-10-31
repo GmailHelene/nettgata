@@ -18,6 +18,28 @@ Den unike pekeren gjør at ingen kan legge inn et domene de ikke eier og få det
 Ubekreftede krav holdes av i 48 timer, og slettes etter 14 dager. Aktive domener som slutter å peke hit,
 kobles fra etter 72 timer.
 
+## Valgt navn: Nettgata (31.10.2026)
+
+Plattformdomenet er `nettgata.no`. Verdiene under brukes i oppsettet:
+
+| Hva | Verdi |
+|---|---|
+| Plattform og studio | `nettgata.no` (studio på `nettgata.no/studio`) |
+| Gratisadresser | `<navn>.nettgata.no` (`SITES_ROOT_DOMAIN=nettgata.no`) |
+| Pekeren kundene bruker | `<token>.kunder.nettgata.no` (`CUSTOM_DOMAIN_TARGET=kunder.nettgata.no`) |
+| Reserveadresse (fallback) | `fallback.nettgata.no` |
+
+Underdomener som `www`, `studio`, `kunder`, `fallback`, `mail` og `test` kan aldri bli en kundes gratisadresse (se `RESERVED_SLUGS` i `lib/sites.ts`).
+
+### Helene gjør
+
+1. Kjøp `nettgata.no` hos Domeneshop i Grønberg Tech Solutions sitt navn (org.nr. 927 889 404). `nettgata.com` er også ledig og beskytter navnet, men er valgfritt.
+2. I Cloudflare: «Add a domain», skriv `nettgata.no`, velg Free. Cloudflare viser to navnetjenere.
+3. Hos Domeneshop: bytt navnetjenerne for `nettgata.no` til de to fra Cloudflare. Cloudflare sender e-post når domenet er aktivt (fra minutter til noen timer).
+4. Lag API-tokenet (steg 6 under) og legg det inn som hemmelighet `CF_API_TOKEN` under Workers, «plattformen», Settings, Variables and Secrets. Lagre det i Bitwarden.
+
+Resten gjør Claude.
+
 ## Oppsett, steg for steg
 
 1. Velg plattformdomenet og legg det til som sone i Cloudflare (Free holder).
