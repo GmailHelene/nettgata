@@ -17,6 +17,7 @@ import type { Theme } from "@/lib/theme";
 import type { SiteInfo } from "@/lib/site-info";
 import type { ShopSettings } from "@/lib/shop/settings";
 import type { SiteLayout } from "@/lib/site-layout";
+import type { NotificationSettings } from "@/lib/notifications";
 
 const id = () => uuid("id").primaryKey().default(sql`gen_random_uuid()`);
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -70,6 +71,8 @@ export const sites = pgTable("sites", {
   shop: jsonb("shop").$type<Partial<ShopSettings>>().notNull().default({}),
   /** Logo, toppstripe og bunntekst. Les via readSiteLayout(). */
   layout: jsonb("layout").$type<Partial<SiteLayout>>().notNull().default({}),
+  /** Hvem som får varsel på e-post om nye ordre og henvendelser. Les via readNotificationSettings(). */
+  notifications: jsonb("notifications").$type<Partial<NotificationSettings>>().notNull().default({}),
   createdAt: createdAt(),
 });
 
@@ -381,4 +384,28 @@ export const discountCodes = pgTable(
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("discount_codes_site_code_idx").on(t.siteId, t.code)],
+);
+
+/**
+ * Logg over e-post plattformen har sendt, så butikken ser om kunden fikk ordrebekreftelsen.
+ * Selve innholdet lagres ikke, bare hvem, hva og om det gikk.
+ */
+export const emailLog = pgTable(
+  "email_log",
+  {
+    id: id(),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    /** ordrebekreftelse, ny-ordre, sendt eller ny-henvendelse. */
+    kind: text("kind").notNull(),
+    recipient: text("recipient").notNull(),
+    subject: text("subject").notNull(),
+    /** sendt, feilet, eller logget (e-post er ikke slått på, så den ble bare lagret her). */
+    status: text("status").notNull(),
+    providerId: text("provider_id"),
+    error: text("error"),
+    orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+    inquiryId: uuid("inquiry_id").references(() => inquiries.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("email_log_site_idx").on(t.siteId, t.createdAt), index("email_log_order_idx").on(t.orderId)],
 );

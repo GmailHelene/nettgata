@@ -6,6 +6,7 @@ import { redirect, unstable_rethrow } from "next/navigation";
 import { getDb } from "@/db";
 import { auditLog, inquiries, sites } from "@/db/schema";
 import { siteLayoutSchema, type SiteLayout } from "@/lib/site-layout";
+import { notificationSettingsSchema, type NotificationSettings } from "@/lib/notifications";
 import { themeSchema, type Theme } from "@/lib/theme";
 import { lookupOrgnr, type BrregCompany } from "@/lib/brreg";
 import { createPage, deletePage, movePage, publishAll, setPageInMenu, updateSiteSettings } from "@/lib/pages";
@@ -162,6 +163,21 @@ export async function saveAppearanceAction(
     await db.insert(auditLog).values({ siteId: site.id, userId: user.id, action: "site.appearance_updated" });
     revalidatePath(`/studio/nettsted/${site.id}`, "layout");
     return { ok: true, message: "Utseendet er lagret og vises på nettstedet med en gang." };
+  } catch (err) {
+    return toState(err);
+  }
+}
+
+export async function saveNotificationsAction(siteId: string, input: NotificationSettings): Promise<ActionState> {
+  try {
+    const { site, user } = await requireSiteAccess(siteId);
+    const parsed = notificationSettingsSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message };
+    const db = await getDb();
+    await db.update(sites).set({ notifications: parsed.data }).where(eq(sites.id, site.id));
+    await db.insert(auditLog).values({ siteId: site.id, userId: user.id, action: "site.notifications_updated" });
+    revalidatePath(`/studio/nettsted/${site.id}/innstillinger`);
+    return { ok: true, message: "Varslene er lagret" };
   } catch (err) {
     return toState(err);
   }

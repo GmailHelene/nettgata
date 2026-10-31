@@ -2,6 +2,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { unstable_rethrow } from "next/navigation";
 import { getDb } from "@/db";
 import { auditLog, discountCodes, productCategories, products, sites } from "@/db/schema";
@@ -19,10 +20,17 @@ import {
 } from "@/lib/shop/catalog";
 import { saveDiscount, type DiscountInput } from "@/lib/shop/discounts";
 import { setCustomerNote } from "@/lib/shop/customers";
+import { notifyOrderShipped } from "@/lib/email/notify";
+import { getEmailProvider } from "@/lib/email/send";
 import { applyImport, planImport, type ImportPlan } from "@/lib/shop/import";
 import { setOrderStatus, setStaffNote, setTracking, type OrderStatus } from "@/lib/shop/orders";
 import { shopSettingsSchema, type ShopSettings } from "@/lib/shop/settings";
 import type { ActionState } from "./actions";
+
+/** «Pakken er på vei» til kunden, sendt etter at studioet har fått svar. */
+function shippedNotice(db: Awaited<ReturnType<typeof getDb>>, orderId: string) {
+  after(() => notifyOrderShipped(db, getEmailProvider(), orderId).catch((err) => console.error("Sendt-varsel feilet", err)));
+}
 
 function toState(err: unknown): ActionState {
   unstable_rethrow(err);
@@ -99,7 +107,9 @@ export async function deleteCategoryAction(siteId: string, categoryId: string) {
 export async function setOrderStatusAction(siteId: string, orderId: string, status: OrderStatus): Promise<ActionState> {
   try {
     const { site, user } = await requireSiteAccess(siteId);
-    await setOrderStatus(await getDb(), site.id, orderId, status, user.id);
+    const db = await getDb();
+    await setOrderStatus(db, site.id, orderId, status, user.id);
+    if (status === "fulfilled") shippedNotice(db, orderId);
     revalidatePath(`/studio/nettsted/${site.id}/ordre`, "layout");
     return { ok: true, message: "Status er oppdatert" };
   } catch (err) {
@@ -134,7 +144,10 @@ export async function saveTrackingAction(
     const { site, user } = await requireSiteAccess(siteId);
     const db = await getDb();
     await setTracking(db, site.id, orderId, tracking, user.id);
-    if (markFulfilled) await setOrderStatus(db, site.id, orderId, "fulfilled", user.id);
+    if (markFulfilled) {
+      await setOrderStatus(db, site.id, orderId, "fulfilled", user.id);
+      shippedNotice(db, orderId);
+    }
     revalidatePath(`/studio/nettsted/${site.id}`, "layout");
     return { ok: true, message: markFulfilled ? "Sporingen er lagret og ordren er markert som sendt" : "Sporingen er lagret" };
   } catch (err) {

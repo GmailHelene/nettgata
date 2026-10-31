@@ -7,7 +7,7 @@ Grunnlag: markedsanalysen (funksjonskart, funksjonsrevisjon og MVP-liste), produ
 
 **Lag:** N = synlig for nybegynneren. A = avansert lag. U = utviklerlaget. S = skjult automatikk som bare virker.
 
-Sist oppdatert 31.10.2026 (kvalitetsløft 2 og domenekobling).
+Sist oppdatert 31.10.2026 (kvalitetsløft 2, domenekobling og e-postvarsler).
 
 ---
 
@@ -151,6 +151,7 @@ Sist oppdatert 31.10.2026 (kvalitetsløft 2 og domenekobling).
 | Funksjon | Lag | Status |
 |---|---|---|
 | Kontaktskjema med innboks i studioet | N | Ferdig |
+| Varsel på e-post til bedriften ved ny henvendelse, med svar rett til den som skrev | N | Bygget, sendes når Brevo er koblet til |
 | Honningkrukke og rate limiting mot spam | S | Ferdig |
 | Feltene beholdes ved feilmelding | S | Ferdig |
 | E-postvarsel til bedriften ved ny henvendelse (Brevo) | S | MVP |
@@ -183,7 +184,8 @@ Sist oppdatert 31.10.2026 (kvalitetsløft 2 og domenekobling).
 | Faste leveringsmåter, hent selv, gratis frakt over en grense | N | Ferdig |
 | Bring med pris fra API og fraktetikett | N | MVP |
 | Ordre med fortløpende nummer, statusregler og kvitteringsside | N | Ferdig |
-| Ordrebekreftelse og varsel på e-post | S | MVP |
+| Ordrebekreftelse til kunden, varsel om ny ordre og «pakken er på vei» med sporing (Brevo) | S | Bygget, sendes når Brevo er koblet til |
+| E-postlogg på ordren, så butikken ser om kunden fikk bekreftelsen | S | Ferdig |
 | Kansellering og refusjon som status, varene legges tilbake på lager | N | Ferdig |
 | Kreditnota | A | MVP |
 | Rabattkoder: prosent, beløp eller fri frakt, minstebeløp, periode og bruksgrense | N | Ferdig (automatiske kampanjer: MVP) |

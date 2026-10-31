@@ -2,9 +2,12 @@
 
 import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { z } from "zod";
 import { getDb } from "@/db";
 import { sites } from "@/db/schema";
+import { notifyOrderPlaced } from "@/lib/email/notify";
+import { getEmailProvider } from "@/lib/email/send";
 import { clientKey, hit, isLimited, rules } from "@/lib/rate-limit";
 import { getSecret } from "@/lib/secret";
 import { getPublishedPage } from "@/lib/publishing";
@@ -100,6 +103,8 @@ export async function placeOrder(siteId: string, input: CheckoutInput): Promise<
     const order = await createOrder(ctx.db, ctx.site.id, ctx.settings, input);
     // Testbetaling finnes bare utenfor produksjon og markerer ordren som betalt med en gang.
     if (order.paymentMethod === "test") await setOrderStatus(ctx.db, ctx.site.id, order.id, "paid", null);
+    // Ordrebekreftelsen sendes etter at kunden har fått svar, så kassen ikke venter på e-posten.
+    after(() => notifyOrderPlaced(ctx.db, getEmailProvider(), order.id).catch((err) => console.error("Ordrevarsel feilet", err)));
     return { ok: true, orderId: order.id, token: order.accessToken };
   } catch (err) {
     if (err instanceof ShopError) return { ok: false, message: err.message };

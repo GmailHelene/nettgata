@@ -15,6 +15,13 @@ export const paymentLabels: Record<PaymentMethod, string> = {
   test: "Testbetaling (bare i utvikling)",
 };
 
+/** Hva kunden må gjøre for å betale. Vises på ordresiden og i ordrebekreftelsen. */
+export const paymentInstructions: Partial<Record<PaymentMethod, string>> = {
+  "ved-henting": "Du betaler når du henter varene.",
+  faktura: "Du får faktura fra butikken.",
+  test: "Dette var en testbetaling. Ingen penger er trukket.",
+};
+
 const shippingOptionSchema = z.object({
   code: z.string().regex(/^[a-z0-9-]{1,30}$/, "Kode kan bare ha små bokstaver, tall og bindestrek"),
   name: z.string().trim().min(1, "Fraktvalget må ha et navn").max(60),

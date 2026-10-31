@@ -11,6 +11,9 @@ import { SiteNav } from "../site-nav";
 import { SettingsForm } from "./settings-form";
 import { ShopSettingsForm } from "./shop-settings-form";
 import { AppearanceForm } from "./appearance-form";
+import { NotificationsForm } from "./notifications-form";
+import { readNotificationSettings } from "@/lib/notifications";
+import { getEmailProvider } from "@/lib/email/send";
 import { readSiteLayout } from "@/lib/site-layout";
 
 export default async function SettingsPage({ params }: { params: Promise<{ siteId: string }> }) {
@@ -44,6 +47,13 @@ export default async function SettingsPage({ params }: { params: Promise<{ siteI
       </section>
       <SettingsForm siteId={site.id} name={site.name} info={readSiteInfo(site.info)} designs={designs} currentDesign={current} />
       <AppearanceForm siteId={site.id} initial={readSiteLayout(site.layout)} fonts={site.theme.fonts} radius={site.theme.radius} />
+      <NotificationsForm
+        siteId={site.id}
+        initial={readNotificationSettings(site.notifications)}
+        contactEmail={readSiteInfo(site.info).email}
+        shop={site.kind === "nettbutikk"}
+        emailEnabled={getEmailProvider().name !== "logg"}
+      />
       {site.kind === "nettbutikk" && (
         <ShopSettingsForm
           siteId={site.id}

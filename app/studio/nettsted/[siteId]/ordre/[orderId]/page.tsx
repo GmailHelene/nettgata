@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { orderLines, orders } from "@/db/schema";
+import { emailLog, orderLines, orders } from "@/db/schema";
 import { requireSiteAccess } from "@/lib/session";
 import { formatNok } from "@/lib/shop/money";
 import { paymentLabels, type PaymentMethod } from "@/lib/shop/settings";
@@ -12,6 +12,17 @@ import { orderStatusLabel } from "../order-status";
 import { OrderActions } from "./order-actions";
 import { StaffNoteForm, TrackingForm } from "./order-extras";
 
+const emailKindLabel: Record<string, string> = {
+  ordrebekreftelse: "Ordrebekreftelse",
+  "ny-ordre": "Varsel til deg om ny ordre",
+  sendt: "«Pakken er på vei»",
+};
+const emailStatusLabel: Record<string, string> = {
+  sendt: "Sendt",
+  feilet: "Feilet",
+  logget: "Ikke sendt, e-post er ikke slått på ennå",
+};
+
 export default async function OrderPage({ params }: { params: Promise<{ siteId: string; orderId: string }> }) {
   const { siteId, orderId } = await params;
   const { site } = await requireSiteAccess(siteId);
@@ -19,7 +30,10 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
   const db = await getDb();
   const [order] = await db.select().from(orders).where(and(eq(orders.id, orderId), eq(orders.siteId, site.id))).limit(1);
   if (!order) notFound();
-  const lines = await db.select().from(orderLines).where(eq(orderLines.orderId, order.id));
+  const [lines, emails] = await Promise.all([
+    db.select().from(orderLines).where(eq(orderLines.orderId, order.id)),
+    db.select().from(emailLog).where(eq(emailLog.orderId, order.id)).orderBy(asc(emailLog.createdAt)),
+  ]);
   const status = orderStatusLabel[order.status];
 
   return (
@@ -150,6 +164,31 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
             </p>
           )}
           <TrackingForm siteId={site.id} orderId={order.id} status={order.status} carrier={order.trackingCarrier} number={order.trackingNumber} />
+        </section>
+      )}
+
+      {emails.length > 0 && (
+        <section className="mt-6 rounded-lg border bg-white p-5">
+          <h2 className="mb-3 font-semibold">E-post</h2>
+          <ul className="space-y-2 text-sm">
+            {emails.map((e) => (
+              <li key={e.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="font-medium">{emailKindLabel[e.kind] ?? e.kind}</span>
+                <span className="text-neutral-600">
+                  til {e.recipient} · {formatOsloDateTime(e.createdAt)}
+                </span>
+                <span className={e.status === "sendt" ? "text-green-800" : e.status === "feilet" ? "text-red-800" : "text-amber-900"}>
+                  {emailStatusLabel[e.status] ?? e.status}
+                  {e.error && `: ${e.error}`}
+                </span>
+                {process.env.NODE_ENV !== "production" && (
+                  <a href={`/studio/epost/${e.id}`} target="_blank" rel="noreferrer" className="underline">
+                    Forhåndsvis
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

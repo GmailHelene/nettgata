@@ -1,0 +1,357 @@
+import type { ShippingAddress } from "@/db/schema";
+import { formatNok } from "@/lib/shop/money";
+import { paymentInstructions, paymentLabels, type PaymentMethod } from "@/lib/shop/settings";
+import { carrierLabel } from "@/lib/shop/tracking";
+import { formatOrgnr } from "@/lib/site-info";
+
+export type Rendered = { subject: string; html: string; text: string };
+
+export type ShopInfo = { name: string; email: string; phone: string; street: string; postalCode: string; city: string; orgnr: string };
+
+export type OrderData = {
+  number: number;
+  status: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string | null;
+  paymentMethod: string;
+  shippingName: string;
+  shippingAddress: ShippingAddress | null;
+  subtotalOre: number;
+  discountOre: number;
+  discountCode: string | null;
+  shippingOre: number;
+  totalOre: number;
+  vatOre: number;
+  note: string | null;
+  trackingCarrier: string | null;
+  trackingNumber: string | null;
+};
+
+export type LineData = { name: string; variantLabel: string | null; quantity: number; totalOre: number };
+
+const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+
+/** Alt som kommer fra kunden eller butikken, escapes, så ingen kan legge HTML eller lenker inn i e-posten. */
+function esc(value: string): string {
+  return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+}
+
+function safeUrl(url: string): string {
+  return /^https?:\/\//.test(url) ? esc(url) : "#";
+}
+
+const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
+
+function button(url: string, label: string): string {
+  return `<p style="margin:24px 0;"><a href="${safeUrl(url)}" style="display:inline-block;background:#111111;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:6px;font-weight:600;">${esc(label)}</a></p>`;
+}
+
+function paragraph(html: string, style = ""): string {
+  return `<p style="margin:0 0 14px;font-size:16px;line-height:1.5;${style}">${html}</p>`;
+}
+
+function layout(o: { subject: string; preheader: string; brand: string; heading: string; body: string; footer: string }): string {
+  return `<!doctype html>
+<html lang="nb">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(o.subject)}</title></head>
+<body style="margin:0;padding:0;background:#f4f4f2;">
+<span style="display:none;max-height:0;overflow:hidden;opacity:0;">${esc(o.preheader)}</span>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f2;"><tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:8px;">
+<tr><td style="padding:28px 28px 8px;font-family:${FONT};color:#111111;">
+<p style="margin:0 0 6px;font-size:14px;color:#555555;">${esc(o.brand)}</p>
+<h1 style="margin:0 0 18px;font-size:22px;line-height:1.3;">${esc(o.heading)}</h1>
+${o.body}
+</td></tr>
+<tr><td style="padding:16px 28px 28px;font-family:${FONT};font-size:13px;line-height:1.5;color:#555555;border-top:1px solid #eeeeee;">${o.footer}</td></tr>
+</table>
+</td></tr></table>
+</body>
+</html>`;
+}
+
+function shopFooter(shop: ShopInfo): string {
+  const address = [shop.street, [shop.postalCode, shop.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  return [
+    `<strong>${esc(shop.name)}</strong>`,
+    address && esc(address),
+    shop.orgnr && `Org.nr. ${esc(formatOrgnr(shop.orgnr))}`,
+    shop.email && `<a href="mailto:${esc(shop.email)}" style="color:#555555;">${esc(shop.email)}</a>`,
+    shop.phone && esc(shop.phone),
+  ]
+    .filter(Boolean)
+    .join("<br>");
+}
+
+const platformFooter = (reason: string) => `Sendt fra Nettgata. ${esc(reason)}`;
+
+function linesTable(lines: LineData[], order: OrderData, withVat: boolean): string {
+  const row = (left: string, right: string, style = "") =>
+    `<tr><td style="padding:8px 0;font-size:15px;${style}">${left}</td><td style="padding:8px 0;font-size:15px;text-align:right;white-space:nowrap;${style}">${right}</td></tr>`;
+  const items = lines
+    .map((l) =>
+      row(
+        `${l.quantity} × ${esc(l.name)}${l.variantLabel ? `<br><span style="font-size:13px;color:#555555;">${esc(l.variantLabel)}</span>` : ""}`,
+        esc(formatNok(l.totalOre)),
+        "border-bottom:1px solid #eeeeee;",
+      ),
+    )
+    .join("");
+  const totals = [
+    order.discountOre > 0 && row(`Rabatt${order.discountCode ? ` (${esc(order.discountCode)})` : ""}`, `−${esc(formatNok(order.discountOre))}`),
+    row(`Frakt, ${esc(order.shippingName)}`, order.shippingOre === 0 ? "Gratis" : esc(formatNok(order.shippingOre))),
+    row("<strong>Totalt</strong>", `<strong>${esc(formatNok(order.totalOre))}</strong>`),
+    withVat && row('<span style="color:#555555;">Herav MVA</span>', `<span style="color:#555555;">${esc(formatNok(order.vatOre))}</span>`),
+  ]
+    .filter(Boolean)
+    .join("");
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 18px;">${items}${totals}</table>`;
+}
+
+function linesText(lines: LineData[], order: OrderData): string {
+  return [
+    ...lines.map((l) => `${l.quantity} x ${l.name}${l.variantLabel ? ` (${l.variantLabel})` : ""}: ${formatNok(l.totalOre)}`),
+    order.discountOre > 0 ? `Rabatt${order.discountCode ? ` (${order.discountCode})` : ""}: -${formatNok(order.discountOre)}` : "",
+    `Frakt, ${order.shippingName}: ${order.shippingOre === 0 ? "Gratis" : formatNok(order.shippingOre)}`,
+    `Totalt: ${formatNok(order.totalOre)} (herav MVA ${formatNok(order.vatOre)})`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function addressHtml(a: ShippingAddress): string {
+  return `${esc(a.name)}<br>${esc(a.street)}<br>${esc(a.postalCode)} ${esc(a.city)}`;
+}
+
+/** «Du betaler når du henter varene.» der det finnes en instruks, ellers betalingsmåten. */
+function paymentLine(order: OrderData): string {
+  const instruction = paymentInstructions[order.paymentMethod as PaymentMethod];
+  if (instruction) return instruction;
+  const label = paymentLabels[order.paymentMethod as PaymentMethod] ?? order.paymentMethod;
+  return order.status === "paid" ? `Betalt med ${label}.` : `Betaling: ${label}.`;
+}
+
+/** Hvor varene hentes, når butikken har lagt inn adressen sin. */
+function pickupLine(shop: ShopInfo): string {
+  const place = [shop.street, [shop.postalCode, shop.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  return place ? `Du henter varene hos ${shop.name}, ${place}.` : "";
+}
+
+function contactLine(shop: ShopInfo): { html: string; text: string } {
+  if (shop.email) {
+    const t = `Har du spørsmål, svarer du bare på denne e-posten. Da kommer svaret rett til ${shop.name}.`;
+    return { html: paragraph(esc(t)), text: t };
+  }
+  if (shop.phone) {
+    const t = `Har du spørsmål, ring ${shop.name} på ${shop.phone}.`;
+    return { html: paragraph(esc(t)), text: t };
+  }
+  return { html: "", text: "" };
+}
+
+// ---------- Til kunden ----------
+
+export function orderConfirmationEmail(o: { shop: ShopInfo; order: OrderData; lines: LineData[]; orderUrl: string; termsUrl: string }): Rendered {
+  const { shop, order, lines } = o;
+  const subject = `Takk for bestillingen (ordre ${order.number})`;
+  const contact = contactLine(shop);
+  const payment = paymentLine(order);
+  const pickup = pickupLine(shop);
+
+  const body = [
+    paragraph(`${esc(shop.name)} har fått bestillingen din. Ordrenummeret er <strong>${order.number}</strong>.`),
+    paragraph(esc(payment)),
+    linesTable(lines, order, true),
+    order.shippingAddress ? paragraph(`<strong>Leveres til</strong><br>${addressHtml(order.shippingAddress)}`) : pickup ? paragraph(esc(pickup)) : "",
+    order.note ? paragraph(`<strong>Din melding til butikken</strong><br>${esc(order.note).replace(/\n/g, "<br>")}`) : "",
+    button(o.orderUrl, "Se bestillingen"),
+    paragraph("Lenken viser bestillingen din, så det er lurt å ta vare på denne e-posten.", "font-size:14px;color:#555555;"),
+    paragraph(`<a href="${safeUrl(o.termsUrl)}" style="color:#111111;">Les kjøpsvilkårene og angreretten</a>`, "font-size:14px;"),
+    contact.html,
+  ].join("");
+
+  const text = [
+    `Takk for bestillingen, ${firstName(order.customerName)}!`,
+    `${shop.name} har fått bestillingen din. Ordrenummeret er ${order.number}.`,
+    payment,
+    "",
+    linesText(lines, order),
+    "",
+    order.shippingAddress
+      ? `Leveres til: ${order.shippingAddress.name}, ${order.shippingAddress.street}, ${order.shippingAddress.postalCode} ${order.shippingAddress.city}`
+      : pickup,
+    order.note ? `Din melding til butikken: ${order.note}` : "",
+    "",
+    `Se bestillingen: ${o.orderUrl}`,
+    `Kjøpsvilkår og angrerett: ${o.termsUrl}`,
+    contact.text,
+  ]
+    .filter((line, i, all) => line !== "" || all[i - 1] !== "")
+    .join("\n");
+
+  return {
+    subject,
+    text,
+    html: layout({
+      subject,
+      preheader: `${shop.name} har fått bestillingen din.`,
+      brand: shop.name,
+      heading: `Takk for bestillingen, ${firstName(order.customerName)}!`,
+      body,
+      footer: shopFooter(shop),
+    }),
+  };
+}
+
+export function orderShippedEmail(o: { shop: ShopInfo; order: OrderData; orderUrl: string; trackingUrl: string | null }): Rendered {
+  const { shop, order } = o;
+  const subject = `Ordren din er sendt (ordre ${order.number})`;
+  const carrier = order.trackingNumber ? carrierLabel(order.trackingCarrier) : order.shippingName;
+  const contact = contactLine(shop);
+
+  const body = [
+    paragraph(`Hei ${esc(firstName(order.customerName))}. Ordre ${order.number} fra ${esc(shop.name)} er sendt med ${esc(carrier)}.`),
+    order.trackingNumber ? paragraph(`Sporingsnummer: <strong>${esc(order.trackingNumber)}</strong>`) : "",
+    o.trackingUrl ? button(o.trackingUrl, "Spor pakken") : "",
+    order.shippingAddress ? paragraph(`<strong>Leveres til</strong><br>${addressHtml(order.shippingAddress)}`) : "",
+    paragraph(`<a href="${safeUrl(o.orderUrl)}" style="color:#111111;">Se bestillingen</a>`),
+    contact.html,
+  ].join("");
+
+  const text = [
+    `Hei ${firstName(order.customerName)}. Ordre ${order.number} fra ${shop.name} er sendt med ${carrier}.`,
+    order.trackingNumber ? `Sporingsnummer: ${order.trackingNumber}` : "",
+    o.trackingUrl ? `Spor pakken: ${o.trackingUrl}` : "",
+    `Se bestillingen: ${o.orderUrl}`,
+    contact.text,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return {
+    subject,
+    text,
+    html: layout({ subject, preheader: `Pakken fra ${shop.name} er på vei.`, brand: shop.name, heading: "Pakken er på vei!", body, footer: shopFooter(shop) }),
+  };
+}
+
+// ---------- Til bedriften ----------
+
+export function newOrderEmail(o: { shop: ShopInfo; order: OrderData; lines: LineData[]; studioUrl: string; shippedNotice: boolean }): Rendered {
+  const { shop, order, lines } = o;
+  const total = formatNok(order.totalOre);
+  const subject = `Ny ordre ${order.number} fra ${order.customerName} (${total})`;
+  const payment = paymentLabels[order.paymentMethod as PaymentMethod] ?? order.paymentMethod;
+  const paid = order.status === "paid";
+  const count = lines.reduce((sum, l) => sum + l.quantity, 0);
+
+  const body = [
+    paragraph(`${esc(order.customerName)} har bestilt for ${esc(total)} i ${esc(shop.name)}. ${paid ? "Ordren er betalt." : `Venter på betaling (${esc(payment)}).`}`),
+    linesTable(lines, order, false),
+    paragraph(
+      [
+        `<strong>Kunde</strong>`,
+        esc(order.customerName),
+        `<a href="mailto:${esc(order.customerEmail)}" style="color:#111111;">${esc(order.customerEmail)}</a>`,
+        order.customerPhone ? esc(order.customerPhone) : "",
+      ]
+        .filter(Boolean)
+        .join("<br>"),
+    ),
+    order.shippingAddress
+      ? paragraph(`<strong>Sendes til</strong><br>${addressHtml(order.shippingAddress)}`)
+      : paragraph("Kunden henter varene selv."),
+    order.note ? paragraph(`<strong>Melding fra kunden</strong><br>${esc(order.note).replace(/\n/g, "<br>")}`) : "",
+    button(o.studioUrl, "Åpne ordren i studioet"),
+    o.shippedNotice && order.shippingAddress
+      ? paragraph("Når du markerer ordren som sendt, får kunden en e-post med sporingen.", "font-size:14px;color:#555555;")
+      : "",
+  ].join("");
+
+  const text = [
+    `${order.customerName} har bestilt for ${total} i ${shop.name}. ${paid ? "Ordren er betalt." : `Venter på betaling (${payment}).`}`,
+    "",
+    linesText(lines, order),
+    "",
+    `Kunde: ${order.customerName}, ${order.customerEmail}${order.customerPhone ? `, ${order.customerPhone}` : ""}`,
+    order.shippingAddress
+      ? `Sendes til: ${order.shippingAddress.name}, ${order.shippingAddress.street}, ${order.shippingAddress.postalCode} ${order.shippingAddress.city}`
+      : "Kunden henter varene selv.",
+    order.note ? `Melding fra kunden: ${order.note}` : "",
+    "",
+    `Åpne ordren: ${o.studioUrl}`,
+  ]
+    .filter((line, i, all) => line !== "" || all[i - 1] !== "")
+    .join("\n");
+
+  return {
+    subject,
+    text,
+    html: layout({
+      subject,
+      preheader: `${count} ${count === 1 ? "vare" : "varer"} for ${total}.`,
+      brand: shop.name,
+      heading: `Ny ordre ${order.number}`,
+      body,
+      footer: platformFooter("Du får dette fordi varsel om nye ordre er slått på under Innstillinger."),
+    }),
+  };
+}
+
+export function newInquiryEmail(o: {
+  shop: ShopInfo;
+  inquiry: { name: string; email: string | null; phone: string | null; message: string; pagePath: string | null };
+  siteUrl: string;
+  studioUrl: string;
+}): Rendered {
+  const { shop, inquiry } = o;
+  const subject = `Ny henvendelse fra ${inquiry.name}`;
+  const host = o.siteUrl.replace(/^https?:\/\//, "");
+  const reply = inquiry.email
+    ? `Svar på denne e-posten, så går svaret rett til ${inquiry.name}.`
+    : `${inquiry.name} oppga bare telefon, så ring tilbake på ${inquiry.phone}.`;
+
+  const body = [
+    paragraph(`${esc(inquiry.name)} har skrevet til deg via kontaktskjemaet på ${esc(host)}.`),
+    paragraph(
+      [
+        inquiry.email ? `E-post: <a href="mailto:${esc(inquiry.email)}" style="color:#111111;">${esc(inquiry.email)}</a>` : "",
+        inquiry.phone ? `Telefon: ${esc(inquiry.phone)}` : "",
+        inquiry.pagePath ? `Sendt fra siden: ${esc(inquiry.pagePath)}` : "",
+      ]
+        .filter(Boolean)
+        .join("<br>"),
+    ),
+    `<div style="margin:0 0 18px;padding:14px 16px;background:#f4f4f2;border-radius:6px;font-size:16px;line-height:1.5;">${esc(inquiry.message).replace(/\n/g, "<br>")}</div>`,
+    paragraph(esc(reply)),
+    button(o.studioUrl, "Se alle henvendelser"),
+  ].join("");
+
+  const text = [
+    `${inquiry.name} har skrevet til deg via kontaktskjemaet på ${host}.`,
+    inquiry.email ? `E-post: ${inquiry.email}` : "",
+    inquiry.phone ? `Telefon: ${inquiry.phone}` : "",
+    inquiry.pagePath ? `Sendt fra siden: ${inquiry.pagePath}` : "",
+    "",
+    inquiry.message,
+    "",
+    reply,
+    `Alle henvendelser: ${o.studioUrl}`,
+  ]
+    .filter((line, i, all) => line !== "" || all[i - 1] !== "")
+    .join("\n");
+
+  return {
+    subject,
+    text,
+    html: layout({
+      subject,
+      preheader: inquiry.message.slice(0, 90),
+      brand: shop.name,
+      heading: subject,
+      body,
+      footer: platformFooter("Du får dette fordi varsel om nye henvendelser er slått på under Innstillinger."),
+    }),
+  };
+}

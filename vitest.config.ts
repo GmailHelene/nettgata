@@ -7,6 +7,8 @@ export default defineConfig({
     environment: "node",
     include: ["tests/**/*.test.ts"],
     testTimeout: 30000,
+    // Hver test lager en ny database i minnet (PGlite). Når maskinen er travel, tar det mer enn standard 10 sekunder.
+    hookTimeout: 30000,
     env: {
       SESSION_SECRET: "test-hemmelighet-som-er-minst-32-tegn-lang",
       PLATFORM_HOSTS: "localhost:3000,app.helene.cloud",

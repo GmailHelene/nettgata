@@ -6,7 +6,7 @@ import { Container, Heading } from "@/components/sections";
 import type { CatalogProduct } from "@/lib/shop/catalog";
 import { formatNok } from "@/lib/shop/money";
 import { carrierLabel, trackingUrl } from "@/lib/shop/tracking";
-import { paymentLabels, type PaymentMethod, type ShopSettings } from "@/lib/shop/settings";
+import { paymentInstructions, paymentLabels, type PaymentMethod, type ShopSettings } from "@/lib/shop/settings";
 import { AddToCart } from "./add-to-cart";
 import { Checkout } from "./checkout";
 import { Gallery } from "./gallery";
@@ -217,12 +217,6 @@ const statusText: Record<string, string> = {
   refunded: "Refundert",
 };
 
-const paymentInstruction: Record<string, string> = {
-  "ved-henting": "Du betaler når du henter varene.",
-  faktura: "Du får faktura fra butikken.",
-  test: "Dette var en testbetaling. Ingen penger er trukket.",
-};
-
 /** Kvitteringssiden. Krever den hemmelige nøkkelen fra lenken, så ingen kan se andres ordre. */
 export async function OrderPage({ db, siteId, orderId, token, basePath }: { db: Db; siteId: string; orderId: string; token: string; basePath: string }) {
   if (!/^[0-9a-f-]{36}$/.test(orderId) || !/^[0-9a-f]{48}$/.test(token)) return null;
@@ -238,7 +232,7 @@ export async function OrderPage({ db, siteId, orderId, token, basePath }: { db: 
           Ordrenummer <strong>{order.number}</strong> · {statusText[order.status]}
         </p>
         <p className="mt-2 text-[var(--c-muted)]">
-          {paymentLabels[order.paymentMethod as PaymentMethod] ?? order.paymentMethod}. {paymentInstruction[order.paymentMethod] ?? ""} Ta vare på
+          {paymentLabels[order.paymentMethod as PaymentMethod] ?? order.paymentMethod}. {paymentInstructions[order.paymentMethod as PaymentMethod] ?? ""} Ta vare på
           denne siden, lenken viser bestillingen din.
         </p>
 

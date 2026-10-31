@@ -2,9 +2,12 @@
 
 import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { z } from "zod";
 import { getDb } from "@/db";
 import { auditLog, inquiries, sites } from "@/db/schema";
+import { notifyInquiry } from "@/lib/email/notify";
+import { getEmailProvider } from "@/lib/email/send";
 import { clientKey, hit, rules } from "@/lib/rate-limit";
 import { getSecret } from "@/lib/secret";
 
@@ -56,7 +59,7 @@ export async function submitInquiry(siteId: string, _prev: InquiryState, formDat
     .values({ siteId: site.id, name, email: email || null, phone: phone || null, message, pagePath: path })
     .returning({ id: inquiries.id });
   await db.insert(auditLog).values({ siteId: site.id, action: "inquiry.received", detail: { inquiryId: row.id } });
-  // Varsel på e-post til bedriften kommer når Brevo er koblet til (fase 1b).
+  after(() => notifyInquiry(db, getEmailProvider(), row.id).catch((err) => console.error("Henvendelsesvarsel feilet", err)));
 
   return { ok: true, message: "Takk! Meldingen er sendt, og du får svar så snart som mulig." };
 }

@@ -57,6 +57,13 @@
       "when": 1793452739400,
       "tag": "0007_domener",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793461881485,
+      "tag": "0008_varsler",
+      "breakpoints": true
     }
   ]
 }
