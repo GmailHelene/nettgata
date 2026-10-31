@@ -29,15 +29,23 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
   const [shippingCode, setShippingCode] = useState<string>("");
   const [payment, setPayment] = useState<PaymentMethod | "">("");
   const [error, setError] = useState<string | null>(null);
+  const [codeInput, setCodeInput] = useState("");
+  const [appliedCode, setAppliedCode] = useState("");
+  const [codeError, setCodeError] = useState<string | null>(null);
   const [submitting, startSubmit] = useTransition();
 
   useEffect(() => {
     let cancelled = false;
-    getCheckoutData(siteId, items, shippingCode || undefined).then((result) => {
+    getCheckoutData(siteId, items, shippingCode || undefined, appliedCode || undefined).then((result) => {
       if (cancelled) return;
       setData(result);
       setLoading(false);
       if (!result) return;
+      // En kode som ikke (lenger) gjelder, for eksempel fordi kurven ble mindre, tas bort med en forklaring.
+      if (result.discountError) {
+        setCodeError(result.discountError);
+        setAppliedCode("");
+      }
       setShippingCode((current) => current || result.shippingOptions[0]?.code || "");
       setPayment((current) => current || result.paymentMethods[0]?.code || "");
       // Varer som ikke lenger finnes, eller antall over det som er på lager, rettes i kurven.
@@ -50,7 +58,7 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
     return () => {
       cancelled = true;
     };
-  }, [siteId, items, shippingCode]);
+  }, [siteId, items, shippingCode, appliedCode]);
 
   const setQuantity = (variantId: string, quantity: number) =>
     writeCart(siteId, quantity <= 0 ? items.filter((i) => i.variantId !== variantId) : items.map((i) => (i.variantId === variantId ? { ...i, quantity } : i)));
@@ -70,6 +78,11 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
 
   const shipping = data.shippingOptions.find((o) => o.code === shippingCode);
 
+  const applyCode = () => {
+    setCodeError(null);
+    setAppliedCode(codeInput.trim());
+  };
+
   const submit = (form: FormData) =>
     startSubmit(async () => {
       setError(null);
@@ -85,6 +98,7 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
         // Typen krever true; serveren avviser bestillingen hvis vilkårene ikke er godtatt.
         acceptedTerms: (form.get("terms") === "on") as true,
         note: text("note"),
+        discountCode: data.discount?.code ?? "",
       });
       if (!result.ok) {
         setError(result.message);
@@ -216,11 +230,63 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
             </li>
           ))}
         </ul>
+        <div className="border-t border-[var(--c-muted)]/30 pt-4">
+          {data.discount ? (
+            <p className="flex items-start justify-between gap-3 text-sm">
+              <span>
+                <strong>{data.discount.code}</strong>
+                <span className="block text-[var(--c-muted)]">{data.discount.label}</span>
+              </span>
+              <button type="button" onClick={() => setAppliedCode("")} className="underline">
+                Fjern
+              </button>
+            </p>
+          ) : (
+            <div>
+              <label htmlFor="rabattkode" className="mb-1 block text-sm font-medium">
+                Rabattkode
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="rabattkode"
+                  value={codeInput}
+                  autoComplete="off"
+                  onChange={(e) => setCodeInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return;
+                    e.preventDefault();
+                    applyCode();
+                  }}
+                  className={`${input} uppercase`}
+                />
+                <button
+                  type="button"
+                  onClick={applyCode}
+                  disabled={!codeInput.trim()}
+                  className="rounded-[var(--radius)] border border-[var(--c-text)] px-4 font-semibold disabled:opacity-40"
+                >
+                  Bruk
+                </button>
+              </div>
+              {codeError && (
+                <p role="alert" className="mt-2 text-sm font-medium">
+                  {codeError}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
         <dl className="space-y-1 border-t border-[var(--c-muted)]/30 pt-4">
           <div className="flex justify-between">
             <dt>Varer</dt>
             <dd>{formatNok(data.subtotalOre)}</dd>
           </div>
+          {data.discount && data.discount.amountOre > 0 && (
+            <div className="flex justify-between">
+              <dt>Rabatt</dt>
+              <dd>−{formatNok(data.discount.amountOre)}</dd>
+            </div>
+          )}
           <div className="flex justify-between">
             <dt>Frakt</dt>
             <dd>{data.shippingOre === 0 ? "Gratis" : formatNok(data.shippingOre)}</dd>

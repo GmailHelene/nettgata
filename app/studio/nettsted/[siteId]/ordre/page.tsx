@@ -1,39 +1,134 @@
 import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { orders } from "@/db/schema";
+import { formatOsloDateTime } from "@/lib/oslo-time";
 import { requireSiteAccess } from "@/lib/session";
+import { listOrders, orderFilters, ORDERS_PER_PAGE, parseOrderQuery, type OrderFilter } from "@/lib/shop/admin";
 import { formatNok } from "@/lib/shop/money";
+import { orderCounts } from "@/lib/shop/reports";
 import { SiteNav } from "../site-nav";
 import { orderStatusLabel } from "./order-status";
 
-export default async function OrdersPage({ params }: { params: Promise<{ siteId: string }> }) {
+export default async function OrdersPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ siteId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { siteId } = await params;
   const { site } = await requireSiteAccess(siteId);
+  const query = parseOrderQuery(await searchParams);
   const db = await getDb();
-  const rows = await db.select().from(orders).where(eq(orders.siteId, site.id)).orderBy(desc(orders.createdAt)).limit(200);
+  const [found, counts] = await Promise.all([listOrders(db, site.id, query), orderCounts(db, site.id)]);
+  const rows = found.slice(0, ORDERS_PER_PAGE);
+  const hasNext = found.length > ORDERS_PER_PAGE;
+  const base = `/studio/nettsted/${site.id}/ordre`;
+
+  const countFor = (key: OrderFilter) => {
+    const statuses = orderFilters[key].statuses;
+    return statuses ? statuses.reduce((sum, s) => sum + (counts[s] ?? 0), 0) : Object.values(counts).reduce((a, b) => a + b, 0);
+  };
+  const href = (changes: Record<string, string | number>) => {
+    const next = new URLSearchParams();
+    const merged = { status: query.filter, q: query.search, side: query.page, ...changes };
+    if (merged.status !== "alle") next.set("status", String(merged.status));
+    if (merged.q) next.set("q", String(merged.q));
+    if (Number(merged.side) > 1) next.set("side", String(merged.side));
+    const qs = next.toString();
+    return qs ? `${base}?${qs}` : base;
+  };
+  const exportHref = href({ side: 1 }).replace(base, `${base}/eksport`);
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-12">
       <SiteNav siteId={site.id} name={site.name} shop active="ordre" />
+
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <form action={base} className="flex flex-1 gap-2" role="search">
+          {query.filter !== "alle" && <input type="hidden" name="status" value={query.filter} />}
+          <label htmlFor="ordre-sok" className="sr-only">
+            Søk i ordre
+          </label>
+          <input
+            id="ordre-sok"
+            name="q"
+            type="search"
+            defaultValue={query.search}
+            placeholder="Ordrenummer, navn, e-post eller sporingsnummer"
+            className="min-w-0 flex-1 rounded-md border border-neutral-400 px-3 py-2"
+          />
+          <button className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">Søk</button>
+        </form>
+        {(counts.paid ?? 0) > 0 && (
+          <Link href={`${base}/plukkliste`} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+            Plukkliste ({counts.paid})
+          </Link>
+        )}
+        <a href={exportHref} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+          Last ned CSV
+        </a>
+      </div>
+
+      <nav aria-label="Filtrer ordre" className="-mx-5 mb-4 overflow-x-auto px-5">
+        <ul className="flex min-w-max gap-2">
+          {(Object.keys(orderFilters) as OrderFilter[]).map((key) => (
+            <li key={key}>
+              <Link
+                href={href({ status: key, side: 1 })}
+                aria-current={key === query.filter ? "page" : undefined}
+                className="block rounded-full border px-3 py-1 text-sm aria-[current=page]:border-neutral-900 aria-[current=page]:bg-neutral-900 aria-[current=page]:text-white"
+              >
+                {orderFilters[key].label} <span className="tabular-nums opacity-80">({countFor(key)})</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
       {rows.length === 0 ? (
-        <p className="rounded-lg border bg-white p-6 text-neutral-700">Ingen ordre ennå.</p>
+        <p className="rounded-lg border bg-white p-6 text-neutral-700">
+          {query.search ? `Ingen ordre passer «${query.search}».` : countFor("alle") === 0 ? "Ingen ordre ennå." : "Ingen ordre med denne statusen."}
+        </p>
       ) : (
         <ul className="divide-y rounded-lg border bg-white">
           {rows.map((o) => (
             <li key={o.id}>
-              <Link href={`/studio/nettsted/${site.id}/ordre/${o.id}`} className="flex flex-wrap items-center gap-4 p-4 hover:bg-neutral-50">
+              <Link href={`${base}/${o.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 p-4 hover:bg-neutral-50">
                 <span className="w-16 font-semibold">#{o.number}</span>
-                <span className="mr-auto">
+                <span className="mr-auto min-w-40">
                   <span className="block">{o.customerName}</span>
-                  <span className="text-sm text-neutral-600">{o.createdAt.toLocaleString("nb-NO", { timeZone: "Europe/Oslo" })}</span>
+                  <span className="text-sm text-neutral-600">
+                    {formatOsloDateTime(o.createdAt)} · {o.shipping.name}
+                    {o.discountCode && ` · ${o.discountCode}`}
+                    {o.trackingNumber && " · sporing lagt inn"}
+                  </span>
                 </span>
-                <span className="font-medium">{formatNok(o.totalOre)}</span>
+                <span className="font-medium tabular-nums">{formatNok(o.totalOre)}</span>
                 <span className={`rounded-full px-3 py-1 text-sm ${orderStatusLabel[o.status].className}`}>{orderStatusLabel[o.status].text}</span>
               </Link>
             </li>
           ))}
         </ul>
+      )}
+
+      {(query.page > 1 || hasNext) && (
+        <nav aria-label="Sider" className="mt-4 flex items-center justify-between text-sm">
+          {query.page > 1 ? (
+            <Link href={href({ side: query.page - 1 })} className="underline">
+              Forrige side
+            </Link>
+          ) : (
+            <span />
+          )}
+          <span className="text-neutral-600">Side {query.page}</span>
+          {hasNext ? (
+            <Link href={href({ side: query.page + 1 })} className="underline">
+              Neste side
+            </Link>
+          ) : (
+            <span />
+          )}
+        </nav>
       )}
     </main>
   );

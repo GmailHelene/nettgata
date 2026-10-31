@@ -1,4 +1,4 @@
-import { and, count, desc, eq, isNull } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { inquiries } from "@/db/schema";
 import { requireSiteAccess } from "@/lib/session";
@@ -9,14 +9,11 @@ export default async function InquiriesPage({ params }: { params: Promise<{ site
   const { siteId } = await params;
   const { site } = await requireSiteAccess(siteId);
   const db = await getDb();
-  const [rows, [{ unread }]] = await Promise.all([
-    db.select().from(inquiries).where(eq(inquiries.siteId, site.id)).orderBy(desc(inquiries.createdAt)).limit(100),
-    db.select({ unread: count() }).from(inquiries).where(and(eq(inquiries.siteId, site.id), isNull(inquiries.readAt))),
-  ]);
+  const rows = await db.select().from(inquiries).where(eq(inquiries.siteId, site.id)).orderBy(desc(inquiries.createdAt)).limit(100);
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-12">
-      <SiteNav siteId={site.id} name={site.name} shop={site.kind === "nettbutikk"} active="henvendelser" unread={unread} />
+      <SiteNav siteId={site.id} name={site.name} shop={site.kind === "nettbutikk"} active="henvendelser" />
       {rows.length === 0 ? (
         <p className="text-neutral-700">Ingen henvendelser ennå. Meldinger fra kontaktskjemaet havner her.</p>
       ) : (

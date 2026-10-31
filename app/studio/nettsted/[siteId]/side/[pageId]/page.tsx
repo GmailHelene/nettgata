@@ -24,7 +24,7 @@ export default async function EditPage({ params }: { params: Promise<{ siteId: s
 
   return (
     <main className="mx-auto max-w-[1600px] px-5 py-12">
-      <Link href={`/studio/nettsted/${site.id}`} className="text-sm underline">
+      <Link href={`/studio/nettsted/${site.id}/sider`} className="text-sm underline">
         {site.name}
       </Link>
       <PageEditor

@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, ne } from "drizzle-orm";
+import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Db } from "@/db";
 import { auditLog, productCategories, productVariants, products, variantPriceHistory } from "@/db/schema";
@@ -246,4 +246,79 @@ export async function listCatalog(db: Db, siteId: string, opts: { categoryId?: s
       };
     })
     .filter((p): p is CatalogProduct => p !== null);
+}
+
+export const variantChangeSchema = z.object({
+  variantId: z.string().uuid(),
+  priceOre: z.number().int().min(0, "Prisen kan ikke være negativ").max(100_000_000).optional(),
+  stock: z.number().int().min(0, "Lager kan ikke være negativt").max(10_000_000).nullable().optional(),
+  /** Lageret slik det var da siden ble åpnet. Har noen kjøpt i mellomtiden, avvises lagerendringen. */
+  expectedStock: z.number().int().nullable().optional(),
+});
+export type VariantChange = z.input<typeof variantChangeSchema>;
+
+/**
+ * Lagrer mange pris- og lagerendringer på én gang. Lager settes bare hvis det fortsatt er det
+ * samme som da siden ble åpnet, ellers ville et salg i mellomtiden blitt skrevet over.
+ */
+export async function updateVariants(db: Db, siteId: string, changes: VariantChange[], userId: string) {
+  const parsed = z.array(variantChangeSchema).max(1000).safeParse(changes);
+  if (!parsed.success) throw new ShopError(parsed.error.issues[0].message);
+  if (parsed.data.length === 0) return { updated: 0, conflicts: [] as string[] };
+
+  const rows = await db
+    .select({ variant: productVariants, name: products.name })
+    .from(productVariants)
+    .innerJoin(products, eq(productVariants.productId, products.id))
+    .where(and(inArray(productVariants.id, parsed.data.map((c) => c.variantId)), eq(products.siteId, siteId)));
+  const byId = new Map(rows.map((r) => [r.variant.id, r]));
+
+  let updated = 0;
+  const conflicts: string[] = [];
+  for (const change of parsed.data) {
+    const row = byId.get(change.variantId);
+    if (!row) throw new ShopError("Fant ikke varianten");
+    const label = row.variant.optionValues.length ? `${row.name} (${row.variant.optionValues.join(" / ")})` : row.name;
+    let changed = false;
+    if (change.stock !== undefined) {
+      const guard =
+        change.expectedStock === undefined ? sql`true` : sql`${productVariants.stock} is not distinct from ${change.expectedStock}`;
+      const res = await db
+        .update(productVariants)
+        .set({ stock: change.stock })
+        .where(and(eq(productVariants.id, change.variantId), guard))
+        .returning({ id: productVariants.id });
+      if (res.length === 0) conflicts.push(label);
+      else changed = true;
+    }
+    if (change.priceOre !== undefined && change.priceOre !== row.variant.priceOre) {
+      await db.update(productVariants).set({ priceOre: change.priceOre }).where(eq(productVariants.id, change.variantId));
+      await db.insert(variantPriceHistory).values({ variantId: change.variantId, priceOre: change.priceOre });
+      changed = true;
+    }
+    if (changed) updated++;
+  }
+  await db.insert(auditLog).values({ siteId, userId, action: "product.bulk_variants", detail: { updated, conflicts: conflicts.length } });
+  return { updated, conflicts };
+}
+
+export const bulkProductChangeSchema = z.union([
+  z.object({ status: z.enum(["draft", "active", "archived"]) }),
+  z.object({ categoryId: z.string().uuid().nullable() }),
+]);
+export type BulkProductChange = z.infer<typeof bulkProductChangeSchema>;
+
+export async function bulkUpdateProducts(db: Db, siteId: string, ids: string[], change: BulkProductChange, userId: string) {
+  const parsedIds = z.array(z.string().uuid()).min(1, "Velg minst én vare").max(1000).safeParse(ids);
+  if (!parsedIds.success) throw new ShopError(parsedIds.error.issues[0].message);
+  const parsed = bulkProductChangeSchema.safeParse(change);
+  if (!parsed.success) throw new ShopError("Ugyldig endring");
+  if ("categoryId" in parsed.data) await assertCategory(db, siteId, parsed.data.categoryId);
+  const updated = await db
+    .update(products)
+    .set({ ...parsed.data, updatedAt: new Date() })
+    .where(and(eq(products.siteId, siteId), inArray(products.id, parsedIds.data)))
+    .returning({ id: products.id });
+  if (updated.length) await db.insert(auditLog).values({ siteId, userId, action: "product.bulk", detail: { count: updated.length, ...parsed.data } });
+  return updated.length;
 }

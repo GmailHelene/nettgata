@@ -6,8 +6,11 @@ import { orderLines, orders } from "@/db/schema";
 import { requireSiteAccess } from "@/lib/session";
 import { formatNok } from "@/lib/shop/money";
 import { paymentLabels, type PaymentMethod } from "@/lib/shop/settings";
+import { carrierLabel, trackingUrl } from "@/lib/shop/tracking";
+import { formatOsloDateTime } from "@/lib/oslo-time";
 import { orderStatusLabel } from "../order-status";
 import { OrderActions } from "./order-actions";
+import { StaffNoteForm, TrackingForm } from "./order-extras";
 
 export default async function OrderPage({ params }: { params: Promise<{ siteId: string; orderId: string }> }) {
   const { siteId, orderId } = await params;
@@ -27,6 +30,14 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
       <div className="mb-8 mt-4 flex flex-wrap items-center gap-4">
         <h1 className="text-2xl font-bold">Ordre #{order.number}</h1>
         <span className={`rounded-full px-3 py-1 text-sm ${status.className}`}>{status.text}</span>
+        <a
+          href={`/studio/nettsted/${site.id}/ordre/${order.id}/pakkseddel`}
+          target="_blank"
+          rel="noreferrer"
+          className="ml-auto rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold"
+        >
+          Pakkseddel
+        </a>
       </div>
 
       <OrderActions siteId={site.id} orderId={order.id} status={order.status} />
@@ -48,6 +59,18 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
           </tbody>
         </table>
         <dl className="mt-3 space-y-1 border-t pt-3 text-sm">
+          {order.discountOre > 0 && (
+            <div className="flex justify-between">
+              <dt>Rabatt ({order.discountCode})</dt>
+              <dd>−{formatNok(order.discountOre)}</dd>
+            </div>
+          )}
+          {order.discountCode && order.discountOre === 0 && (
+            <div className="flex justify-between">
+              <dt>Rabattkode</dt>
+              <dd>{order.discountCode} (fri frakt)</dd>
+            </div>
+          )}
           <div className="flex justify-between">
             <dt>Levering: {order.shipping.name}</dt>
             <dd>{formatNok(order.shippingOre)}</dd>
@@ -101,10 +124,38 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
         )}
       </section>
 
+      {/* Sporing gir bare mening når pakken sendes. «Hent selv» har ingen adresse. */}
+      {order.shippingAddress && order.status !== "cancelled" && order.status !== "pending_payment" && (
+        <section className="mt-6 rounded-lg border bg-white p-5">
+          <h2 className="mb-3 font-semibold">Sporing</h2>
+          {order.trackingNumber && (
+            <p className="mb-3 text-sm">
+              {carrierLabel(order.trackingCarrier)}: {order.trackingNumber}
+              {trackingUrl(order.trackingCarrier, order.trackingNumber) && (
+                <>
+                  {" "}
+                  <a href={trackingUrl(order.trackingCarrier, order.trackingNumber)!} target="_blank" rel="noreferrer" className="underline">
+                    Åpne sporing
+                  </a>
+                </>
+              )}
+            </p>
+          )}
+          <TrackingForm siteId={site.id} orderId={order.id} status={order.status} carrier={order.trackingCarrier} number={order.trackingNumber} />
+        </section>
+      )}
+
+      <section className="mt-6 rounded-lg border bg-white p-5">
+        <h2 className="mb-1 font-semibold">Internt notat</h2>
+        <p className="mb-3 text-sm text-neutral-600">Bare for deg og de som jobber i butikken. Kunden ser det aldri.</p>
+        <StaffNoteForm siteId={site.id} orderId={order.id} note={order.staffNote} />
+      </section>
+
       <p className="mt-6 text-sm text-neutral-600">
-        Bestilt {order.createdAt.toLocaleString("nb-NO", { timeZone: "Europe/Oslo" })}
-        {order.paidAt && ` · betalt ${order.paidAt.toLocaleString("nb-NO", { timeZone: "Europe/Oslo" })}`}
-        {order.fulfilledAt && ` · sendt ${order.fulfilledAt.toLocaleString("nb-NO", { timeZone: "Europe/Oslo" })}`}
+        Bestilt {formatOsloDateTime(order.createdAt)}
+        {order.paidAt && ` · betalt ${formatOsloDateTime(order.paidAt)}`}
+        {order.fulfilledAt && ` · sendt ${formatOsloDateTime(order.fulfilledAt)}`}
+        {order.cancelledAt && ` · kansellert ${formatOsloDateTime(order.cancelledAt)}`}
       </p>
     </main>
   );

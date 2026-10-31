@@ -5,6 +5,7 @@ import { orderLines, orders, products, sites } from "@/db/schema";
 import { Container, Heading } from "@/components/sections";
 import type { CatalogProduct } from "@/lib/shop/catalog";
 import { formatNok } from "@/lib/shop/money";
+import { carrierLabel, trackingUrl } from "@/lib/shop/tracking";
 import { paymentLabels, type PaymentMethod, type ShopSettings } from "@/lib/shop/settings";
 import { AddToCart } from "./add-to-cart";
 import { Checkout } from "./checkout";
@@ -254,6 +255,12 @@ export async function OrderPage({ db, siteId, orderId, token, basePath }: { db: 
             ))}
           </ul>
           <dl className="mt-4 space-y-1 border-t border-[var(--c-muted)]/30 pt-4">
+            {order.discountOre > 0 && (
+              <div className="flex justify-between">
+                <dt>Rabatt ({order.discountCode})</dt>
+                <dd>−{formatNok(order.discountOre)}</dd>
+              </div>
+            )}
             <div className="flex justify-between">
               <dt>Levering: {order.shipping.name}</dt>
               <dd>{order.shippingOre === 0 ? "Gratis" : formatNok(order.shippingOre)}</dd>
@@ -268,6 +275,23 @@ export async function OrderPage({ db, siteId, orderId, token, basePath }: { db: 
             </div>
           </dl>
         </div>
+
+        {order.trackingNumber && (
+          <div className="mt-6">
+            <h2 className="mb-2 font-semibold">Sporing</h2>
+            <p>
+              {carrierLabel(order.trackingCarrier)}: {order.trackingNumber}
+              {trackingUrl(order.trackingCarrier, order.trackingNumber) && (
+                <>
+                  {" "}
+                  <a href={trackingUrl(order.trackingCarrier, order.trackingNumber)!} target="_blank" rel="noreferrer" className="font-semibold underline">
+                    Spor pakken
+                  </a>
+                </>
+              )}
+            </p>
+          </div>
+        )}
 
         {order.shippingAddress && (
           <div className="mt-6">

@@ -9,6 +9,8 @@ export const rules = {
   loginPerIp: { limit: 20, windowSeconds: 15 * 60 },
   inquiryPerIp: { limit: 5, windowSeconds: 10 * 60 },
   inquiryPerSite: { limit: 50, windowSeconds: 60 * 60 },
+  /** Bare koder som ikke finnes teller, så en kunde som skriver feil et par ganger ikke stenges ute. */
+  discountFailuresPerIp: { limit: 10, windowSeconds: 10 * 60 },
 } satisfies Record<string, RateLimitRule>;
 
 /**
@@ -25,6 +27,16 @@ export async function hit(db: Db, key: string, rule: RateLimitRule, now = new Da
   if (n >= rule.limit) return false;
   await db.insert(rateLimitEvents).values({ key, createdAt: now });
   return true;
+}
+
+/** Svarer om grensen er nådd, uten å registrere et nytt forsøk. */
+export async function isLimited(db: Db, key: string, rule: RateLimitRule, now = new Date()): Promise<boolean> {
+  const since = new Date(now.getTime() - rule.windowSeconds * 1000);
+  const [{ n }] = await db
+    .select({ n: count() })
+    .from(rateLimitEvents)
+    .where(and(eq(rateLimitEvents.key, key), gte(rateLimitEvents.createdAt, since)));
+  return n >= rule.limit;
 }
 
 /** Nullstiller en nøkkel, f.eks. etter vellykket innlogging. */

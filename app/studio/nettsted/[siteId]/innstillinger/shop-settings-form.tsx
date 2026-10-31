@@ -41,6 +41,7 @@ export function ShopSettingsForm({ siteId, initial, pages }: { siteId: string; i
   const [freeOver, setFreeOver] = useState(initial.freeShippingOverOre === null ? "" : kr(initial.freeShippingOverOre));
   const [methods, setMethods] = useState<PaymentMethod[]>(initial.paymentMethods);
   const [termsPath, setTermsPath] = useState(initial.termsPath);
+  const [lowStockAt, setLowStockAt] = useState(String(initial.lowStockAt));
   const [state, setState] = useState<ActionState>(null);
   const [pending, startTransition] = useTransition();
   const termsPage = pages.find((p) => p.path === termsPath);
@@ -55,7 +56,9 @@ export function ShopSettingsForm({ siteId, initial, pages }: { siteId: string; i
       }
       const freeShippingOverOre = freeOver.trim() === "" ? null : parseNok(freeOver);
       if (freeOver.trim() !== "" && freeShippingOverOre === null) return setState({ ok: false, message: "Ugyldig beløp for gratis frakt" });
-      setState(await saveShopSettingsAction(siteId, { shippingOptions: options, freeShippingOverOre, paymentMethods: methods, termsPath }));
+      const lowStock = Number(lowStockAt);
+      if (!/^\d+$/.test(lowStockAt.trim()) || lowStock > 10_000) return setState({ ok: false, message: "Grensen for lite på lager må være et helt tall" });
+      setState(await saveShopSettingsAction(siteId, { shippingOptions: options, freeShippingOverOre, paymentMethods: methods, termsPath, lowStockAt: lowStock }));
     });
 
   return (
@@ -95,6 +98,12 @@ export function ShopSettingsForm({ siteId, initial, pages }: { siteId: string; i
       <label className="block max-w-xs">
         <span className="mb-1 block text-sm font-medium">Gratis frakt ved kjøp over (kr)</span>
         <input value={freeOver} inputMode="decimal" placeholder="Ingen grense" onChange={(e) => setFreeOver(e.target.value)} className={inputClass} />
+      </label>
+
+      <label className="block max-w-xs">
+        <span className="mb-1 block text-sm font-medium">Lite på lager når det er igjen (stk.)</span>
+        <input value={lowStockAt} inputMode="numeric" onChange={(e) => setLowStockAt(e.target.value)} className={inputClass} />
+        <span className="mt-1 block text-xs text-neutral-600">Varer med så få eller færre vises i oversikten, så du rekker å bestille nye.</span>
       </label>
 
       <fieldset>

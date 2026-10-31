@@ -3,8 +3,10 @@ import { z } from "zod";
 import type { Db } from "@/db";
 import { auditLog, orderLines, orders, productVariants, products, type ShippingAddress } from "@/db/schema";
 import { ShopError } from "./catalog";
+import { allocateDiscount, assertUsable, claimDiscount, discountAmount, findDiscount, releaseDiscount, type Discount } from "./discounts";
 import { vatOf } from "./money";
 import { availablePaymentMethods, paymentMethods, type ShopSettings } from "./settings";
+import { trackingSchema } from "./tracking";
 
 export const MAX_QUANTITY = 99;
 
@@ -28,6 +30,7 @@ export const checkoutSchema = z.object({
   paymentMethod: z.enum(paymentMethods),
   acceptedTerms: z.literal(true, { error: "Du må godta kjøpsvilkårene" }),
   note: z.string().trim().max(1000).default(""),
+  discountCode: z.string().trim().max(40).default(""),
 });
 export type CheckoutInput = z.input<typeof checkoutSchema>;
 
@@ -81,10 +84,11 @@ export async function priceLines(db: Db, siteId: string, lines: { variantId: str
   });
 }
 
-export function shippingFor(settings: ShopSettings, code: string, subtotalOre: number) {
+/** Grensen for gratis frakt gjelder varebeløpet etter rabatt, som hos Shopify. */
+export function shippingFor(settings: ShopSettings, code: string, goodsOre: number, freeShipping = false) {
   const option = settings.shippingOptions.find((o) => o.code === code);
   if (!option) return null;
-  const free = settings.freeShippingOverOre !== null && subtotalOre >= settings.freeShippingOverOre;
+  const free = freeShipping || (settings.freeShippingOverOre !== null && goodsOre >= settings.freeShippingOverOre);
   return { ...option, priceOre: free ? 0 : option.priceOre };
 }
 
@@ -95,6 +99,25 @@ export function totalVat(lines: Pick<PricedLine, "totalOre" | "vatRate">[], ship
   if (shippingOre === 0 || subtotal === 0) return goodsVat;
   const shippingVat = lines.reduce((sum, l) => sum + vatOf(Math.round((shippingOre * l.totalOre) / subtotal), l.vatRate), 0);
   return goodsVat + shippingVat;
+}
+
+export type CartTotals = ReturnType<typeof cartTotals>;
+
+/** Én utregning for handlekurv, kasse og ordre, så tallene kunden ser alltid er tallene som lagres. */
+export function cartTotals(
+  settings: ShopSettings,
+  lines: Pick<PricedLine, "totalOre" | "vatRate">[],
+  shippingCode: string,
+  discount: Pick<Discount, "kind" | "value"> | null = null,
+) {
+  const subtotalOre = lines.reduce((sum, l) => sum + l.totalOre, 0);
+  const discountOre = discount ? discountAmount(discount, subtotalOre) : 0;
+  const goodsOre = subtotalOre - discountOre;
+  const shipping = shippingFor(settings, shippingCode, goodsOre, discount?.kind === "free_shipping");
+  const shippingOre = shipping?.priceOre ?? 0;
+  const shares = allocateDiscount(lines.map((l) => l.totalOre), discountOre);
+  const vatOre = totalVat(lines.map((l, i) => ({ totalOre: l.totalOre - shares[i], vatRate: l.vatRate })), shippingOre);
+  return { subtotalOre, discountOre, shipping, shippingOre, totalOre: goodsOre + shippingOre, vatOre };
 }
 
 /** Trekker lager for én variant bare hvis det er nok igjen. Atomisk i én SQL-setning. */
@@ -128,8 +151,14 @@ export async function createOrder(db: Db, siteId: string, settings: ShopSettings
   if (lines.length !== new Set(data.lines.map((l) => l.variantId)).size) {
     throw new ShopError("En eller flere varer i handlekurven finnes ikke lenger. Oppdater handlekurven.");
   }
-  const subtotalOre = lines.reduce((sum, l) => sum + l.totalOre, 0);
-  const shipping = shippingFor(settings, data.shippingCode, subtotalOre);
+  let discount: Discount | null = null;
+  if (data.discountCode) {
+    const found = await findDiscount(db, siteId, data.discountCode);
+    assertUsable(found, lines.reduce((sum, l) => sum + l.totalOre, 0), new Date());
+    discount = found;
+  }
+  const totals = cartTotals(settings, lines, data.shippingCode, discount);
+  const shipping = totals.shipping;
   if (!shipping) throw new ShopError("Velg en leveringsmåte");
 
   let address: ShippingAddress | null = null;
@@ -151,9 +180,12 @@ export async function createOrder(db: Db, siteId: string, settings: ShopSettings
     }
     reserved.push(line);
   }
+  if (discount && !(await claimDiscount(db, discount.id))) {
+    for (const r of reserved) await release(db, r.variantId, r.quantity);
+    throw new ShopError("Rabattkoden er brukt opp");
+  }
 
   try {
-    const totalOre = subtotalOre + shipping.priceOre;
     let order: typeof orders.$inferSelect | undefined;
     // Ordrenummer er fortløpende per nettsted. Unik indeks stopper dobbeltnummer; da prøver vi igjen.
     for (let attempt = 0; attempt < 3 && !order; attempt++) {
@@ -169,10 +201,12 @@ export async function createOrder(db: Db, siteId: string, settings: ShopSettings
             customerPhone: data.phone || null,
             shippingAddress: address,
             shipping: { code: shipping.code, name: shipping.name, priceOre: shipping.priceOre },
-            subtotalOre,
-            shippingOre: shipping.priceOre,
-            totalOre,
-            vatOre: totalVat(lines, shipping.priceOre),
+            subtotalOre: totals.subtotalOre,
+            discountCode: discount?.code ?? null,
+            discountOre: totals.discountOre,
+            shippingOre: totals.shippingOre,
+            totalOre: totals.totalOre,
+            vatOre: totals.vatOre,
             paymentMethod: data.paymentMethod,
             note: data.note || null,
             accessToken: randomToken(),
@@ -202,6 +236,7 @@ export async function createOrder(db: Db, siteId: string, settings: ShopSettings
     return order;
   } catch (err) {
     for (const r of reserved) await release(db, r.variantId, r.quantity);
+    if (discount) await releaseDiscount(db, discount.id);
     throw err;
   }
 }
@@ -237,4 +272,31 @@ export async function setOrderStatus(db: Db, siteId: string, orderId: string, ne
     for (const l of lines) if (l.variantId) await release(db, l.variantId, l.quantity);
   }
   await db.insert(auditLog).values({ siteId, userId, action: "order.status", detail: { orderId, from: order.status, to: next } });
+}
+
+/** Lagrer sporingsnummer. Tomt nummer fjerner sporingen. */
+export async function setTracking(db: Db, siteId: string, orderId: string, input: { carrier: string; number: string }, userId: string) {
+  let values: { trackingCarrier: string | null; trackingNumber: string | null } = { trackingCarrier: null, trackingNumber: null };
+  if (input.number.trim()) {
+    const parsed = trackingSchema.safeParse(input);
+    if (!parsed.success) throw new ShopError(parsed.error.issues[0].message);
+    values = { trackingCarrier: parsed.data.carrier, trackingNumber: parsed.data.number };
+  }
+  const updated = await db
+    .update(orders)
+    .set(values)
+    .where(and(eq(orders.id, orderId), eq(orders.siteId, siteId)))
+    .returning({ id: orders.id });
+  if (updated.length === 0) throw new ShopError("Fant ikke ordren");
+  await db.insert(auditLog).values({ siteId, userId, action: "order.tracking", detail: { orderId, ...values } });
+}
+
+export async function setStaffNote(db: Db, siteId: string, orderId: string, note: string) {
+  const text = note.trim().slice(0, 2000);
+  const updated = await db
+    .update(orders)
+    .set({ staffNote: text || null })
+    .where(and(eq(orders.id, orderId), eq(orders.siteId, siteId)))
+    .returning({ id: orders.id });
+  if (updated.length === 0) throw new ShopError("Fant ikke ordren");
 }

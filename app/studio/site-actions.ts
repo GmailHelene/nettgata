@@ -97,7 +97,7 @@ export async function deletePageAction(siteId: string, pageId: string): Promise<
   try {
     const { user, site } = await requireSiteAccess(siteId);
     await deletePage(await getDb(), site.id, pageId, user.id);
-    revalidatePath(`/studio/nettsted/${site.id}`);
+    revalidatePath(`/studio/nettsted/${site.id}`, "layout");
     return { ok: true, message: "Siden er slettet" };
   } catch (err) {
     return toState(err);
@@ -107,13 +107,13 @@ export async function deletePageAction(siteId: string, pageId: string): Promise<
 export async function setMenuAction(siteId: string, pageId: string, show: boolean) {
   const { site } = await requireSiteAccess(siteId);
   await setPageInMenu(await getDb(), site.id, pageId, show);
-  revalidatePath(`/studio/nettsted/${site.id}`);
+  revalidatePath(`/studio/nettsted/${site.id}`, "layout");
 }
 
 export async function movePageAction(siteId: string, pageId: string, direction: -1 | 1) {
   const { site } = await requireSiteAccess(siteId);
   await movePage(await getDb(), site.id, pageId, direction === -1 ? -1 : 1);
-  revalidatePath(`/studio/nettsted/${site.id}`);
+  revalidatePath(`/studio/nettsted/${site.id}`, "layout");
 }
 
 export async function publishAllAction(siteId: string): Promise<ActionState> {

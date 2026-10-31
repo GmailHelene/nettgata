@@ -37,6 +37,8 @@ export const shopSettingsSchema = z.object({
   paymentMethods: z.array(z.enum(paymentMethods)).min(1).default(["ved-henting"]),
   /** Siden med kjøpsvilkår som kunden må godta i kassen. */
   termsPath: z.string().regex(/^\/[a-z0-9æøå/-]*$/).default("/kjopsvilkar"),
+  /** Varianter med så få eller færre på lager vises under «Lite på lager» i oversikten. */
+  lowStockAt: z.number().int().min(0).max(10_000).default(3),
 });
 export type ShopSettings = z.infer<typeof shopSettingsSchema>;
 

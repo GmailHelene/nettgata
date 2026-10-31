@@ -7,7 +7,7 @@ Grunnlag: markedsanalysen (funksjonskart, funksjonsrevisjon og MVP-liste), produ
 
 **Lag:** N = synlig for nybegynneren. A = avansert lag. U = utviklerlaget. S = skjult automatikk som bare virker.
 
-Sist oppdatert 31.10.2026 (kvalitetsløft 1).
+Sist oppdatert 31.10.2026 (kvalitetsløft 2, del 1: adminpanelet).
 
 ---
 
@@ -164,6 +164,11 @@ Sist oppdatert 31.10.2026 (kvalitetsløft 1).
 | Varianter fra opptil tre valg, laget automatisk av kombinasjonene | N | Ferdig |
 | Kategorier med filter i butikken | N | Ferdig |
 | Lager per variant, atomisk trekk, «Bare X igjen» | N | Ferdig (lagervarsel på e-post: MVP) |
+| Oversikt i studio: salg i dag, 7 og 30 dager, graf per dag, mest solgt, lite på lager, gjøremål | N | Ferdig |
+| Ordreliste med statusfaner, søk, sider, plukkliste og pakkseddel | N | Ferdig |
+| Sporingsnummer med lenke til Posten, PostNord, Helthjem og DHL, og internt notat på ordre | N | Ferdig |
+| Søk og filter i varer i studio, bulkendring av status og kategori | N | Ferdig |
+| Pris og lager for alle varianter i én tabell, som stopper overskriving av salg | N | Ferdig |
 | Priser med MVA (25/15/12/0), prishistorikk og automatisk førpris | S | Ferdig |
 | Handlekurv og kasse, priser alltid fra serveren | N | Ferdig |
 | Handlekurv som skuff med fri frakt-måler | N | Ferdig |
@@ -179,12 +184,13 @@ Sist oppdatert 31.10.2026 (kvalitetsløft 1).
 | Ordrebekreftelse og varsel på e-post | S | MVP |
 | Kansellering og refusjon som status, varene legges tilbake på lager | N | Ferdig |
 | Kreditnota | A | MVP |
-| Rabattkoder og kampanjer | N | MVP |
+| Rabattkoder: prosent, beløp eller fri frakt, minstebeløp, periode og bruksgrense | N | Ferdig (automatiske kampanjer: MVP) |
 | Fiken-eksport og ordreeksport som stemmer mot Vipps-oppgjør | A | MVP |
 | Produktfeed til Google og Meta | S | MVP |
 | Sortering (pris, nyeste) og filtre på valg og lager | N | Ferdig |
-| Søk i varer | N | MVP |
-| Masseimport og -eksport med CSV | A | MVP |
+| Søk i varer for kunden | N | MVP |
+| Eksport av varer og ordre som CSV (norsk Excel) | A | Ferdig |
+| Import av varer fra CSV | A | MVP |
 | Kundekonto med ordrehistorikk | N | Senere |
 | Klarna, Helthjem, PostNord | N | Senere |
 | Gavekort | N | Senere |

@@ -1,70 +1,139 @@
 import Link from "next/link";
-import { asc, eq, inArray } from "drizzle-orm";
+import { asc, count, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { productCategories, productVariants, products } from "@/db/schema";
+import { productCategories, products } from "@/db/schema";
 import { requireSiteAccess } from "@/lib/session";
-import { formatNok } from "@/lib/shop/money";
+import { listProductsAdmin, parseProductQuery, productStatusFilters, type ProductStatusFilter } from "@/lib/shop/admin";
+import { readShopSettings } from "@/lib/shop/settings";
 import { SiteNav } from "../site-nav";
 import { Categories } from "./categories";
+import { ProductTable } from "./product-table";
 
-const statusLabel = { draft: "Kladd", active: "I butikken", archived: "Arkivert" } as const;
-
-export default async function ProductsPage({ params }: { params: Promise<{ siteId: string }> }) {
+export default async function ProductsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ siteId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { siteId } = await params;
   const { site } = await requireSiteAccess(siteId);
+  const query = parseProductQuery(await searchParams);
+  const settings = readShopSettings(site.shop);
   const db = await getDb();
-  const [rows, categories] = await Promise.all([
-    db.select().from(products).where(eq(products.siteId, site.id)).orderBy(asc(products.status), asc(products.name)),
+  const [rows, categories, [{ total }]] = await Promise.all([
+    listProductsAdmin(db, site.id, query, settings.lowStockAt),
     db.select().from(productCategories).where(eq(productCategories.siteId, site.id)).orderBy(asc(productCategories.sortOrder), asc(productCategories.name)),
+    db.select({ total: count() }).from(products).where(eq(products.siteId, site.id)),
   ]);
-  const variants = rows.length
-    ? await db.select().from(productVariants).where(inArray(productVariants.productId, rows.map((r) => r.id)))
-    : [];
+  const base = `/studio/nettsted/${site.id}/varer`;
+  const href = (changes: Record<string, string>) => {
+    const merged = { status: query.status, q: query.search, kategori: query.categoryId, lager: query.lowStock ? "lite" : "", ...changes };
+    const next = new URLSearchParams();
+    if (merged.status !== "alle") next.set("status", merged.status);
+    for (const key of ["q", "kategori", "lager"] as const) if (merged[key]) next.set(key, merged[key]);
+    const qs = next.toString();
+    return qs ? `${base}?${qs}` : base;
+  };
+  const filtered = query.search || query.categoryId || query.lowStock || query.status !== "alle";
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-12">
       <SiteNav siteId={site.id} name={site.name} shop active="varer" />
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Varer ({rows.length})</h2>
-        <Link href={`/studio/nettsted/${site.id}/varer/ny`} className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white">
-          Ny vare
-        </Link>
+
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold">Varer</h2>
+        <div className="flex flex-wrap gap-2">
+          <a href={`${base}/eksport`} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+            Last ned CSV
+          </a>
+          <Link href={`${base}/pris-og-lager`} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+            Pris og lager
+          </Link>
+          <Link href={`${base}/ny`} className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white">
+            Ny vare
+          </Link>
+        </div>
       </div>
-      {rows.length === 0 ? (
+
+      {total === 0 ? (
         <p className="rounded-lg border bg-white p-6 text-neutral-700">Ingen varer ennå. Trykk «Ny vare» for å legge til den første.</p>
       ) : (
-        <ul className="divide-y rounded-lg border bg-white">
-          {rows.map((p) => {
-            const vs = variants.filter((v) => v.productId === p.id);
-            const tracked = vs.filter((v) => v.stock !== null);
-            const stock = tracked.reduce((sum, v) => sum + (v.stock ?? 0), 0);
-            const prices = vs.map((v) => v.priceOre);
-            return (
-              <li key={p.id}>
-                <Link href={`/studio/nettsted/${site.id}/varer/${p.id}`} className="flex flex-wrap items-center gap-4 p-4 hover:bg-neutral-50">
-                  {p.images[0] ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.images[0].src} alt="" className="h-12 w-12 rounded object-cover" />
-                  ) : (
-                    <span className="h-12 w-12 rounded bg-neutral-100" />
-                  )}
-                  <span className="mr-auto">
-                    <span className="block font-medium">{p.name}</span>
-                    <span className="text-sm text-neutral-600">
-                      {vs.length} {vs.length === 1 ? "variant" : "varianter"}
-                      {prices.length > 0 && ` · fra ${formatNok(Math.min(...prices))}`}
-                      {categories.find((c) => c.id === p.categoryId) && ` · ${categories.find((c) => c.id === p.categoryId)!.name}`}
-                    </span>
-                  </span>
-                  <span className={`text-sm ${tracked.length && stock === 0 ? "text-red-800" : "text-neutral-700"}`}>
-                    {tracked.length ? (stock === 0 ? "Utsolgt" : `${stock} på lager`) : "Lager følges ikke"}
-                  </span>
-                  <span className={`text-sm ${p.status === "active" ? "text-green-800" : "text-neutral-600"}`}>{statusLabel[p.status]}</span>
+        <>
+          <form action={base} role="search" className="mb-3 flex flex-wrap gap-2">
+            {query.status !== "alle" && <input type="hidden" name="status" value={query.status} />}
+            {query.lowStock && <input type="hidden" name="lager" value="lite" />}
+            <label htmlFor="vare-sok" className="sr-only">
+              Søk i varer
+            </label>
+            <input
+              id="vare-sok"
+              name="q"
+              type="search"
+              defaultValue={query.search}
+              placeholder="Varenavn eller varenummer"
+              className="min-w-0 flex-1 rounded-md border border-neutral-400 px-3 py-2"
+            />
+            {categories.length > 0 && (
+              <>
+                <label htmlFor="vare-kategori" className="sr-only">
+                  Kategori
+                </label>
+                <select id="vare-kategori" name="kategori" defaultValue={query.categoryId} className="rounded-md border border-neutral-400 px-3 py-2">
+                  <option value="">Alle kategorier</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+            <button className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">Søk</button>
+          </form>
+
+          <nav aria-label="Filtrer varer" className="-mx-5 mb-4 overflow-x-auto px-5">
+            <ul className="flex min-w-max gap-2">
+              {(Object.keys(productStatusFilters) as ProductStatusFilter[]).map((key) => (
+                <li key={key}>
+                  <Link
+                    href={href({ status: key })}
+                    aria-current={key === query.status ? "page" : undefined}
+                    className="block rounded-full border px-3 py-1 text-sm aria-[current=page]:border-neutral-900 aria-[current=page]:bg-neutral-900 aria-[current=page]:text-white"
+                  >
+                    {productStatusFilters[key].label}
+                  </Link>
+                </li>
+              ))}
+              <li>
+                <Link
+                  href={href({ lager: query.lowStock ? "" : "lite" })}
+                  aria-pressed={query.lowStock}
+                  className="block rounded-full border px-3 py-1 text-sm aria-pressed:border-neutral-900 aria-pressed:bg-neutral-900 aria-pressed:text-white"
+                >
+                  Lite på lager ({settings.lowStockAt} eller færre)
                 </Link>
               </li>
-            );
-          })}
-        </ul>
+            </ul>
+          </nav>
+
+          {rows.length === 0 ? (
+            <p className="rounded-lg border bg-white p-6 text-neutral-700">
+              Ingen varer passer.{" "}
+              {filtered && (
+                <Link href={base} className="underline">
+                  Vis alle
+                </Link>
+              )}
+            </p>
+          ) : (
+            <ProductTable
+              siteId={site.id}
+              products={rows}
+              categories={categories.map((c) => ({ id: c.id, name: c.name }))}
+            />
+          )}
+        </>
       )}
       <Categories siteId={site.id} categories={categories.map((c) => ({ id: c.id, name: c.name }))} />
     </main>

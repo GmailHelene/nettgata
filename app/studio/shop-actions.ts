@@ -4,10 +4,21 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { getDb } from "@/db";
-import { auditLog, productCategories, products, sites } from "@/db/schema";
+import { auditLog, discountCodes, productCategories, products, sites } from "@/db/schema";
 import { requireSiteAccess } from "@/lib/session";
-import { createProduct, productSlug, ShopError, updateProduct, type ProductInput } from "@/lib/shop/catalog";
-import { setOrderStatus, type OrderStatus } from "@/lib/shop/orders";
+import {
+  bulkUpdateProducts,
+  createProduct,
+  productSlug,
+  ShopError,
+  updateProduct,
+  updateVariants,
+  type BulkProductChange,
+  type ProductInput,
+  type VariantChange,
+} from "@/lib/shop/catalog";
+import { saveDiscount, type DiscountInput } from "@/lib/shop/discounts";
+import { setOrderStatus, setStaffNote, setTracking, type OrderStatus } from "@/lib/shop/orders";
 import { shopSettingsSchema, type ShopSettings } from "@/lib/shop/settings";
 import type { ActionState } from "./actions";
 
@@ -106,6 +117,113 @@ export async function saveShopSettingsAction(siteId: string, settings: ShopSetti
     await db.insert(auditLog).values({ siteId: site.id, userId: user.id, action: "shop.settings_updated" });
     revalidatePath(`/studio/nettsted/${site.id}`, "layout");
     return { ok: true, message: "Butikkinnstillingene er lagret" };
+  } catch (err) {
+    return toState(err);
+  }
+}
+
+export async function saveTrackingAction(
+  siteId: string,
+  orderId: string,
+  tracking: { carrier: string; number: string },
+  markFulfilled: boolean,
+): Promise<ActionState> {
+  try {
+    const { site, user } = await requireSiteAccess(siteId);
+    const db = await getDb();
+    await setTracking(db, site.id, orderId, tracking, user.id);
+    if (markFulfilled) await setOrderStatus(db, site.id, orderId, "fulfilled", user.id);
+    revalidatePath(`/studio/nettsted/${site.id}`, "layout");
+    return { ok: true, message: markFulfilled ? "Sporingen er lagret og ordren er markert som sendt" : "Sporingen er lagret" };
+  } catch (err) {
+    return toState(err);
+  }
+}
+
+export async function saveStaffNoteAction(siteId: string, orderId: string, note: string): Promise<ActionState> {
+  try {
+    const { site } = await requireSiteAccess(siteId);
+    await setStaffNote(await getDb(), site.id, orderId, note);
+    revalidatePath(`/studio/nettsted/${site.id}/ordre/${orderId}`);
+    return { ok: true, message: "Notatet er lagret" };
+  } catch (err) {
+    return toState(err);
+  }
+}
+
+export async function bulkProductsAction(siteId: string, ids: string[], change: BulkProductChange): Promise<ActionState> {
+  try {
+    const { site, user } = await requireSiteAccess(siteId);
+    const count = await bulkUpdateProducts(await getDb(), site.id, ids, change, user.id);
+    revalidatePath(`/studio/nettsted/${site.id}`, "layout");
+    return { ok: true, message: `${count} ${count === 1 ? "vare er" : "varer er"} oppdatert` };
+  } catch (err) {
+    return toState(err);
+  }
+}
+
+export async function saveVariantGridAction(
+  siteId: string,
+  changes: VariantChange[],
+): Promise<{ ok: boolean; message: string; conflicts?: string[] }> {
+  try {
+    const { site, user } = await requireSiteAccess(siteId);
+    const { updated, conflicts } = await updateVariants(await getDb(), site.id, changes, user.id);
+    revalidatePath(`/studio/nettsted/${site.id}`, "layout");
+    if (conflicts.length) {
+      return {
+        ok: false,
+        message: `${updated} lagret. Lageret er endret av et salg siden du åpnet siden, så disse ble ikke lagret: ${conflicts.join(", ")}. Last siden på nytt og prøv igjen.`,
+        conflicts,
+      };
+    }
+    return { ok: true, message: `${updated} ${updated === 1 ? "variant er" : "varianter er"} lagret` };
+  } catch (err) {
+    return toState(err) as { ok: boolean; message: string };
+  }
+}
+
+export async function saveDiscountAction(
+  siteId: string,
+  discountId: string | null,
+  input: DiscountInput,
+): Promise<{ ok: boolean; message: string; discountId?: string }> {
+  try {
+    const { site, user } = await requireSiteAccess(siteId);
+    const id = await saveDiscount(await getDb(), site.id, discountId, input, user.id);
+    revalidatePath(`/studio/nettsted/${site.id}`, "layout");
+    return { ok: true, message: discountId ? "Rabattkoden er lagret" : "Rabattkoden er opprettet", discountId: id };
+  } catch (err) {
+    return toState(err) as { ok: boolean; message: string };
+  }
+}
+
+/** Koder som er brukt, kan bare slås av, så historikken i gamle ordre fortsatt gir mening. */
+export async function deleteDiscountAction(siteId: string, discountId: string): Promise<ActionState> {
+  try {
+    const { site, user } = await requireSiteAccess(siteId);
+    const db = await getDb();
+    const deleted = await db
+      .delete(discountCodes)
+      .where(and(eq(discountCodes.id, discountId), eq(discountCodes.siteId, site.id), eq(discountCodes.usedCount, 0)))
+      .returning({ code: discountCodes.code });
+    if (deleted.length === 0) return { ok: false, message: "Koden er brukt og kan bare slås av" };
+    await db.insert(auditLog).values({ siteId: site.id, userId: user.id, action: "discount.deleted", detail: { code: deleted[0].code } });
+    revalidatePath(`/studio/nettsted/${site.id}/rabatter`);
+    return { ok: true, message: `Koden ${deleted[0].code} er slettet` };
+  } catch (err) {
+    return toState(err);
+  }
+}
+
+export async function setDiscountActiveAction(siteId: string, discountId: string, active: boolean): Promise<ActionState> {
+  try {
+    const { site, user } = await requireSiteAccess(siteId);
+    const db = await getDb();
+    await db.update(discountCodes).set({ active }).where(and(eq(discountCodes.id, discountId), eq(discountCodes.siteId, site.id)));
+    await db.insert(auditLog).values({ siteId: site.id, userId: user.id, action: "discount.active", detail: { discountId, active } });
+    revalidatePath(`/studio/nettsted/${site.id}/rabatter`);
+    return { ok: true, message: active ? "Koden er slått på" : "Koden er slått av" };
   } catch (err) {
     return toState(err);
   }

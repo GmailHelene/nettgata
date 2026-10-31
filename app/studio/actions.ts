@@ -64,7 +64,7 @@ export async function saveDraftAction(pageId: string, title: string, content: un
   try {
     const { db, user, site } = await authorizePage(pageId);
     await saveDraft(db, pageId, { title, content }, user.id);
-    revalidatePath(`/studio/nettsted/${site.id}`);
+    revalidatePath(`/studio/nettsted/${site.id}`, "layout");
     return { ok: true, message: "Kladden er lagret" };
   } catch (err) {
     return toState(err);

@@ -284,11 +284,22 @@ export const orders = pgTable(
     fulfilledAt: timestamp("fulfilled_at", { withTimezone: true }),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
     note: text("note"),
+    /** Rabattkoden slik den var ved kjøp, og hvor mye den trakk fra varene. totalOre er etter rabatt. */
+    discountCode: text("discount_code"),
+    discountOre: integer("discount_ore").notNull().default(0),
+    trackingCarrier: text("tracking_carrier"),
+    trackingNumber: text("tracking_number"),
+    /** Internt notat for butikken. Vises aldri for kunden. */
+    staffNote: text("staff_note"),
     /** Hemmelig nøkkel i kvitteringslenken, så kunden kan se ordren uten konto. */
     accessToken: text("access_token").notNull(),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex("orders_site_number_idx").on(t.siteId, t.number), index("orders_site_created_idx").on(t.siteId, t.createdAt)],
+  (t) => [
+    uniqueIndex("orders_site_number_idx").on(t.siteId, t.number),
+    index("orders_site_created_idx").on(t.siteId, t.createdAt),
+    index("orders_site_status_idx").on(t.siteId, t.status),
+  ],
 );
 
 export const orderLines = pgTable(
@@ -308,4 +319,28 @@ export const orderLines = pgTable(
     totalOre: integer("total_ore").notNull(),
   },
   (t) => [index("order_lines_order_idx").on(t.orderId)],
+);
+
+export const discountKindEnum = pgEnum("discount_kind", ["percent", "amount", "free_shipping"]);
+
+/** Rabattkoder kunden skriver inn i kassen. Bruk telles atomisk, så en kode med grense ikke kan brukes for mange ganger. */
+export const discountCodes = pgTable(
+  "discount_codes",
+  {
+    id: id(),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    /** Lagres med store bokstaver. Kunden kan skrive koden med små. */
+    code: text("code").notNull(),
+    kind: discountKindEnum("kind").notNull(),
+    /** Prosent (1-100) eller beløp i øre. Brukes ikke for fri frakt. */
+    value: integer("value").notNull().default(0),
+    minSubtotalOre: integer("min_subtotal_ore"),
+    startsAt: timestamp("starts_at", { withTimezone: true }),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    usageLimit: integer("usage_limit"),
+    usedCount: integer("used_count").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("discount_codes_site_code_idx").on(t.siteId, t.code)],
 );
