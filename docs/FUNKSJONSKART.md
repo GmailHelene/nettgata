@@ -7,7 +7,7 @@ Grunnlag: markedsanalysen (funksjonskart, funksjonsrevisjon og MVP-liste), produ
 
 **Lag:** N = synlig for nybegynneren. A = avansert lag. U = utviklerlaget. S = skjult automatikk som bare virker.
 
-Sist oppdatert 31.10.2026 (kvalitetsløft 2, domenekobling og e-postvarsler).
+Sist oppdatert 31.10.2026 (byggeverktøyet, første runde).
 
 ---
 
@@ -17,16 +17,23 @@ Sist oppdatert 31.10.2026 (kvalitetsløft 2, domenekobling og e-postvarsler).
 |---|---|---|
 | Skjemabasert redigering av seksjoner (lag 1) | N | Ferdig |
 | Legg til, flytt, slett seksjoner, velg variant | N | Ferdig |
+| Seksjonsbibliotek med bilde av hver variant i nettstedets egne farger og fonter, sett inn hvor som helst | N | Bygget |
+| Dra og slipp for å flytte seksjoner, også med piltaster og knapper | N | Bygget |
+| Ryddig seksjonsliste: bare seksjonen du jobber med er åpen, de andre viser navn og første tekst | N | Bygget |
 | Forhåndsvisning ved siden av redigeringen, oppdateres mens du skriver | N | Ferdig |
+| Forhåndsvisning som datamaskin eller mobil, med ekte mobilbredde | N | Bygget |
+| Klikk på en seksjon i forhåndsvisningen for å åpne den i skjemaet | N | Bygget |
+| Automatisk lagring av kladden, også når noe ikke er fylt ut ennå | S | Bygget |
 | Kladd og publisert versjon per side | N | Ferdig |
 | Delbar forhåndsvisningslenke (signert, utløper etter 7 dager) | N | Ferdig |
 | Versjonshistorikk og «Gå tilbake hit» | N | Ferdig |
 | Publiser alle sider samtidig | N | Ferdig |
 | Lag, slett, flytt sider, velg hva som vises i menyen | N | Ferdig |
-| Dupliser side og seksjon | N | MVP |
-| Kvalitetsport før publisering (lenker, alt-tekst, plassholdertekst, kontrast, mobil) | S | MVP |
+| Lag kopi av en seksjon | N | Bygget |
+| Dupliser side | N | MVP |
+| Kvalitetsport før publisering: det som mangler vises på seksjonen, eksempeltekst og eksempelbilder stopper eller varsler | S | Bygget (lenkesjekk, kontrast og mobil: MVP) |
 | Låste felt per bransjepakke, så kunden ikke kan ødelegge oppsettet | S | MVP |
-| Angre og gjør om i redigereren | N | MVP |
+| Angre og gjør om i redigereren, med knapper og Ctrl+Z | N | Bygget |
 | Visuell redigering direkte i siden (klikk på teksten for å endre) | A | Senere |
 | Fri layout: kolonner, avstand, rekkefølge i seksjonen | A | Senere |
 | Navngitte kladder («Julekampanje»), planlagt publisering | A | Senere |
@@ -123,6 +130,7 @@ Sist oppdatert 31.10.2026 (kvalitetsløft 2, domenekobling og e-postvarsler).
 | Innloggingssperre per e-post og IP, IP lagres bare som hash | S | Ferdig |
 | Tilgangssjekk i hver handling, studio bare på plattformens adresse | S | Ferdig |
 | Trygge lenker (ingen javascript:) og escaping av strukturerte data | S | Ferdig |
+| Studioet kan ikke legges i en ramme på andre nettsteder (vern mot clickjacking) | S | Bygget |
 | Revisjonslogg (lagres) | S | Ferdig, visning i studio MVP |
 | Tofaktorinnlogging | N | MVP |
 | Daglig backup med testet gjenoppretting | S | MVP |
@@ -137,7 +145,7 @@ Sist oppdatert 31.10.2026 (kvalitetsløft 2, domenekobling og e-postvarsler).
 |---|---|---|
 | Hosting i EU-region, CDN og SSL | S | Ferdig (Cloudflare, Neon Frankfurt) |
 | Visning via plattformens adresse (/vis/navn) før domenet er koblet | N | Ferdig |
-| Gratis underdomene per kunde | S | Venter på domenevalg |
+| Gratis underdomene per kunde (navn.nettgata.no) | S | Venter på at nettgata.no blir aktiv i Cloudflare |
 | Koble eget domene med DNS-veiviser (Cloudflare for SaaS), automatisk sjekk og https | N | Bygget, slås på når plattformen har eget domene |
 | Unik peker per domene, så ingen kan koble til et domene de ikke eier | S | Bygget |
 | Hoveddomenet, ekstra domener og gratisadressen sender videre til hovedadressen | S | Bygget |

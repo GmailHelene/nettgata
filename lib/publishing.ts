@@ -1,4 +1,4 @@
-import { and, desc, eq, max } from "drizzle-orm";
+import { and, desc, eq, gt, max, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { auditLog, pageVersions, pages } from "@/db/schema";
 import { validatePageContent } from "@/lib/content/registry";
@@ -23,10 +23,17 @@ export async function getPublishedPage(db: Db, siteId: string, path: string) {
   return { pageId: row.page.id, title: row.version.title, content: row.version.content, versionNumber: row.version.number };
 }
 
+/** Redigereren lagrer automatisk hvert par sekunder. Loggen får én linje per side og bruker per kvarter. */
+const DRAFT_LOG_INTERVAL_MS = 15 * 60_000;
+
+/**
+ * Lagrer kladden. Den kan være uferdig (et felt som mangler, et eksempelbilde), men aldri ugyldig.
+ * Alt som mangler, stoppes av publishPage.
+ */
 export async function saveDraft(db: Db, pageId: string, input: { title: string; content: unknown }, userId: string) {
   const title = input.title.trim();
   if (!title || title.length > 120) throw new PublishingError("Sidetittel må være mellom 1 og 120 tegn");
-  const result = validatePageContent(input.content);
+  const result = validatePageContent(input.content, "draft");
   if (!result.ok) throw new PublishingError(result.errors.map((e) => e.message).join("\n"));
 
   const [updated] = await db
@@ -35,7 +42,20 @@ export async function saveDraft(db: Db, pageId: string, input: { title: string; 
     .where(eq(pages.id, pageId))
     .returning({ siteId: pages.siteId });
   if (!updated) throw new PublishingError("Fant ikke siden");
-  await db.insert(auditLog).values({ siteId: updated.siteId, userId, action: "page.draft_saved", detail: { pageId } });
+  const [recent] = await db
+    .select({ id: auditLog.id })
+    .from(auditLog)
+    .where(
+      and(
+        eq(auditLog.siteId, updated.siteId),
+        eq(auditLog.userId, userId),
+        eq(auditLog.action, "page.draft_saved"),
+        gt(auditLog.createdAt, new Date(Date.now() - DRAFT_LOG_INTERVAL_MS)),
+        sql`${auditLog.detail}->>'pageId' = ${pageId}`,
+      ),
+    )
+    .limit(1);
+  if (!recent) await db.insert(auditLog).values({ siteId: updated.siteId, userId, action: "page.draft_saved", detail: { pageId } });
 }
 
 async function createVersion(db: Db, pageId: string, title: string, content: PageContent, userId: string) {

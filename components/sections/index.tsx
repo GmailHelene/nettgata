@@ -1,7 +1,8 @@
 import Link from "next/link";
-import type { CSSProperties, ReactNode } from "react";
+import { Fragment, type CSSProperties, type ReactNode } from "react";
 import type { PageContent, Section } from "@/lib/content/types";
-import { isSafeHref, type ImageValue } from "@/lib/content/fields";
+import { EXAMPLE_IMAGE_SRC, isSafeHref, type ImageValue } from "@/lib/content/fields";
+import { sectionRegistry } from "@/lib/content/registry";
 import { mediaSrcPattern } from "@/lib/media-types";
 import { formatAddress, formatOrgnr, type SiteInfo } from "@/lib/site-info";
 import { ContactForm } from "./contact-form";
@@ -16,11 +17,27 @@ const str = (p: Props, key: string) => (typeof p[key] === "string" ? (p[key] as 
 const list = (p: Props, key: string) => (Array.isArray(p[key]) ? (p[key] as Props[]) : []);
 const image = (p: Props, key: string): ImageValue | null => {
   const v = p[key] as ImageValue | null | undefined;
-  return v && typeof v.src === "string" && mediaSrcPattern.test(v.src) ? v : null;
+  return v && typeof v.src === "string" && (mediaSrcPattern.test(v.src) || v.src === EXAMPLE_IMAGE_SRC) ? v : null;
 };
 
 /** Bilder fra eget lager. next/image brukes ikke fordi bildene allerede er krympet til WebP ved opplasting. */
 function Img({ value, className = "", eager = false }: { value: ImageValue; className?: string; eager?: boolean }) {
+  if (value.src === EXAMPLE_IMAGE_SRC) {
+    // Eksempelbilde fra seksjonsbiblioteket. Finnes bare i kladder, fordi publisering stopper det.
+    return (
+      <div
+        role="img"
+        aria-label="Eksempelbilde"
+        className={`${className} flex items-center justify-center bg-[color-mix(in_srgb,var(--c-muted)_22%,var(--c-surface))] text-[var(--c-muted)]`}
+      >
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <circle cx="9" cy="10" r="2" />
+          <path d="M3 17l5-5 4 4 3-3 6 6" />
+        </svg>
+      </div>
+    );
+  }
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -717,20 +734,42 @@ export function PageRenderer({
   style,
   ctx,
   canonicalUrl,
+  editor,
 }: {
   content: PageContent;
   style: CSSProperties;
   ctx: RenderContext;
   canonicalUrl?: string;
+  /** Bare i redigereren: hver seksjon merkes, så et klikk i forhåndsvisningen kan velge den. */
+  editor?: { selectedId: string | null };
 }) {
   return (
     <SiteChrome style={style} ctx={ctx} canonicalUrl={canonicalUrl}>
-      {content.sections.map((section, i) => (
-        <SectionBackground key={section.id} background={section.background}>
-          {renderSection(section, i, ctx)}
-        </SectionBackground>
-      ))}
+      {content.sections.map((section, i) => {
+        const rendered = <SectionBackground background={section.background}>{renderSection(section, i, ctx)}</SectionBackground>;
+        return editor ? (
+          <div
+            key={section.id}
+            data-section-id={section.id}
+            data-section-label={sectionRegistry[section.type].label}
+            data-selected={editor.selectedId === section.id ? "" : undefined}
+          >
+            {rendered}
+          </div>
+        ) : (
+          <Fragment key={section.id}>{rendered}</Fragment>
+        );
+      })}
     </SiteChrome>
+  );
+}
+
+/** Én seksjon alene, med nettstedets farger og fonter. Brukes til bildene i seksjonsbiblioteket. */
+export function SectionPreview({ section, style, ctx }: { section: Section; style: CSSProperties; ctx: RenderContext }) {
+  return (
+    <div style={style} className="bg-[var(--c-bg)] font-[family-name:var(--f-body)] text-[var(--c-text)]">
+      <SectionBackground background={section.background}>{renderSection(section, 1, ctx)}</SectionBackground>
+    </div>
   );
 }
 

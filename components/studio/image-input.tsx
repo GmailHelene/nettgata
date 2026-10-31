@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useRef, useState } from "react";
-import type { ImageValue } from "@/lib/content/fields";
+import { EXAMPLE_IMAGE_SRC, type ImageValue } from "@/lib/content/fields";
 
 /** Nettstedet bildene lastes opp til. Settes én gang rundt redigereren i stedet for å sendes gjennom alle felt. */
 export const SiteIdContext = createContext<string | null>(null);
@@ -41,6 +41,8 @@ export function ImageInput({
   onChange: (v: ImageValue | null) => void;
 }) {
   const siteId = useContext(SiteIdContext);
+  const isExample = value?.src === EXAMPLE_IMAGE_SRC;
+  const hasImage = Boolean(value?.src) && !isExample;
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +61,8 @@ export function ImageInput({
       const res = await fetch("/studio/api/media", { method: "POST", body: form });
       const data = (await res.json()) as { src?: string; error?: string };
       if (!res.ok || !data.src) throw new Error(data.error ?? "Opplastingen feilet");
-      onChange({ src: data.src, alt: value?.alt ?? "" });
+      // Alt-teksten følger bare med når et ekte bilde byttes, ikke fra eksempelbildet.
+      onChange({ src: data.src, alt: hasImage ? (value?.alt ?? "") : "" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Opplastingen feilet");
     } finally {
@@ -75,16 +78,19 @@ export function ImageInput({
         {optional && <span className="font-normal text-neutral-600"> (valgfritt)</span>}
       </legend>
       <div className="flex flex-wrap items-start gap-4">
-        {value?.src ? (
+        {hasImage ? (
           // eslint-disable-next-line @next/next/no-img-element -- forhåndsvisning av eget opplastet bilde
-          <img src={value.src} alt="" className="h-24 w-32 rounded object-cover" />
+          <img src={value?.src} alt="" className="h-24 w-32 rounded object-cover" />
         ) : (
-          <div className="flex h-24 w-32 items-center justify-center rounded bg-neutral-100 text-xs text-neutral-500">Ingen bilde</div>
+          <div className="flex h-24 w-32 items-center justify-center rounded bg-neutral-100 text-xs text-neutral-600">
+            {isExample ? "Eksempelbilde" : "Ingen bilde"}
+          </div>
         )}
         <div className="min-w-48 flex-1 space-y-2">
+          {isExample && <p className="text-sm text-amber-900">Bytt ut eksempelbildet med et eget bilde før du publiserer.</p>}
           <div className="flex flex-wrap gap-3 text-sm">
             <label className="cursor-pointer rounded-md border border-neutral-900 px-3 py-1.5 font-semibold has-[:focus-visible]:outline-2">
-              {busy ? "Laster opp..." : value?.src ? "Bytt bilde" : "Last opp bilde"}
+              {busy ? "Laster opp..." : hasImage ? "Bytt bilde" : "Last opp bilde"}
               <input
                 ref={fileRef}
                 type="file"
@@ -100,7 +106,7 @@ export function ImageInput({
               </button>
             )}
           </div>
-          {value?.src && (
+          {hasImage && value && (
             <>
               <label className="block">
                 <span className="block text-sm">Beskrivelse av bildet (alt-tekst)</span>

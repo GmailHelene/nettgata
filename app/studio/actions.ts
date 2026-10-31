@@ -60,11 +60,18 @@ function toState(err: unknown): ActionState {
   return { ok: false, message: "Noe gikk galt. Prøv igjen." };
 }
 
-export async function saveDraftAction(pageId: string, title: string, content: unknown): Promise<ActionState> {
+export async function saveDraftAction(
+  pageId: string,
+  title: string,
+  content: unknown,
+  options: { quiet?: boolean } = {},
+): Promise<ActionState> {
   try {
     const { db, user, site } = await authorizePage(pageId);
     await saveDraft(db, pageId, { title, content }, user.id);
-    revalidatePath(`/studio/nettsted/${site.id}`, "layout");
+    // Automatisk lagring henter ikke siden på nytt: redigereren har allerede innholdet,
+    // og en full runde mot databasen etter hvert lagret ord er bortkastet.
+    if (!options.quiet) revalidatePath(`/studio/nettsted/${site.id}`, "layout");
     return { ok: true, message: "Kladden er lagret" };
   } catch (err) {
     return toState(err);

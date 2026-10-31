@@ -63,14 +63,19 @@ describe("publisering", () => {
     expect((await listVersions(db, pageId)).map((v) => v.number)).toEqual([3, 2, 1]);
   });
 
-  it("avviser ugyldig innhold og farlige lenker", async () => {
+  it("avviser ugyldig innhold og farlige lenker, også i kladden", async () => {
     const bad = {
       ...demoFrontpage,
       sections: [{ id: "h", type: "hero", variant: "standard", props: { overskrift: "Hei", knappLenke: "javascript:alert(1)" } }],
     };
     await expect(saveDraft(db, pageId, { title: "Forside", content: bad }, userId)).rejects.toBeInstanceOf(PublishingError);
+  });
+
+  it("lagrer en uferdig kladd, men publiserer den ikke", async () => {
     const missing = { ...demoFrontpage, sections: [{ id: "h", type: "hero", variant: "standard", props: {} }] };
-    await expect(saveDraft(db, pageId, { title: "Forside", content: missing }, userId)).rejects.toThrow(/Overskrift/);
+    await saveDraft(db, pageId, { title: "Forside", content: missing }, userId);
+    await expect(publishPage(db, pageId, userId)).rejects.toThrow(/Overskrift/);
+    expect(await getPublishedPage(db, siteId, "/")).toBeNull();
   });
 
   it("finner riktig side uansett store bokstaver og skråstrek", async () => {

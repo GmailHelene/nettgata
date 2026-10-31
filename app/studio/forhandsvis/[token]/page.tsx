@@ -25,7 +25,8 @@ export default async function PreviewPage({ params }: { params: Promise<{ token:
     .where(eq(pages.id, pageId))
     .limit(1);
   if (!row) notFound();
-  const result = validatePageContent(row.page.draft);
+  // Kladden kan være uferdig. Den vises likevel, slik den ser ut i redigereren.
+  const result = validatePageContent(row.page.draft, "draft");
   if (!result.ok) notFound();
 
   return (

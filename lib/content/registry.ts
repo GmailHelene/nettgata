@@ -1,8 +1,13 @@
-import { fieldsToZod, type Field } from "./fields";
+import type { ZodType } from "zod";
+import { fieldsToZod, type Field, type ValidationMode } from "./fields";
 import { pageContentSchema, type PageContent, type Section, type SectionType } from "./types";
 
 export type SectionDefinition = {
   label: string;
+  /** Kort forklaring i seksjonsbiblioteket. */
+  description: string;
+  /** Vises øverst når seksjonen redigeres. */
+  hint?: string;
   variants: { key: string; label: string }[];
   fields: Field[];
 };
@@ -10,6 +15,7 @@ export type SectionDefinition = {
 export const sectionRegistry: Record<SectionType, SectionDefinition> = {
   hero: {
     label: "Toppseksjon",
+    description: "Det første folk ser. Én tydelig overskrift og gjerne en knapp.",
     variants: [
       { key: "standard", label: "Venstrestilt" },
       { key: "sentrert", label: "Sentrert" },
@@ -26,6 +32,7 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
   },
   tekst: {
     label: "Tekst",
+    description: "Vanlig tekst, for eksempel om bedriften eller hvordan dere jobber.",
     variants: [{ key: "standard", label: "Standard" }],
     fields: [
       { key: "overskrift", label: "Overskrift", type: "text", optional: true },
@@ -34,6 +41,7 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
   },
   bildetekst: {
     label: "Bilde og tekst",
+    description: "Et bilde med tekst ved siden av.",
     variants: [
       { key: "bilde-venstre", label: "Bilde til venstre" },
       { key: "bilde-hoyre", label: "Bilde til høyre" },
@@ -48,6 +56,7 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
   },
   galleri: {
     label: "Bildegalleri",
+    description: "Flere bilder samlet på ett sted.",
     variants: [
       { key: "rutenett", label: "Rutenett" },
       { key: "store", label: "Store bilder" },
@@ -70,6 +79,8 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
   omtaler: {
     // Bare ekte omtaler fra ekte kunder. Oppdiktede omtaler er ulovlig etter markedsføringsloven.
     label: "Kundeomtaler",
+    description: "Hva ekte kunder har sagt om dere.",
+    hint: "Bruk bare ekte omtaler fra ekte kunder, og spør gjerne om lov først. Oppdiktede omtaler er ulovlig etter markedsføringsloven.",
     variants: [{ key: "standard", label: "Kort" }],
     fields: [
       { key: "overskrift", label: "Overskrift", type: "text" },
@@ -89,6 +100,7 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
   },
   faq: {
     label: "Spørsmål og svar",
+    description: "Det kundene ofte lurer på, med svar.",
     variants: [{ key: "standard", label: "Utvidbare" }],
     fields: [
       { key: "overskrift", label: "Overskrift", type: "text" },
@@ -108,6 +120,8 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
   produkter: {
     // Gjør ingenting på nettsteder uten butikk.
     label: "Varer",
+    description: "Varer fra butikken, hentet automatisk fra varelisten.",
+    hint: "Varene hentes fra varelisten. Her velger du bare hvilke som vises.",
     variants: [
       { key: "standard", label: "Rutenett" },
       { key: "karusell", label: "Karusell" },
@@ -130,6 +144,7 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
   },
   fordeler: {
     label: "Trygghetspunkter",
+    description: "Korte punkter som gjør kunden trygg, som levering, betaling og garanti.",
     variants: [
       { key: "stripe", label: "Stripe" },
       { key: "kort", label: "Kort" },
@@ -151,6 +166,7 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
   },
   kategorikort: {
     label: "Kategorikort",
+    description: "Bildekort som sender folk videre til kategorier eller andre sider.",
     variants: [
       { key: "rutenett", label: "Rutenett" },
       { key: "store", label: "Store kort" },
@@ -174,6 +190,7 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
   },
   tjenester: {
     label: "Tjenester og priser",
+    description: "Det dere tilbyr, med eller uten pris.",
     variants: [
       { key: "standard", label: "Kort" },
       { key: "liste", label: "Prisliste" },
@@ -197,6 +214,8 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
   kontakt: {
     // Telefon, e-post, adresse og åpningstider hentes fra nettstedets innstillinger (én kilde).
     label: "Kontakt og åpningstider",
+    description: "Telefon, e-post, adresse og åpningstider, med eller uten skjema.",
+    hint: "Telefon, e-post, adresse og åpningstider hentes fra Innstillinger, så de alltid er like på hele nettstedet.",
     variants: [
       { key: "skjema", label: "Med kontaktskjema" },
       { key: "standard", label: "Uten skjema" },
@@ -208,6 +227,7 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
   },
   cta: {
     label: "Oppfordring",
+    description: "En kort oppfordring med én knapp. Passer fint nederst på siden.",
     variants: [{ key: "standard", label: "Standard" }],
     fields: [
       { key: "overskrift", label: "Overskrift", type: "text" },
@@ -222,8 +242,29 @@ export type ValidationResult =
   | { ok: true; content: PageContent }
   | { ok: false; errors: { sectionId?: string; message: string }[] };
 
-/** Validerer hele sideinnholdet, inkludert feltene i hver seksjon. */
-export function validatePageContent(input: unknown): ValidationResult {
+// Redigereren sjekker hele siden ved hvert tastetrykk, så skjemaene bygges bare én gang.
+const propsSchemas = new Map<string, ZodType>();
+function propsSchema(type: SectionType, mode: ValidationMode): ZodType {
+  const key = `${type}:${mode}`;
+  let schema = propsSchemas.get(key);
+  if (!schema) {
+    schema = fieldsToZod(sectionRegistry[type].fields, mode);
+    propsSchemas.set(key, schema);
+  }
+  return schema;
+}
+
+/** Det som må rettes i én seksjon, uten seksjonsnavnet foran. Vises på seksjonen i redigereren. */
+export function sectionProblems(section: Section, mode: ValidationMode = "publish"): string[] {
+  const result = propsSchema(section.type, mode).safeParse(section.props);
+  return result.success ? [] : result.error.issues.map((i) => i.message);
+}
+
+/**
+ * Validerer hele sideinnholdet, inkludert feltene i hver seksjon. «draft» brukes når kladden lagres:
+ * da kan noe mangle, men ingenting kan være ugyldig. Publisering krever «publish».
+ */
+export function validatePageContent(input: unknown, mode: ValidationMode = "publish"): ValidationResult {
   const parsed = pageContentSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, errors: parsed.error.issues.map((i) => ({ message: i.message })) };
@@ -235,14 +276,14 @@ export function validatePageContent(input: unknown): ValidationResult {
     ids.add(section.id);
     const def = sectionRegistry[section.type];
     const variant = def.variants.some((v) => v.key === section.variant) ? section.variant : def.variants[0].key;
-    const props = fieldsToZod(def.fields).safeParse(section.props);
+    const props = propsSchema(section.type, mode).safeParse(section.props);
     if (!props.success) {
       for (const issue of props.error.issues) {
         errors.push({ sectionId: section.id, message: `${def.label}: ${issue.message}` });
       }
       return section;
     }
-    return { ...section, variant, props: props.data };
+    return { ...section, variant, props: props.data as Section["props"] };
   });
   if (errors.length) return { ok: false, errors };
   return { ok: true, content: { ...parsed.data, sections } };

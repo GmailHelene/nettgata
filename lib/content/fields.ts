@@ -25,14 +25,27 @@ export function isSafeHref(value: string): boolean {
   }
 }
 
-function fieldToZod(field: Field): z.ZodType {
+/**
+ * Plassholder for bilder i seksjonsbiblioteket. Den kan stå i en kladd, men stopper publisering,
+ * så et eksempelbilde aldri havner på en ekte nettside.
+ */
+export const EXAMPLE_IMAGE_SRC = "eksempelbilde";
+
+/**
+ * «publish» krever at alt er fylt ut. «draft» godtar det som mangler, men aldri det som er ugyldig
+ * (farlige lenker, for lang tekst, bilder utenfor eget lager). Slik kan kladden lagres underveis.
+ */
+export type ValidationMode = "publish" | "draft";
+
+function fieldToZod(field: Field, mode: ValidationMode): z.ZodType {
   const required = `${field.label} må fylles ut`;
+  const optional = mode === "draft" || ("optional" in field && field.optional);
   switch (field.type) {
     case "text":
     case "textarea": {
       const max = field.max ?? (field.type === "text" ? 160 : 4000);
       const base = z.string({ error: required }).trim().max(max, `${field.label} kan ha maks ${max} tegn`);
-      return field.optional ? base.optional().default("") : base.min(1, required);
+      return optional ? base.optional().default("") : base.min(1, required);
     }
     case "link": {
       const base = z
@@ -40,16 +53,27 @@ function fieldToZod(field: Field): z.ZodType {
         .trim()
         .max(500, `${field.label} er for lang`)
         .refine((v) => v === "" || isSafeHref(v), `${field.label}: ugyldig lenke`);
-      return field.optional ? base.optional().default("") : base.refine((v) => v !== "", required);
+      return optional ? base.optional().default("") : base.refine((v) => v !== "", required);
     }
     case "image": {
-      // Alt-tekst er påkrevd for universell utforming. Rent pyntebilder kan ha tom alt, men da må det velges aktivt.
+      const src = z
+        .string()
+        .refine((v) => mode === "draft" || v !== EXAMPLE_IMAGE_SRC, {
+          error: `${field.label}: bytt ut eksempelbildet med et eget bilde`,
+          abort: true,
+        })
+        .refine((v) => v === EXAMPLE_IMAGE_SRC || mediaSrcPattern.test(v), `${field.label}: ugyldig bilde`);
       const image = z.object({
-        src: z.string().regex(mediaSrcPattern, `${field.label}: ugyldig bilde`),
+        src,
         alt: z.string().trim().max(200, `${field.label}: alt-teksten er for lang`),
         decorative: z.boolean().optional(),
-      }).refine((v) => v.decorative || v.alt !== "", `${field.label}: skriv en kort beskrivelse av bildet (alt-tekst)`);
-      return field.optional ? image.nullable().optional().default(null) : image.nullable().refine((v) => v !== null, required);
+      });
+      // Alt-tekst er påkrevd for universell utforming. Rent pyntebilder kan ha tom alt, men da må det velges aktivt.
+      const checked =
+        mode === "draft"
+          ? image
+          : image.refine((v) => v.decorative || v.alt !== "", `${field.label}: skriv en kort beskrivelse av bildet (alt-tekst)`);
+      return optional ? checked.nullable().optional().default(null) : checked.nullable().refine((v) => v !== null, required);
     }
     case "select":
       return z
@@ -57,13 +81,13 @@ function fieldToZod(field: Field): z.ZodType {
         .catch(field.options[0].value);
     case "list":
       return z
-        .array(fieldsToZod(field.fields), { error: `${field.label} mangler` })
+        .array(fieldsToZod(field.fields, mode), { error: `${field.label} mangler` })
         .max(field.max ?? 30, `${field.label}: for mange elementer`);
   }
 }
 
-export function fieldsToZod(fields: Field[]) {
-  return z.object(Object.fromEntries(fields.map((f) => [f.key, fieldToZod(f)])));
+export function fieldsToZod(fields: Field[], mode: ValidationMode = "publish") {
+  return z.object(Object.fromEntries(fields.map((f) => [f.key, fieldToZod(f, mode)])));
 }
 
 export type ImageValue = { src: string; alt: string; decorative?: boolean };
