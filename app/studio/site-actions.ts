@@ -4,7 +4,9 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { getDb } from "@/db";
-import { auditLog, inquiries } from "@/db/schema";
+import { auditLog, inquiries, sites } from "@/db/schema";
+import { siteLayoutSchema, type SiteLayout } from "@/lib/site-layout";
+import { themeSchema, type Theme } from "@/lib/theme";
 import { lookupOrgnr, type BrregCompany } from "@/lib/brreg";
 import { createPage, deletePage, movePage, publishAll, setPageInMenu, updateSiteSettings } from "@/lib/pages";
 import { PublishingError } from "@/lib/publishing";
@@ -142,4 +144,25 @@ export async function deleteInquiryAction(siteId: string, inquiryId: string) {
   await db.delete(inquiries).where(and(eq(inquiries.id, inquiryId), eq(inquiries.siteId, site.id)));
   await db.insert(auditLog).values({ siteId: site.id, userId: user.id, action: "inquiry.deleted", detail: { inquiryId } });
   revalidatePath(`/studio/nettsted/${site.id}/henvendelser`);
+}
+
+/** Logo, toppstripe, bunntekst, fonter og hjørner. Gjelder med en gang på alle sider. */
+export async function saveAppearanceAction(
+  siteId: string,
+  input: { layout: SiteLayout; fonts: Theme["fonts"]; radius: Theme["radius"] },
+): Promise<ActionState> {
+  try {
+    const { site, user } = await requireSiteAccess(siteId);
+    const layout = siteLayoutSchema.safeParse(input.layout);
+    if (!layout.success) return { ok: false, message: layout.error.issues[0].message };
+    const theme = themeSchema.safeParse({ ...site.theme, fonts: input.fonts, radius: input.radius });
+    if (!theme.success) return { ok: false, message: "Ugyldig font eller hjørnevalg" };
+    const db = await getDb();
+    await db.update(sites).set({ layout: layout.data, theme: theme.data }).where(eq(sites.id, site.id));
+    await db.insert(auditLog).values({ siteId: site.id, userId: user.id, action: "site.appearance_updated" });
+    revalidatePath(`/studio/nettsted/${site.id}`, "layout");
+    return { ok: true, message: "Utseendet er lagret og vises på nettstedet med en gang." };
+  } catch (err) {
+    return toState(err);
+  }
 }

@@ -106,12 +106,70 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
     ],
   },
   produkter: {
-    // Viser de første aktive varene i nettbutikken. Gjør ingenting på nettsteder uten butikk.
-    label: "Utvalgte varer",
-    variants: [{ key: "standard", label: "Rutenett" }],
+    // Gjør ingenting på nettsteder uten butikk.
+    label: "Varer",
+    variants: [
+      { key: "standard", label: "Rutenett" },
+      { key: "karusell", label: "Karusell" },
+    ],
     fields: [
       { key: "overskrift", label: "Overskrift", type: "text" },
+      {
+        key: "utvalg",
+        label: "Hvilke varer",
+        type: "select",
+        options: [
+          { value: "utvalgte", label: "De første i varelisten" },
+          { value: "nyeste", label: "Nyeste" },
+          { value: "salg", label: "På salg (med førpris)" },
+          { value: "lager", label: "På lager nå" },
+        ],
+      },
       { key: "knappTekst", label: "Knappetekst til alle varer", type: "text", max: 40, optional: true },
+    ],
+  },
+  fordeler: {
+    label: "Trygghetspunkter",
+    variants: [
+      { key: "stripe", label: "Stripe" },
+      { key: "kort", label: "Kort" },
+    ],
+    fields: [
+      { key: "overskrift", label: "Overskrift", type: "text", optional: true },
+      {
+        key: "punkter",
+        label: "Punkter",
+        type: "list",
+        itemLabel: "Punkt",
+        max: 4,
+        fields: [
+          { key: "tittel", label: "Tittel", type: "text", max: 50 },
+          { key: "tekst", label: "Forklaring", type: "text", max: 120, optional: true },
+        ],
+      },
+    ],
+  },
+  kategorikort: {
+    label: "Kategorikort",
+    variants: [
+      { key: "rutenett", label: "Rutenett" },
+      { key: "store", label: "Store kort" },
+    ],
+    fields: [
+      { key: "overskrift", label: "Overskrift", type: "text", optional: true },
+      {
+        key: "kort",
+        label: "Kort",
+        type: "list",
+        itemLabel: "Kort",
+        max: 8,
+        fields: [
+          { key: "tittel", label: "Tittel", type: "text", max: 60 },
+          { key: "tekst", label: "Tekst", type: "text", max: 140, optional: true },
+          { key: "bilde", label: "Bilde", type: "image" },
+          { key: "lenke", label: "Lenke", type: "link" },
+        ],
+      },
     ],
   },
   tjenester: {

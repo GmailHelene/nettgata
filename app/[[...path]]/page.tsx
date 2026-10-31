@@ -11,6 +11,8 @@ import { isPlatformHost, resolveSiteByHost } from "@/lib/hosts";
 import { getPublishedPage, normalizePath } from "@/lib/publishing";
 import { buildRenderContext } from "@/lib/render";
 import { listCatalog } from "@/lib/shop/catalog";
+import { readShopSettings } from "@/lib/shop/settings";
+import { parseBrowseQuery } from "@/lib/shop/browse";
 import { themeToCssVars } from "@/lib/theme";
 
 type Props = { params: Promise<{ path?: string[] }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
@@ -126,13 +128,17 @@ export default async function PublicPage(props: Props) {
           .orderBy(asc(productCategories.sortOrder), asc(productCategories.name));
         const active = categories.find((c) => c.slug === query.kategori);
         const items = await listCatalog(db, site.id, active ? { categoryId: active.id } : {});
-        body = <ProductsPage products={items} categories={categories} activeSlug={active?.slug ?? null} basePath={basePath} />;
+        body = (
+          <ProductsPage products={items} categories={categories} activeSlug={active?.slug ?? null} basePath={basePath} query={parseBrowseQuery(query)} />
+        );
         break;
       }
       case "product": {
         const [product] = await listCatalog(db, site.id, { slug: route.slug });
         if (!product) notFound();
-        body = <ProductPage siteId={site.id} product={product} basePath={basePath} />;
+        body = (
+          <ProductPage siteId={site.id} siteName={site.name} product={product} basePath={basePath} settings={readShopSettings(site.shop)} origin={origin} />
+        );
         break;
       }
       case "cart":

@@ -90,7 +90,8 @@ export async function updateSiteSettings(
   const [site] = await db.select().from(sites).where(eq(sites.id, siteId)).limit(1);
   if (!site) throw new PublishingError("Fant ikke nettstedet");
   const design = getPack(site.industryPack)?.designs.find((d) => d.key === input.designKey);
-  const theme = design?.theme ?? site.theme;
+  // Designretningen bytter farger. Fonter og hjørner velges separat under Utseende og beholdes.
+  const theme = design ? { ...design.theme, fonts: site.theme.fonts, radius: site.theme.radius } : site.theme;
   const problems = themeContrastProblems(theme);
   if (problems.length) throw new PublishingError(problems.join("\n"));
 

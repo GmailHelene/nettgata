@@ -4,6 +4,7 @@ import { pages, sites } from "@/db/schema";
 import type { RenderContext } from "@/components/sections";
 import { schemaTypeFor } from "@/lib/packs";
 import { readSiteInfo } from "@/lib/site-info";
+import { readSiteLayout } from "@/lib/site-layout";
 import { listCatalog } from "@/lib/shop/catalog";
 
 type Site = typeof sites.$inferSelect;
@@ -18,6 +19,8 @@ export async function buildRenderContext(db: Db, site: Site, path: string, previ
     .from(pages)
     .where(and(...conditions))
     .orderBy(asc(pages.sortOrder), asc(pages.path));
+  // I en nettbutikk står «Alle varer» alltid i menyen, rett etter forsiden.
+  if (shop && !nav.some((n) => n.path === "/produkter")) nav.splice(nav[0]?.path === "/" ? 1 : 0, 0, { path: "/produkter", title: "Alle varer" });
   return {
     site: { id: site.id, name: site.name, info: readSiteInfo(site.info), schemaType: schemaTypeFor(site.industryPack) },
     nav,
@@ -25,6 +28,7 @@ export async function buildRenderContext(db: Db, site: Site, path: string, previ
     preview,
     basePath,
     shop,
-    products: shop ? (await listCatalog(db, site.id)).slice(0, 12) : [],
+    layout: readSiteLayout(site.layout),
+    products: shop ? (await listCatalog(db, site.id)).slice(0, 60) : [],
   };
 }

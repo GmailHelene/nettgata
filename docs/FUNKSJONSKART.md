@@ -7,7 +7,7 @@ Grunnlag: markedsanalysen (funksjonskart, funksjonsrevisjon og MVP-liste), produ
 
 **Lag:** N = synlig for nybegynneren. A = avansert lag. U = utviklerlaget. S = skjult automatikk som bare virker.
 
-Sist oppdatert 31.10.2026.
+Sist oppdatert 31.10.2026 (kvalitetsløft 1).
 
 ---
 
@@ -42,10 +42,15 @@ Sist oppdatert 31.10.2026.
 | Designretninger per bransjepakke (tre for håndverker) | N | Ferdig |
 | Kontrastsjekk etter WCAG, tema som bryter kravet kan ikke lagres | S | Ferdig |
 | Farger hentet automatisk fra logo og bilder | N | MVP |
-| Egendefinert palett og fonter innenfor kontrastkravene | A | MVP |
-| Opplasting av logo og favicon | N | MVP |
+| Seks fontpar, selvhostet (ingen kall til Google), valg av hjørner | N | Ferdig |
+| Bakgrunn per seksjon (vanlig, flate, fargerik) med kontrast i behold | N | Ferdig |
+| Egendefinert palett innenfor kontrastkravene | A | MVP |
+| Opplasting av logo | N | Ferdig (favicon: MVP) |
 | Mørk modus for nettstedet | A | Senere |
 | Egen sidemalbygger (lagre egne seksjoner som maler) | A | Senere |
+
+| Toppstripe med budskap og lenker, logo, mobilmeny, bunntekst med kolonner og sosiale lenker | N | Ferdig |
+| Meny med undermeny og megameny | A | MVP |
 
 ## 3. Seksjoner og innhold
 
@@ -54,6 +59,7 @@ Sist oppdatert 31.10.2026.
 | Toppseksjon (fire varianter, også med bilde og bilde som bakgrunn) | N | Ferdig |
 | Tekst, bilde og tekst, tjenester og priser, kontakt, oppfordring | N | Ferdig |
 | Bildegalleri, kundeomtaler, spørsmål og svar | N | Ferdig |
+| Trygghetspunkter, varekarusell (nyeste, salg, på lager), kategorikort | N | Ferdig |
 | Ansatte og team | N | MVP |
 | Åpningstider som egen seksjon | N | MVP |
 | Kart (uten sporing før samtykke) | N | MVP |
@@ -160,6 +166,9 @@ Sist oppdatert 31.10.2026.
 | Lager per variant, atomisk trekk, «Bare X igjen» | N | Ferdig (lagervarsel på e-post: MVP) |
 | Priser med MVA (25/15/12/0), prishistorikk og automatisk førpris | S | Ferdig |
 | Handlekurv og kasse, priser alltid fra serveren | N | Ferdig |
+| Handlekurv som skuff med fri frakt-måler | N | Ferdig |
+| Vareside med galleri, brødsmuler, trekkspill og fast kjøpsknapp på mobil | N | Ferdig |
+| Produktdata for Google (pris, lager per variant) | S | Ferdig |
 | Vipps (ePayment) og kort | N | MVP |
 | Betal ved henting, faktura, testbetaling i utvikling | N | Ferdig |
 | Kassen stengt til kjøpsvilkårene er publisert | S | Ferdig |
@@ -173,6 +182,7 @@ Sist oppdatert 31.10.2026.
 | Rabattkoder og kampanjer | N | MVP |
 | Fiken-eksport og ordreeksport som stemmer mot Vipps-oppgjør | A | MVP |
 | Produktfeed til Google og Meta | S | MVP |
+| Sortering (pris, nyeste) og filtre på valg og lager | N | Ferdig |
 | Søk i varer | N | MVP |
 | Masseimport og -eksport med CSV | A | MVP |
 | Kundekonto med ordrehistorikk | N | Senere |

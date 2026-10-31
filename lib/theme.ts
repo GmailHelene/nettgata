@@ -2,10 +2,17 @@ import { z } from "zod";
 
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Farge må være på formen #RRGGBB");
 
+const sans = "system-ui, sans-serif";
+const serif = "Georgia, serif";
+
+/** Fontpar. CSS-variablene settes av app/fonts.ts, med systemfonter som reserve. */
 export const fontPairs = {
-  moderne: { heading: "'Inter', system-ui, sans-serif", body: "'Inter', system-ui, sans-serif" },
-  klassisk: { heading: "Georgia, 'Times New Roman', serif", body: "system-ui, sans-serif" },
-  robust: { heading: "'Arial Black', Arial, sans-serif", body: "Arial, system-ui, sans-serif" },
+  moderne: { label: "Moderne", heading: `var(--font-inter), ${sans}`, body: `var(--font-inter), ${sans}` },
+  klassisk: { label: "Klassisk", heading: `var(--font-playfair), ${serif}`, body: `var(--font-inter), ${sans}` },
+  robust: { label: "Robust", heading: `var(--font-archivo), ${sans}`, body: `var(--font-inter), ${sans}` },
+  elegant: { label: "Elegant", heading: `var(--font-cormorant), ${serif}`, body: `var(--font-dmsans), ${sans}` },
+  myk: { label: "Myk", heading: `var(--font-fraunces), ${serif}`, body: `var(--font-dmsans), ${sans}` },
+  vennlig: { label: "Vennlig", heading: `var(--font-nunito), ${sans}`, body: `var(--font-nunito), ${sans}` },
 } as const;
 
 export const themeSchema = z.object({
@@ -15,7 +22,7 @@ export const themeSchema = z.object({
   surface: hex,
   text: hex,
   muted: hex,
-  fonts: z.enum(["moderne", "klassisk", "robust"]),
+  fonts: z.enum(["moderne", "klassisk", "robust", "elegant", "myk", "vennlig"]),
   radius: z.enum(["skarp", "myk", "rund"]),
 });
 export type Theme = z.infer<typeof themeSchema>;
@@ -45,6 +52,7 @@ export function themeContrastProblems(theme: Theme): string[] {
     ["Tekst mot bakgrunn", theme.text, theme.background],
     ["Tekst mot flater", theme.text, theme.surface],
     ["Dempet tekst mot bakgrunn", theme.muted, theme.background],
+    ["Dempet tekst mot flater", theme.muted, theme.surface],
     ["Knappetekst mot knapp", theme.onPrimary, theme.primary],
   ];
   return checks
@@ -57,6 +65,9 @@ export function themeToCssVars(theme: Theme): Record<string, string> {
   return {
     "--c-primary": theme.primary,
     "--c-on-primary": theme.onPrimary,
+    // Faste kopier, brukt når en seksjon bytter om primærfargene lokalt.
+    "--c-primary-fixed": theme.primary,
+    "--c-on-primary-fixed": theme.onPrimary,
     "--c-bg": theme.background,
     "--c-surface": theme.surface,
     "--c-text": theme.text,

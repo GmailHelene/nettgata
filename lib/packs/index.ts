@@ -1,4 +1,5 @@
 import type { PageContent } from "@/lib/content/types";
+import type { SiteLayout } from "@/lib/site-layout";
 import type { Theme } from "@/lib/theme";
 import { handverker } from "./handverker";
 import { nettbutikk } from "./nettbutikk";
@@ -20,6 +21,8 @@ export type Pack = {
   /** Nettbutikk-pakker gir varer, kurv og kasse. Standard er vanlig nettside. */
   kind?: "nettside" | "nettbutikk";
   designs: { key: string; label: string; theme: Theme }[];
+  /** Ferdig toppstripe og bunntekst for bransjen. Kunden kan endre alt under Utseende. */
+  layout?: Partial<SiteLayout>;
   pages: (input: PackInput) => PackPage[];
 };
 

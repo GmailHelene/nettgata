@@ -23,12 +23,28 @@ type Props = {
 type Value = Record<string, unknown>;
 
 function emptyValue(fields: Field[]): Value {
-  return Object.fromEntries(fields.map((f) => [f.key, f.type === "list" ? [] : f.type === "image" ? null : ""]));
+  return Object.fromEntries(
+    fields.map((f) => [f.key, f.type === "list" ? [] : f.type === "image" ? null : f.type === "select" ? f.options[0].value : ""]),
+  );
 }
 
 const inputClass = "w-full rounded-md border border-neutral-400 bg-white px-3 py-2";
 
 function FieldInput({ field, value, onChange }: { field: Field; value: unknown; onChange: (v: unknown) => void }) {
+  if (field.type === "select") {
+    return (
+      <label className="block">
+        <span className="mb-1 block text-sm font-medium">{field.label}</span>
+        <select className={inputClass} value={typeof value === "string" ? value : field.options[0].value} onChange={(e) => onChange(e.target.value)}>
+          {field.options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  }
   if (field.type === "image") {
     return <ImageInput label={field.label} optional={field.optional} value={value as ImageValue | null} onChange={onChange} />;
   }
@@ -240,6 +256,16 @@ export function PageEditor({ siteId, preview, pageId, path, initialTitle, initia
                           ))}
                         </select>
                       )}
+                      <select
+                        aria-label="Bakgrunn"
+                        className="rounded-md border border-neutral-400 px-2 py-1 text-sm"
+                        value={section.background ?? "standard"}
+                        onChange={(e) => setSection(i, { ...section, background: e.target.value as Section["background"] })}
+                      >
+                        <option value="standard">Vanlig bakgrunn</option>
+                        <option value="flate">Flate</option>
+                        <option value="fargerik">Fargerik</option>
+                      </select>
                       <button
                         type="button"
                         className="text-sm underline disabled:opacity-40"

@@ -29,6 +29,13 @@
       "when": 1793423735458,
       "tag": "0003_nettbutikk",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793427335933,
+      "tag": "0004_layout",
+      "breakpoints": true
     }
   ]
 }

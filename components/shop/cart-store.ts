@@ -54,6 +54,7 @@ export function addToCart(siteId: string, variantId: string, quantity: number) {
     ? items.map((i) => (i.variantId === variantId ? { ...i, quantity: Math.min(99, i.quantity + quantity) } : i))
     : [...items, { variantId, quantity }];
   writeCart(siteId, next);
+  window.dispatchEvent(new Event("kurv-lagt-til"));
 }
 
 function subscribe(callback: () => void) {

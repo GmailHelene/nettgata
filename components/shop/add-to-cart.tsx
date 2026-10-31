@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CatalogProduct } from "@/lib/shop/catalog";
 import { addToCart } from "./cart-store";
 import { Price } from "./price";
@@ -11,9 +11,25 @@ export function AddToCart({ siteId, product, cartHref }: { siteId: string; produ
   const [selected, setSelected] = useState<string[]>(firstAvailable.optionValues);
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
+  const buttonRef = useRef<HTMLDivElement>(null);
+  const [buttonHidden, setButtonHidden] = useState(false);
+
+  // Fast kjøpslinje på mobil når den vanlige knappen er rullet ut av syne.
+  useEffect(() => {
+    const el = buttonRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(([entry]) => setButtonHidden(!entry.isIntersecting && entry.boundingClientRect.top < 0));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const variant = product.variants.find((v) => v.optionValues.every((value, i) => value === selected[i]));
   const soldOut = !variant || (variant.stock !== null && variant.stock <= 0);
+  const add = () => {
+    if (!variant) return;
+    addToCart(siteId, variant.id, quantity);
+    setAdded(true);
+  };
   const max = variant?.stock === null || variant?.stock === undefined ? 99 : Math.max(1, Math.min(99, variant.stock));
 
   return (
@@ -56,7 +72,7 @@ export function AddToCart({ siteId, product, cartHref }: { siteId: string; produ
         <p className="text-sm">Bare {variant.stock} igjen</p>
       )}
 
-      <div className="flex flex-wrap items-end gap-3">
+      <div ref={buttonRef} className="flex flex-wrap items-end gap-3">
         <label className="block">
           <span className="mb-1 block text-sm font-medium">Antall</span>
           <input
@@ -70,16 +86,24 @@ export function AddToCart({ siteId, product, cartHref }: { siteId: string; produ
         </label>
         <button
           disabled={soldOut}
-          onClick={() => {
-            if (!variant) return;
-            addToCart(siteId, variant.id, quantity);
-            setAdded(true);
-          }}
-          className="rounded-[var(--radius)] bg-[var(--c-primary)] px-6 py-3 font-semibold text-[var(--c-on-primary)] disabled:opacity-50"
+          onClick={add}
+          className="flex-1 rounded-[var(--radius)] bg-[var(--c-primary)] px-6 py-3 font-semibold text-[var(--c-on-primary)] disabled:opacity-50 sm:flex-none"
         >
           {soldOut ? "Utsolgt" : "Legg i handlekurven"}
         </button>
       </div>
+
+      {buttonHidden && !soldOut && variant && (
+        <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-4 border-t border-[var(--c-muted)]/25 bg-[var(--c-bg)] p-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] md:hidden">
+          <span className="flex-1 truncate text-sm">
+            <span className="block truncate font-medium">{product.name}</span>
+            <Price priceOre={variant.priceOre} beforePriceOre={variant.beforePriceOre} />
+          </span>
+          <button onClick={add} className="rounded-[var(--radius)] bg-[var(--c-primary)] px-5 py-3 font-semibold text-[var(--c-on-primary)]">
+            Legg i kurven
+          </button>
+        </div>
+      )}
 
       {added && (
         <p role="status" className="rounded-[var(--radius)] bg-[var(--c-surface)] p-4">

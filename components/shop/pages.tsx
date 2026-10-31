@@ -5,9 +5,12 @@ import { orderLines, orders, products, sites } from "@/db/schema";
 import { Container, Heading } from "@/components/sections";
 import type { CatalogProduct } from "@/lib/shop/catalog";
 import { formatNok } from "@/lib/shop/money";
-import { paymentLabels, type PaymentMethod } from "@/lib/shop/settings";
+import { paymentLabels, type PaymentMethod, type ShopSettings } from "@/lib/shop/settings";
 import { AddToCart } from "./add-to-cart";
 import { Checkout } from "./checkout";
+import { Gallery } from "./gallery";
+import { BrowseControls } from "./browse-controls";
+import { availableFilters, browse, type BrowseQuery } from "@/lib/shop/browse";
 import { ProductGrid } from "./product-grid";
 
 export type ShopRoute =
@@ -36,16 +39,19 @@ export async function shopTitle(db: Db, site: typeof sites.$inferSelect, route: 
 }
 
 export function ProductsPage({
-  products: items,
+  products: all,
   categories,
   activeSlug,
   basePath,
+  query,
 }: {
   products: CatalogProduct[];
   categories: { name: string; slug: string }[];
   activeSlug: string | null;
   basePath: string;
+  query: BrowseQuery;
 }) {
+  const items = browse(all, query);
   return (
     <section className="py-12">
       <Container>
@@ -72,52 +78,117 @@ export function ProductsPage({
           </nav>
         )}
         <div className={categories.length ? "" : "mt-8"}>
-          {items.length === 0 ? <p className="text-[var(--c-muted)]">Ingen varer her ennå.</p> : <ProductGrid products={items} basePath={basePath} />}
+          {all.length > 0 && (
+            <BrowseControls action={`${basePath}/produkter`} category={activeSlug} query={query} filters={availableFilters(all)} count={items.length} />
+          )}
+          {items.length === 0 ? <p className="text-[var(--c-muted)]">{all.length ? "Ingen varer passer filtrene." : "Ingen varer her ennå."}</p> : <ProductGrid products={items} basePath={basePath} />}
         </div>
       </Container>
     </section>
   );
 }
 
-export function ProductPage({ siteId, product, basePath }: { siteId: string; product: CatalogProduct; basePath: string }) {
-  const [main, ...rest] = product.images;
+function Accordion({ title, children, open = false }: { title: string; children: React.ReactNode; open?: boolean }) {
   return (
-    <section className="py-12">
-      <Container className="grid gap-10 md:grid-cols-2">
-        <div className="space-y-4">
-          {main ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={main.src} alt={main.decorative ? "" : main.alt} className="aspect-square w-full rounded-[var(--radius)] object-cover" />
-          ) : (
-            <div className="aspect-square w-full rounded-[var(--radius)] bg-[var(--c-surface)]" />
-          )}
-          {rest.length > 0 && (
-            <ul className="grid grid-cols-4 gap-3">
-              {rest.map((img, i) => (
-                <li key={i}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.src} alt={img.decorative ? "" : img.alt} loading="lazy" className="aspect-square w-full rounded-[var(--radius)] object-cover" />
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div>
-          <Link href={`${basePath}/produkter`} className="text-sm underline">
+    <details open={open} className="group border-b border-[var(--c-muted)]/25 py-4">
+      <summary className="flex cursor-pointer list-none items-center justify-between font-semibold">
+        {title}
+        <span aria-hidden="true" className="text-xl transition-transform group-open:rotate-45">
+          +
+        </span>
+      </summary>
+      <div className="mt-3 space-y-3 leading-relaxed text-[var(--c-text)]">{children}</div>
+    </details>
+  );
+}
+
+/** Produktdata for Google: pris, valuta og lagerstatus per variant. */
+function ProductStructuredData({ product, url, siteName }: { product: CatalogProduct; url: string; siteName: string }) {
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: product.description.slice(0, 500) || undefined,
+    image: product.images.map((i) => i.src),
+    brand: { "@type": "Brand", name: siteName },
+    offers: product.variants.map((v) => ({
+      "@type": "Offer",
+      url,
+      priceCurrency: "NOK",
+      price: (v.priceOre / 100).toFixed(2),
+      availability: v.stock === null || v.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      ...(v.label && { name: v.label }),
+    })),
+  };
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, "\\u003c") }} />;
+}
+
+export function ProductPage({
+  siteId,
+  siteName,
+  product,
+  basePath,
+  settings,
+  origin,
+}: {
+  siteId: string;
+  siteName: string;
+  product: CatalogProduct;
+  basePath: string;
+  settings: ShopSettings;
+  origin: string;
+}) {
+  const paragraphs = product.description.split(/\n\s*\n/).filter(Boolean);
+  return (
+    <section className="py-8 md:py-12">
+      {!basePath && <ProductStructuredData product={product} url={`${origin}/produkt/${product.slug}`} siteName={siteName} />}
+      <Container>
+        <nav aria-label="Brødsmuler" className="mb-6 text-sm text-[var(--c-muted)]">
+          <Link href={`${basePath}/`} className="hover:underline">
+            Forside
+          </Link>
+          <span aria-hidden="true"> / </span>
+          <Link href={`${basePath}/produkter`} className="hover:underline">
             Alle varer
           </Link>
-          <h1 className="mb-4 mt-3 font-[family-name:var(--f-heading)] text-3xl font-bold md:text-4xl">{product.name}</h1>
-          <AddToCart siteId={siteId} product={product} cartHref={`${basePath}/handlekurv`} />
-          {product.description && (
-            <div className="mt-10 space-y-4 leading-relaxed">
-              {product.description
-                .split(/\n\s*\n/)
-                .filter(Boolean)
-                .map((para, i) => (
-                  <p key={i}>{para}</p>
-                ))}
+          <span aria-hidden="true"> / </span>
+          <span aria-current="page">{product.name}</span>
+        </nav>
+        <div className="grid gap-10 md:grid-cols-2 lg:gap-16">
+          <Gallery images={product.images} />
+          <div className="md:sticky md:top-28 md:self-start">
+            <h1 className="mb-4 font-[family-name:var(--f-heading)] text-3xl font-bold leading-tight md:text-4xl">{product.name}</h1>
+            <AddToCart siteId={siteId} product={product} cartHref={`${basePath}/handlekurv`} />
+            <div className="mt-10 border-t border-[var(--c-muted)]/25">
+              {paragraphs.length > 0 && (
+                <Accordion title="Beskrivelse" open>
+                  {paragraphs.map((para, i) => (
+                    <p key={i}>{para}</p>
+                  ))}
+                </Accordion>
+              )}
+              <Accordion title="Levering">
+                <ul className="space-y-1">
+                  {settings.shippingOptions.map((o) => (
+                    <li key={o.code} className="flex justify-between gap-4">
+                      <span>{o.name}</span>
+                      <span>{o.priceOre === 0 ? "Gratis" : formatNok(o.priceOre)}</span>
+                    </li>
+                  ))}
+                </ul>
+                {settings.freeShippingOverOre !== null && <p>Gratis frakt ved kjøp over {formatNok(settings.freeShippingOverOre)}.</p>}
+              </Accordion>
+              <Accordion title="Angrerett og retur">
+                <p>
+                  Du har 14 dagers angrerett fra du mottar varen.{" "}
+                  <Link href={`${basePath}${settings.termsPath}`} className="underline">
+                    Les kjøpsvilkårene
+                  </Link>
+                  .
+                </p>
+              </Accordion>
             </div>
-          )}
+          </div>
         </div>
       </Container>
     </section>

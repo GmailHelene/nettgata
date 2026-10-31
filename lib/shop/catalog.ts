@@ -195,6 +195,7 @@ export type CatalogProduct = {
   variants: CatalogVariant[];
   fromPriceOre: number;
   inStock: boolean;
+  createdAt: string;
 };
 
 /** Aktive varer med varianter, priser og førpris, klare for nettstedet. */
@@ -241,6 +242,7 @@ export async function listCatalog(db: Db, siteId: string, opts: { categoryId?: s
         variants: vs,
         fromPriceOre: Math.min(...vs.map((v) => v.priceOre)),
         inStock: vs.some((v) => v.stock === null || v.stock > 0),
+        createdAt: p.createdAt.toISOString(),
       };
     })
     .filter((p): p is CatalogProduct => p !== null);

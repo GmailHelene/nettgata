@@ -69,7 +69,16 @@ export async function createSiteFromPack(db: Db, input: CreateSiteInput) {
   await db.insert(memberships).values({ orgId: org.id, userId: input.ownerId, role: "owner" });
   const [site] = await db
     .insert(sites)
-    .values({ orgId: org.id, name, slug, kind: pack.kind ?? "nettside", industryPack: pack.key, theme: design.theme, info: info.data })
+    .values({
+      orgId: org.id,
+      name,
+      slug,
+      kind: pack.kind ?? "nettside",
+      industryPack: pack.key,
+      theme: design.theme,
+      info: info.data,
+      layout: pack.layout ?? {},
+    })
     .returning();
 
   const packPages = pack.pages({ name, city: info.data.city });

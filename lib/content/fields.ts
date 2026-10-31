@@ -10,6 +10,7 @@ export type Field =
   | { key: string; label: string; type: "textarea"; max?: number; optional?: boolean }
   | { key: string; label: string; type: "link"; optional?: boolean }
   | { key: string; label: string; type: "image"; optional?: boolean }
+  | { key: string; label: string; type: "select"; options: { value: string; label: string }[] }
   | { key: string; label: string; type: "list"; itemLabel: string; fields: Field[]; max?: number };
 
 /** Bare trygge lenker: ingen javascript:, data: eller lignende. */
@@ -50,6 +51,10 @@ function fieldToZod(field: Field): z.ZodType {
       }).refine((v) => v.decorative || v.alt !== "", `${field.label}: skriv en kort beskrivelse av bildet (alt-tekst)`);
       return field.optional ? image.nullable().optional().default(null) : image.nullable().refine((v) => v !== null, required);
     }
+    case "select":
+      return z
+        .enum(field.options.map((o) => o.value) as [string, ...string[]])
+        .catch(field.options[0].value);
     case "list":
       return z
         .array(fieldsToZod(field.fields), { error: `${field.label} mangler` })

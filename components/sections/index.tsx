@@ -5,8 +5,10 @@ import { isSafeHref, type ImageValue } from "@/lib/content/fields";
 import { mediaSrcPattern } from "@/lib/media-types";
 import { formatAddress, formatOrgnr, type SiteInfo } from "@/lib/site-info";
 import { ContactForm } from "./contact-form";
-import { CartLink } from "@/components/shop/cart-link";
-import { ProductGrid } from "@/components/shop/product-grid";
+import { CartDrawer } from "@/components/shop/cart-drawer";
+import { MobileMenu } from "@/components/site/mobile-menu";
+import type { SiteLayout } from "@/lib/site-layout";
+import { ProductCarousel, ProductGrid } from "@/components/shop/product-grid";
 import type { CatalogProduct } from "@/lib/shop/catalog";
 
 type Props = Record<string, unknown>;
@@ -257,9 +259,7 @@ function Tjenester({ section }: { section: Section }) {
               <div key={i} className="flex flex-wrap items-baseline justify-between gap-2 py-4">
                 <dt className="font-semibold">{str(item, "navn")}</dt>
                 <dd>{str(item, "pris")}</dd>
-                {str(item, "beskrivelse") && (
-                  <dd className="w-full text-sm text-[var(--c-muted)]">{str(item, "beskrivelse")}</dd>
-                )}
+                {str(item, "beskrivelse") && <dd className="w-full text-sm text-[var(--c-muted)]">{str(item, "beskrivelse")}</dd>}
               </div>
             ))}
           </dl>
@@ -281,27 +281,149 @@ function Tjenester({ section }: { section: Section }) {
 
 function Produkter({ section, ctx }: { section: Section; ctx: RenderContext }) {
   const p = section.props;
-  const items = ctx.products.slice(0, 8);
   if (!ctx.shop) return null;
+  const all = ctx.products;
+  const selection = str(p, "utvalg") || "utvalgte";
+  const items = (
+    selection === "nyeste"
+      ? [...all].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      : selection === "salg"
+        ? all.filter((x) => x.variants.some((v) => v.beforePriceOre))
+        : selection === "lager"
+          ? all.filter((x) => x.inStock)
+          : all
+  ).slice(0, section.variant === "karusell" ? 12 : 8);
   return (
     <section className="py-14">
       <Container>
-        <Heading>{str(p, "overskrift")}</Heading>
+        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+          <Heading>{str(p, "overskrift")}</Heading>
+          {str(p, "knappTekst") && (
+            <Link href={siteHref(ctx.basePath, "/produkter")} className="mb-6 font-semibold underline underline-offset-4">
+              {str(p, "knappTekst")} →
+            </Link>
+          )}
+        </div>
         {items.length === 0 ? (
           <p className="text-[var(--c-muted)]">Varene kommer snart.</p>
+        ) : section.variant === "karusell" ? (
+          <ProductCarousel products={items} basePath={ctx.basePath} />
         ) : (
           <ProductGrid products={items} basePath={ctx.basePath} />
-        )}
-        {str(p, "knappTekst") && (
-          <div className="mt-8">
-            <Button href="/produkter" basePath={ctx.basePath}>
-              {str(p, "knappTekst")}
-            </Button>
-          </div>
         )}
       </Container>
     </section>
   );
+}
+
+function Fordeler({ section }: { section: Section }) {
+  const p = section.props;
+  const items = list(p, "punkter");
+  const cards = section.variant === "kort";
+  return (
+    <section className={cards ? "py-14" : "py-8"}>
+      <Container>
+        {str(p, "overskrift") && <Heading>{str(p, "overskrift")}</Heading>}
+        <ul className={`grid gap-6 ${items.length >= 4 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
+          {items.map((item, i) => (
+            <li key={i} className={`flex gap-3 ${cards ? "rounded-[var(--radius)] bg-[var(--c-surface)] p-6" : "items-start"}`}>
+              <svg
+                className="mt-0.5 shrink-0 text-[var(--c-primary)]"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M5 12.5l4.5 4.5L19 7.5" />
+              </svg>
+              <div>
+                <p className="font-semibold">{str(item, "tittel")}</p>
+                {str(item, "tekst") && <p className="mt-1 text-sm text-[var(--c-muted)]">{str(item, "tekst")}</p>}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Container>
+    </section>
+  );
+}
+
+function Kategorikort({ section, basePath }: { section: Section; basePath: string }) {
+  const p = section.props;
+  const items = list(p, "kort").map((k) => ({
+    tittel: str(k, "tittel"),
+    tekst: str(k, "tekst"),
+    lenke: str(k, "lenke"),
+    bilde: image(k, "bilde"),
+  }));
+  const large = section.variant === "store";
+  return (
+    <section className="py-14">
+      <Container>
+        {str(p, "overskrift") && <Heading>{str(p, "overskrift")}</Heading>}
+        <ul className={`grid gap-5 ${large ? "md:grid-cols-2" : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}`}>
+          {items.map((k, i) => (
+            <li key={i}>
+              <a
+                href={isSafeHref(k.lenke) ? siteHref(basePath, k.lenke) : "#"}
+                className="group relative block overflow-hidden rounded-[var(--radius)]"
+              >
+                {k.bilde ? (
+                  <Img
+                    value={{ ...k.bilde, decorative: true }}
+                    className={`w-full object-cover transition-transform duration-500 group-hover:scale-105 ${large ? "aspect-[4/3]" : "aspect-[4/5]"}`}
+                  />
+                ) : (
+                  <div className={`w-full bg-[var(--c-surface)] ${large ? "aspect-[4/3]" : "aspect-[4/5]"}`} />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 p-5 text-white">
+                  <p className="font-[family-name:var(--f-heading)] text-xl font-bold">{k.tittel}</p>
+                  {k.tekst && <p className="mt-1 text-sm text-white/90">{k.tekst}</p>}
+                </div>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </Container>
+    </section>
+  );
+}
+
+/**
+ * Bakgrunn per seksjon. Fargene byttes om lokalt med CSS-variabler, så alle seksjoner
+ * og knapper fortsatt har godkjent kontrast (de samme fargeparene som er sjekket i temaet).
+ */
+function SectionBackground({ background, children }: { background?: string; children: ReactNode }) {
+  if (background === "flate") {
+    return <div style={{ background: "var(--c-surface)", "--c-surface": "var(--c-bg)" } as CSSProperties}>{children}</div>;
+  }
+  if (background === "fargerik") {
+    return (
+      <div
+        style={
+          {
+            // De faste kopiene brukes, fordi --c-primary byttes om på samme element.
+            background: "var(--c-primary-fixed)",
+            color: "var(--c-on-primary-fixed)",
+            "--c-text": "var(--c-on-primary-fixed)",
+            "--c-muted": "var(--c-on-primary-fixed)",
+            "--c-surface": "color-mix(in srgb, var(--c-on-primary-fixed) 12%, var(--c-primary-fixed))",
+            "--c-primary": "var(--c-on-primary-fixed)",
+            "--c-on-primary": "var(--c-primary-fixed)",
+          } as CSSProperties
+        }
+      >
+        {children}
+      </div>
+    );
+  }
+  return <>{children}</>;
 }
 
 function Kontakt({ section, ctx }: { section: Section; ctx: RenderContext }) {
@@ -317,12 +439,18 @@ function Kontakt({ section, ctx }: { section: Section; ctx: RenderContext }) {
           <address className="space-y-2 not-italic">
             {info.phone && (
               <p>
-                Telefon: <a className="underline" href={`tel:${info.phone.replace(/\s/g, "")}`}>{info.phone}</a>
+                Telefon:{" "}
+                <a className="underline" href={`tel:${info.phone.replace(/\s/g, "")}`}>
+                  {info.phone}
+                </a>
               </p>
             )}
             {info.email && (
               <p>
-                E-post: <a className="underline" href={`mailto:${info.email}`}>{info.email}</a>
+                E-post:{" "}
+                <a className="underline" href={`mailto:${info.email}`}>
+                  {info.email}
+                </a>
               </p>
             )}
             {address && <p>{address}</p>}
@@ -374,62 +502,157 @@ export type RenderContext = {
   /** Nettbutikk: handlekurv i menyen og varer til «Utvalgte varer»-seksjonen. */
   shop: boolean;
   products: CatalogProduct[];
+  layout: SiteLayout;
 };
 
 function SiteHeader({ ctx }: { ctx: RenderContext }) {
+  const { layout, site } = ctx;
+  const nav = ctx.nav.map((item) => ({ ...item, href: siteHref(ctx.basePath, item.path) }));
   return (
-    <header className="border-b border-[var(--c-muted)]/20">
-      <Container className="flex flex-wrap items-center justify-between gap-4 py-4">
-        <Link href={siteHref(ctx.basePath, "/")} className="font-[family-name:var(--f-heading)] text-xl font-bold">
-          {ctx.site.name}
-        </Link>
-        {ctx.nav.length > 1 && (
-          <nav aria-label="Hovedmeny">
-            <ul className="flex flex-wrap gap-x-6 gap-y-2">
-              {ctx.nav.map((item) => (
-                <li key={item.path}>
-                  <Link
-                    href={siteHref(ctx.basePath, item.path)}
-                    aria-current={item.path === ctx.path ? "page" : undefined}
-                    className="underline-offset-4 hover:underline aria-[current=page]:font-semibold aria-[current=page]:underline"
-                  >
-                    {item.title}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        )}
-        {ctx.shop ? (
-          <CartLink siteId={ctx.site.id} href={siteHref(ctx.basePath, "/handlekurv")} />
-        ) : (
-          ctx.site.info.phone && (
-            <a href={`tel:${ctx.site.info.phone.replace(/\s/g, "")}`} className="font-semibold">
-              Ring {ctx.site.info.phone}
-            </a>
-          )
-        )}
-      </Container>
+    <header className="sticky top-0 z-40 bg-[var(--c-bg)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--c-bg)]/85">
+      {(layout.announcement.text || layout.topLinks.length > 0) && (
+        <div className="bg-[var(--c-primary)] text-sm text-[var(--c-on-primary)]">
+          <Container className="flex min-h-9 items-center justify-between gap-4 py-1.5">
+            <p className="flex-1 text-center md:text-left">
+              {layout.announcement.href && isSafeHref(layout.announcement.href) ? (
+                <a href={siteHref(ctx.basePath, layout.announcement.href)} className="underline-offset-2 hover:underline">
+                  {layout.announcement.text}
+                </a>
+              ) : (
+                layout.announcement.text
+              )}
+            </p>
+            {layout.topLinks.length > 0 && (
+              <ul className="hidden gap-5 md:flex">
+                {layout.topLinks.map((l) => (
+                  <li key={l.label}>
+                    <a href={siteHref(ctx.basePath, l.href)} className="hover:underline">
+                      {l.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Container>
+        </div>
+      )}
+      <div className="border-b border-[var(--c-muted)]/15">
+        <Container className="flex h-16 items-center gap-6 md:h-20">
+          <MobileMenu items={nav} currentPath={ctx.path} siteName={site.name} />
+          <Link
+            href={siteHref(ctx.basePath, "/")}
+            className="mr-auto flex shrink-0 items-center font-[family-name:var(--f-heading)] text-xl font-bold md:mr-0"
+          >
+            {layout.logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={layout.logo.src} alt={site.name} className="h-9 w-auto max-w-[180px] object-contain md:h-11" />
+            ) : (
+              site.name
+            )}
+          </Link>
+          {nav.length > 1 && (
+            <nav aria-label="Hovedmeny" className="hidden flex-1 justify-center md:flex">
+              <ul className="flex flex-wrap gap-x-8">
+                {nav.map((item) => (
+                  <li key={item.path}>
+                    <Link
+                      href={item.href}
+                      aria-current={item.path === ctx.path ? "page" : undefined}
+                      className="py-2 text-[0.95rem] underline-offset-8 hover:underline aria-[current=page]:font-semibold aria-[current=page]:underline"
+                    >
+                      {item.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          )}
+          <div className="ml-auto flex items-center gap-4 md:ml-0">
+            {ctx.shop ? (
+              <CartDrawer siteId={site.id} basePath={ctx.basePath} />
+            ) : (
+              site.info.phone && (
+                <a href={`tel:${site.info.phone.replace(/\s/g, "")}`} className="hidden font-semibold sm:inline">
+                  Ring {site.info.phone}
+                </a>
+              )
+            )}
+          </div>
+        </Container>
+      </div>
     </header>
   );
 }
 
+const socialLabels = { facebook: "Facebook", instagram: "Instagram", tiktok: "TikTok", linkedin: "LinkedIn" } as const;
+
 function SiteFooter({ ctx }: { ctx: RenderContext }) {
   const { info, name } = ctx.site;
+  const { layout } = ctx;
   const address = formatAddress(info);
+  const social = (Object.keys(socialLabels) as (keyof typeof socialLabels)[]).filter((k) => layout.social[k]);
   return (
-    <footer className="mt-10 bg-[var(--c-surface)] py-10 text-sm">
-      <Container className="flex flex-wrap justify-between gap-6">
-        <div className="space-y-1">
-          <p className="font-semibold">{name}</p>
-          {address && <p>{address}</p>}
-          {info.orgnr && <p>Org.nr. {formatOrgnr(info.orgnr)}</p>}
+    <footer className="mt-16 bg-[var(--c-surface)] text-sm">
+      <Container className="grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="space-y-3">
+          <p className="font-[family-name:var(--f-heading)] text-lg font-bold">{name}</p>
+          {layout.footerText && <p className="max-w-xs text-[var(--c-muted)]">{layout.footerText}</p>}
         </div>
-        <div className="space-y-1">
-          {info.phone && <p>{info.phone}</p>}
-          {info.email && <p>{info.email}</p>}
+        {layout.footerColumns.map((col) => (
+          <div key={col.title}>
+            <h2 className="mb-3 font-semibold">{col.title}</h2>
+            <ul className="space-y-2">
+              {col.links.map((l) => (
+                <li key={l.label}>
+                  <a href={siteHref(ctx.basePath, l.href)} className="text-[var(--c-muted)] hover:text-[var(--c-text)] hover:underline">
+                    {l.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+        <div>
+          <h2 className="mb-3 font-semibold">Kontakt</h2>
+          <address className="space-y-1 not-italic text-[var(--c-muted)]">
+            {info.phone && (
+              <p>
+                <a href={`tel:${info.phone.replace(/\s/g, "")}`} className="hover:underline">
+                  {info.phone}
+                </a>
+              </p>
+            )}
+            {info.email && (
+              <p>
+                <a href={`mailto:${info.email}`} className="hover:underline">
+                  {info.email}
+                </a>
+              </p>
+            )}
+            {address && <p>{address}</p>}
+          </address>
+          {social.length > 0 && (
+            <ul className="mt-4 flex flex-wrap gap-3">
+              {social.map((k) => (
+                <li key={k}>
+                  <a href={layout.social[k]} rel="noopener" target="_blank" className="font-medium underline">
+                    {socialLabels[k]}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </Container>
+      <div className="border-t border-[var(--c-muted)]/20">
+        <Container className="flex flex-wrap items-center justify-between gap-3 py-5 text-xs text-[var(--c-muted)]">
+          <p>
+            © {new Date().getFullYear()} {name}
+            {info.orgnr && ` · Org.nr. ${formatOrgnr(info.orgnr)}`}
+          </p>
+          {ctx.shop && <p>Trygg betaling · Angrerett i 14 dager</p>}
+        </Container>
+      </div>
     </footer>
   );
 }
@@ -473,7 +696,10 @@ export function SiteChrome({
 }) {
   return (
     <div style={style} className="flex min-h-screen flex-col bg-[var(--c-bg)] font-[family-name:var(--f-body)] text-[var(--c-text)]">
-      <a href="#innhold" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-[var(--c-bg)] focus:p-3">
+      <a
+        href="#innhold"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-[var(--c-bg)] focus:p-3"
+      >
         Hopp til innhold
       </a>
       {ctx.path === "/" && !ctx.preview && !ctx.basePath && <StructuredData ctx={ctx} url={canonicalUrl} />}
@@ -499,30 +725,40 @@ export function PageRenderer({
 }) {
   return (
     <SiteChrome style={style} ctx={ctx} canonicalUrl={canonicalUrl}>
-      {content.sections.map((section, i) => {
-        switch (section.type) {
-          case "hero":
-            return <Hero key={section.id} section={section} isFirst={i === 0} basePath={ctx.basePath} />;
-          case "tekst":
-            return <Tekst key={section.id} section={section} />;
-          case "bildetekst":
-            return <BildeTekst key={section.id} section={section} basePath={ctx.basePath} />;
-          case "galleri":
-            return <Galleri key={section.id} section={section} />;
-          case "omtaler":
-            return <Omtaler key={section.id} section={section} />;
-          case "faq":
-            return <Faq key={section.id} section={section} />;
-          case "tjenester":
-            return <Tjenester key={section.id} section={section} />;
-          case "produkter":
-            return <Produkter key={section.id} section={section} ctx={ctx} />;
-          case "kontakt":
-            return <Kontakt key={section.id} section={section} ctx={ctx} />;
-          case "cta":
-            return <Cta key={section.id} section={section} basePath={ctx.basePath} />;
-        }
-      })}
+      {content.sections.map((section, i) => (
+        <SectionBackground key={section.id} background={section.background}>
+          {renderSection(section, i, ctx)}
+        </SectionBackground>
+      ))}
     </SiteChrome>
   );
+}
+
+function renderSection(section: Section, i: number, ctx: RenderContext) {
+  switch (section.type) {
+    case "hero":
+      return <Hero key={section.id} section={section} isFirst={i === 0} basePath={ctx.basePath} />;
+    case "tekst":
+      return <Tekst key={section.id} section={section} />;
+    case "bildetekst":
+      return <BildeTekst key={section.id} section={section} basePath={ctx.basePath} />;
+    case "galleri":
+      return <Galleri key={section.id} section={section} />;
+    case "omtaler":
+      return <Omtaler key={section.id} section={section} />;
+    case "faq":
+      return <Faq key={section.id} section={section} />;
+    case "tjenester":
+      return <Tjenester key={section.id} section={section} />;
+    case "produkter":
+      return <Produkter key={section.id} section={section} ctx={ctx} />;
+    case "kontakt":
+      return <Kontakt key={section.id} section={section} ctx={ctx} />;
+    case "cta":
+      return <Cta key={section.id} section={section} basePath={ctx.basePath} />;
+    case "fordeler":
+      return <Fordeler key={section.id} section={section} />;
+    case "kategorikort":
+      return <Kategorikort key={section.id} section={section} basePath={ctx.basePath} />;
+  }
 }

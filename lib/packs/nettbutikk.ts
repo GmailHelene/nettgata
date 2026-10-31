@@ -54,6 +54,25 @@ export const nettbutikk: Pack = {
       },
     },
   ],
+  layout: {
+    footerText: "Skriv én setning om butikken og hva du selger.",
+    footerColumns: [
+      {
+        title: "Butikken",
+        links: [
+          { label: "Alle varer", href: "/produkter" },
+          { label: "Om oss", href: "/om-oss" },
+        ],
+      },
+      {
+        title: "Kundeservice",
+        links: [
+          { label: "Kontakt oss", href: "/kontakt" },
+          { label: "Kjøpsvilkår", href: "/kjopsvilkar" },
+        ],
+      },
+    ],
+  },
   pages: ({ name }) => [
     {
       path: "/",
@@ -74,10 +93,29 @@ export const nettbutikk: Pack = {
             },
           },
           {
+            id: "fordeler",
+            type: "fordeler",
+            variant: "stripe",
+            background: "flate",
+            props: {
+              punkter: [
+                { tittel: "Rask levering", tekst: "Skriv hvor raskt du sender" },
+                { tittel: "14 dagers angrerett", tekst: "Enkel retur" },
+                { tittel: "Trygg betaling", tekst: "Skriv hvilke betalingsmåter du har" },
+              ],
+            },
+          },
+          {
+            id: "nyheter",
+            type: "produkter",
+            variant: "karusell",
+            props: { overskrift: "Nyheter", utvalg: "nyeste", knappTekst: "Se alle varer" },
+          },
+          {
             id: "utvalgte",
             type: "produkter",
             variant: "standard",
-            props: { overskrift: "Utvalgte varer", knappTekst: "Se alle varer" },
+            props: { overskrift: "Populære varer", utvalg: "utvalgte", knappTekst: "" },
           },
           {
             id: "trygghet",

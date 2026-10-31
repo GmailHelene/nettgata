@@ -1,0 +1,1 @@
+ALTER TABLE "sites" ADD COLUMN "layout" jsonb DEFAULT '{}'::jsonb NOT NULL;

@@ -16,6 +16,7 @@ import type { PageContent } from "@/lib/content/types";
 import type { Theme } from "@/lib/theme";
 import type { SiteInfo } from "@/lib/site-info";
 import type { ShopSettings } from "@/lib/shop/settings";
+import type { SiteLayout } from "@/lib/site-layout";
 
 const id = () => uuid("id").primaryKey().default(sql`gen_random_uuid()`);
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -65,6 +66,8 @@ export const sites = pgTable("sites", {
   info: jsonb("info").$type<Partial<SiteInfo>>().notNull().default({}),
   /** Butikkinnstillinger: frakt, betalingsmåter og kjøpsvilkår. Les via readShopSettings(). */
   shop: jsonb("shop").$type<Partial<ShopSettings>>().notNull().default({}),
+  /** Logo, toppstripe og bunntekst. Les via readSiteLayout(). */
+  layout: jsonb("layout").$type<Partial<SiteLayout>>().notNull().default({}),
   createdAt: createdAt(),
 });
 
