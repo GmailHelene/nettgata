@@ -7,6 +7,8 @@
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "plattformen" }],
   "observability": { "enabled": true },
+  // Bildelager (R2, Vest-Europa). Leses i lib/storage.ts som env.MEDIA.
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "plattformen-media" }],
   // Gratis underdomener per kunde krever eget domene på Cloudflare; til da vises nettstedene på /vis/<slug>.
   "vars": {
     "PLATFORM_HOSTS": "plattformen.helene721.workers.dev",

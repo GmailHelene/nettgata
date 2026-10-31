@@ -70,7 +70,7 @@ Sist oppdatert 31.10.2026.
 | Opplasting med krymping og WebP i nettleseren | N | Ferdig |
 | Filtype sjekkes fra innholdet, SVG avvist (sikkerhet) | S | Ferdig |
 | Alt-tekst påkrevd, eller aktivt merket som pynt | N | Ferdig |
-| Bildelager lokalt og i Cloudflare R2 | S | Ferdig i kode, R2 må slås på i kontoen |
+| Bildelager lokalt og i Cloudflare R2 (Vest-Europa) | S | Ferdig |
 | Mediebibliotek: gjenbruk av opplastede bilder | N | MVP |
 | Fokuspunkt og beskjæring | N | MVP |
 | Responsive bildestørrelser (flere bredder) | S | MVP |
