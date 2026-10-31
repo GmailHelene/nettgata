@@ -15,6 +15,7 @@ import {
 import type { PageContent } from "@/lib/content/types";
 import type { Theme } from "@/lib/theme";
 import type { SiteInfo } from "@/lib/site-info";
+import type { ShopSettings } from "@/lib/shop/settings";
 
 const id = () => uuid("id").primaryKey().default(sql`gen_random_uuid()`);
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -62,6 +63,8 @@ export const sites = pgTable("sites", {
   theme: jsonb("theme").$type<Theme>().notNull(),
   /** Kontaktinfo som én kilde. Les alltid via readSiteInfo(), som fyller inn standardverdier. */
   info: jsonb("info").$type<Partial<SiteInfo>>().notNull().default({}),
+  /** Butikkinnstillinger: frakt, betalingsmåter og kjøpsvilkår. Les via readShopSettings(). */
+  shop: jsonb("shop").$type<Partial<ShopSettings>>().notNull().default({}),
   createdAt: createdAt(),
 });
 
@@ -173,4 +176,133 @@ export const media = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("media_site_idx").on(t.siteId, t.createdAt)],
+);
+
+// ---------- Nettbutikk ----------
+// Alle beløp lagres i øre (heltall) inkludert MVA, slik norske forbrukerpriser skal vises.
+
+export const productStatusEnum = pgEnum("product_status", ["draft", "active", "archived"]);
+export const orderStatusEnum = pgEnum("order_status", ["pending_payment", "paid", "fulfilled", "cancelled", "refunded"]);
+
+export const productCategories = pgTable(
+  "product_categories",
+  {
+    id: id(),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("product_categories_site_slug_idx").on(t.siteId, t.slug)],
+);
+
+export type ProductOption = { name: string; values: string[] };
+export type ProductImage = { src: string; alt: string; decorative?: boolean };
+
+export const products = pgTable(
+  "products",
+  {
+    id: id(),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    categoryId: uuid("category_id").references(() => productCategories.id, { onDelete: "set null" }),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    description: text("description").notNull().default(""),
+    images: jsonb("images").$type<ProductImage[]>().notNull().default([]),
+    /** Opptil tre valg, f.eks. Størrelse og Farge. Tom liste betyr én variant uten valg. */
+    options: jsonb("options").$type<ProductOption[]>().notNull().default([]),
+    /** MVA-sats i prosent: 25 (standard), 15 (mat), 12, 0. */
+    vatRate: integer("vat_rate").notNull().default(25),
+    status: productStatusEnum("status").notNull().default("draft"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("products_site_slug_idx").on(t.siteId, t.slug), index("products_site_status_idx").on(t.siteId, t.status)],
+);
+
+export const productVariants = pgTable(
+  "product_variants",
+  {
+    id: id(),
+    productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+    /** Verdier i samme rekkefølge som produktets options, f.eks. ["M", "Blå"]. */
+    optionValues: jsonb("option_values").$type<string[]>().notNull().default([]),
+    sku: text("sku"),
+    priceOre: integer("price_ore").notNull(),
+    /** Null betyr at lager ikke følges (tjenester, digitale varer, laget på bestilling). */
+    stock: integer("stock"),
+    weightGrams: integer("weight_grams"),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index("product_variants_product_idx").on(t.productId)],
+);
+
+/**
+ * Hver prisendring lagres. Brukes til å regne ut førpris automatisk:
+ * laveste pris de siste 30 dagene før prisen ble satt ned (markedsføringsloven).
+ */
+export const variantPriceHistory = pgTable(
+  "variant_price_history",
+  {
+    id: id(),
+    variantId: uuid("variant_id").notNull().references(() => productVariants.id, { onDelete: "cascade" }),
+    priceOre: integer("price_ore").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("variant_price_history_idx").on(t.variantId, t.createdAt)],
+);
+
+export type ShippingChoice = { code: string; name: string; priceOre: number };
+export type ShippingAddress = { name: string; street: string; postalCode: string; city: string; country: string };
+
+export const orders = pgTable(
+  "orders",
+  {
+    id: id(),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    /** Fortløpende per nettsted, starter på 1001. */
+    number: integer("number").notNull(),
+    status: orderStatusEnum("status").notNull().default("pending_payment"),
+    customerName: text("customer_name").notNull(),
+    customerEmail: text("customer_email").notNull(),
+    customerPhone: text("customer_phone"),
+    shippingAddress: jsonb("shipping_address").$type<ShippingAddress | null>(),
+    shipping: jsonb("shipping").$type<ShippingChoice>().notNull(),
+    subtotalOre: integer("subtotal_ore").notNull(),
+    shippingOre: integer("shipping_ore").notNull(),
+    totalOre: integer("total_ore").notNull(),
+    vatOre: integer("vat_ore").notNull(),
+    paymentMethod: text("payment_method").notNull(),
+    paymentRef: text("payment_ref"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    fulfilledAt: timestamp("fulfilled_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    note: text("note"),
+    /** Hemmelig nøkkel i kvitteringslenken, så kunden kan se ordren uten konto. */
+    accessToken: text("access_token").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("orders_site_number_idx").on(t.siteId, t.number), index("orders_site_created_idx").on(t.siteId, t.createdAt)],
+);
+
+export const orderLines = pgTable(
+  "order_lines",
+  {
+    id: id(),
+    orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+    productId: uuid("product_id").references(() => products.id, { onDelete: "set null" }),
+    variantId: uuid("variant_id").references(() => productVariants.id, { onDelete: "set null" }),
+    /** Øyeblikksbilde ved kjøp, så ordren ikke endrer seg når varen endres senere. */
+    name: text("name").notNull(),
+    variantLabel: text("variant_label"),
+    sku: text("sku"),
+    quantity: integer("quantity").notNull(),
+    unitPriceOre: integer("unit_price_ore").notNull(),
+    vatRate: integer("vat_rate").notNull(),
+    totalOre: integer("total_ore").notNull(),
+  },
+  (t) => [index("order_lines_order_idx").on(t.orderId)],
 );
