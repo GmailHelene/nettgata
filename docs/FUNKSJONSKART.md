@@ -7,7 +7,7 @@ Grunnlag: markedsanalysen (funksjonskart, funksjonsrevisjon og MVP-liste), produ
 
 **Lag:** N = synlig for nybegynneren. A = avansert lag. U = utviklerlaget. S = skjult automatikk som bare virker.
 
-Sist oppdatert 31.10.2026 (byggeverktøyet, første runde).
+Sist oppdatert 31.10.2026 (byggeverktøyet og bildebiblioteket).
 
 ---
 
@@ -84,8 +84,10 @@ Sist oppdatert 31.10.2026 (byggeverktøyet, første runde).
 | Filtype sjekkes fra innholdet, SVG avvist (sikkerhet) | S | Ferdig |
 | Alt-tekst påkrevd, eller aktivt merket som pynt | N | Ferdig |
 | Bildelager lokalt og i Cloudflare R2 (Vest-Europa) | S | Ferdig |
-| Mediebibliotek: gjenbruk av opplastede bilder | N | MVP |
-| Slette et bilde helt fra lageret («Fjern» tar det i dag bare ut av siden) | N | MVP |
+| Mediebibliotek: gjenbruk av opplastede bilder, «Velg fra biblioteket» i alle bildefelt | N | Bygget |
+| Oversikt over alle bilder med størrelse, standard alt-tekst og hvor hvert bilde brukes | N | Bygget |
+| Slette et bilde helt fra lageret, bare når det ikke er i bruk | N | Bygget |
+| Publisering stopper hvis en side bruker et bilde som er slettet | S | Bygget |
 | Fokuspunkt og beskjæring | N | MVP |
 | Responsive bildestørrelser (flere bredder) | S | MVP |
 | Alt-tekst-forslag fra AI, som kunden godkjenner | N | MVP |

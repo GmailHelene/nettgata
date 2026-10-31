@@ -6,6 +6,7 @@ import { inquiries, orders } from "@/db/schema";
 const tabs = [
   { key: "oversikt", label: "Oversikt", href: "", shopOnly: false },
   { key: "sider", label: "Sider", href: "/sider", shopOnly: false },
+  { key: "bilder", label: "Bilder", href: "/bilder", shopOnly: false },
   { key: "varer", label: "Varer", href: "/varer", shopOnly: true },
   { key: "ordre", label: "Ordre", href: "/ordre", shopOnly: true },
   { key: "kunder", label: "Kunder", href: "/kunder", shopOnly: true },

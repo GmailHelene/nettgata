@@ -2,6 +2,7 @@ import { and, desc, eq, gt, max, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { auditLog, pageVersions, pages } from "@/db/schema";
 import { validatePageContent } from "@/lib/content/registry";
+import { missingMedia } from "@/lib/media";
 import type { PageContent } from "@/lib/content/types";
 
 export class PublishingError extends Error {}
@@ -21,6 +22,18 @@ export async function getPublishedPage(db: Db, siteId: string, path: string) {
     .limit(1);
   if (!row) return null;
   return { pageId: row.page.id, title: row.version.title, content: row.version.content, versionNumber: row.version.number };
+}
+
+/** Stopper publisering av en side med bilder som er slettet fra bildebiblioteket. */
+async function assertMediaExists(db: Db, siteId: string, content: unknown) {
+  const missing = await missingMedia(db, siteId, content);
+  if (missing.length) {
+    throw new PublishingError(
+      missing.length === 1
+        ? "Siden bruker et bilde som er slettet fra bildebiblioteket. Velg et nytt bilde der det mangler."
+        : `Siden bruker ${missing.length} bilder som er slettet fra bildebiblioteket. Velg nye bilder der de mangler.`,
+    );
+  }
 }
 
 /** Redigereren lagrer automatisk hvert par sekunder. Loggen får én linje per side og bruker per kvarter. */
@@ -84,6 +97,7 @@ export async function publishPage(db: Db, pageId: string, userId: string) {
   if (!page) throw new PublishingError("Fant ikke siden");
   const result = validatePageContent(page.draft);
   if (!result.ok) throw new PublishingError(result.errors.map((e) => e.message).join("\n"));
+  await assertMediaExists(db, page.siteId, result.content);
 
   const version = await createVersion(db, pageId, page.title, result.content, userId);
   await db.update(pages).set({ publishedVersionId: version.id }).where(eq(pages.id, pageId));
@@ -103,6 +117,7 @@ export async function restoreVersion(db: Db, pageId: string, versionId: string, 
   if (!old) throw new PublishingError("Fant ikke versjonen");
   const [page] = await db.select({ siteId: pages.siteId }).from(pages).where(eq(pages.id, pageId)).limit(1);
   if (!page) throw new PublishingError("Fant ikke siden");
+  await assertMediaExists(db, page.siteId, old.content);
 
   const version = await createVersion(db, pageId, old.title, old.content, userId);
   await db

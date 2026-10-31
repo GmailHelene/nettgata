@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useRef, useState } from "react";
 import { EXAMPLE_IMAGE_SRC, type ImageValue } from "@/lib/content/fields";
+import { MediaPicker } from "./media-picker";
 
 /** Nettstedet bildene lastes opp til. Settes én gang rundt redigereren i stedet for å sendes gjennom alle felt. */
 export const SiteIdContext = createContext<string | null>(null);
@@ -29,6 +30,20 @@ async function prepare(file: File): Promise<{ blob: Blob; width: number; height:
   return { blob, width, height };
 }
 
+/** Krymper og laster opp ett bilde til nettstedets bibliotek. Returnerer stien som brukes i innholdet. */
+export async function uploadImage(siteId: string, file: File): Promise<string> {
+  const { blob, width, height } = await prepare(file);
+  const form = new FormData();
+  form.set("siteId", siteId);
+  form.set("file", blob, file.name);
+  form.set("width", String(width));
+  form.set("height", String(height));
+  const res = await fetch("/studio/api/media", { method: "POST", body: form });
+  const data = (await res.json().catch(() => ({}))) as { src?: string; error?: string };
+  if (!res.ok || !data.src) throw new Error(data.error ?? "Opplastingen feilet");
+  return data.src;
+}
+
 export function ImageInput({
   label,
   value,
@@ -46,23 +61,16 @@ export function ImageInput({
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
 
   const upload = async (file: File) => {
     if (!siteId) return;
     setBusy(true);
     setError(null);
     try {
-      const { blob, width, height } = await prepare(file);
-      const form = new FormData();
-      form.set("siteId", siteId);
-      form.set("file", blob, file.name);
-      form.set("width", String(width));
-      form.set("height", String(height));
-      const res = await fetch("/studio/api/media", { method: "POST", body: form });
-      const data = (await res.json()) as { src?: string; error?: string };
-      if (!res.ok || !data.src) throw new Error(data.error ?? "Opplastingen feilet");
+      const src = await uploadImage(siteId, file);
       // Alt-teksten følger bare med når et ekte bilde byttes, ikke fra eksempelbildet.
-      onChange({ src: data.src, alt: hasImage ? (value?.alt ?? "") : "" });
+      onChange({ src, alt: hasImage ? (value?.alt ?? "") : "" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Opplastingen feilet");
     } finally {
@@ -100,6 +108,11 @@ export function ImageInput({
                 onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
               />
             </label>
+            {siteId && (
+              <button type="button" className="rounded-md border border-neutral-400 px-3 py-1.5" onClick={() => setPicking(true)}>
+                Velg fra biblioteket
+              </button>
+            )}
             {value?.src && (
               <button type="button" className="underline" onClick={() => onChange(null)}>
                 Fjern
@@ -136,6 +149,14 @@ export function ImageInput({
           )}
         </div>
       </div>
+      {picking && siteId && (
+        <MediaPicker
+          siteId={siteId}
+          // Beskrivelsen fra biblioteket følger med, så den bare trenger å skrives én gang.
+          onPick={(item) => onChange({ src: item.src, alt: item.alt })}
+          onClose={() => setPicking(false)}
+        />
+      )}
     </fieldset>
   );
 }

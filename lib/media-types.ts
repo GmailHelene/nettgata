@@ -16,6 +16,14 @@ export const mediaKeyPattern = new RegExp(`^${uuid}/${uuid}\\.(webp|jpg|png|gif|
 /** Slik lagres et bilde i innholdet: /media/<key> */
 export const mediaSrcPattern = new RegExp(`^/media/${uuid}/${uuid}\\.(webp|jpg|png|gif|avif)$`);
 
+const mediaSrcAnywhere = new RegExp(`/media/(${uuid}/${uuid}\\.(?:webp|jpg|png|gif|avif))`, "g");
+
+/** Alle bildenøkler i et innhold (side, vare, logo), uansett hvor dypt i strukturen de ligger. */
+export function mediaKeysIn(value: unknown): Set<string> {
+  const json = typeof value === "string" ? value : (JSON.stringify(value) ?? "");
+  return new Set(Array.from(json.matchAll(mediaSrcAnywhere), (m) => m[1]));
+}
+
 /**
  * Finner bildetypen fra de første bytene i filen, ikke fra det nettleseren påstår.
  * Slik kan ingen laste opp HTML eller skript forkledd som bilde.
