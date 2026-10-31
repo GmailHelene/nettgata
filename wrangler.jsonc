@@ -16,6 +16,9 @@
     { "pattern": "*/*", "zone_name": "nettgata.no" },
     { "pattern": "*nettgata.com/*", "zone_name": "nettgata.com" }
   ],
+  // Med ruter slår wrangler av workers.dev-adressen hvis den ikke er satt. Den beholdes som reserveinngang
+  // til studioet hvis nettgata.no skulle få problemer (står også i PLATFORM_HOSTS).
+  "workers_dev": true,
   // Gratis underdomener per kunde: <navn>.nettgata.no. Nettstedene vises også på /vis/<slug> på plattformens adresse.
   "vars": {
     "PLATFORM_HOSTS": "nettgata.no,plattformen.helene721.workers.dev",
