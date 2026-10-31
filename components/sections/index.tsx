@@ -5,6 +5,9 @@ import { isSafeHref, type ImageValue } from "@/lib/content/fields";
 import { mediaSrcPattern } from "@/lib/media-types";
 import { formatAddress, formatOrgnr, type SiteInfo } from "@/lib/site-info";
 import { ContactForm } from "./contact-form";
+import { CartLink } from "@/components/shop/cart-link";
+import { ProductGrid } from "@/components/shop/product-grid";
+import type { CatalogProduct } from "@/lib/shop/catalog";
 
 type Props = Record<string, unknown>;
 const str = (p: Props, key: string) => (typeof p[key] === "string" ? (p[key] as string) : "");
@@ -44,7 +47,7 @@ function Paragraphs({ text }: { text: string }) {
 }
 
 /** Interne lenker får nettstedets grunnsti, slik at de virker både på eget domene og under /vis/<slug>. */
-function siteHref(basePath: string, href: string): string {
+export function siteHref(basePath: string, href: string): string {
   if (!basePath || !href.startsWith("/") || href.startsWith("//")) return href;
   return href === "/" ? basePath : `${basePath}${href}`;
 }
@@ -61,11 +64,11 @@ function Button({ href, basePath, children }: { href: string; basePath: string; 
   );
 }
 
-function Container({ children, className = "" }: { children: ReactNode; className?: string }) {
+export function Container({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={`mx-auto max-w-5xl px-5 ${className}`}>{children}</div>;
 }
 
-function Heading({ children, level = 2 }: { children: ReactNode; level?: 1 | 2 }) {
+export function Heading({ children, level = 2 }: { children: ReactNode; level?: 1 | 2 }) {
   const Tag = level === 1 ? "h1" : "h2";
   return (
     <Tag
@@ -276,6 +279,31 @@ function Tjenester({ section }: { section: Section }) {
   );
 }
 
+function Produkter({ section, ctx }: { section: Section; ctx: RenderContext }) {
+  const p = section.props;
+  const items = ctx.products.slice(0, 8);
+  if (!ctx.shop) return null;
+  return (
+    <section className="py-14">
+      <Container>
+        <Heading>{str(p, "overskrift")}</Heading>
+        {items.length === 0 ? (
+          <p className="text-[var(--c-muted)]">Varene kommer snart.</p>
+        ) : (
+          <ProductGrid products={items} basePath={ctx.basePath} />
+        )}
+        {str(p, "knappTekst") && (
+          <div className="mt-8">
+            <Button href="/produkter" basePath={ctx.basePath}>
+              {str(p, "knappTekst")}
+            </Button>
+          </div>
+        )}
+      </Container>
+    </section>
+  );
+}
+
 function Kontakt({ section, ctx }: { section: Section; ctx: RenderContext }) {
   const p = section.props;
   const { info } = ctx.site;
@@ -343,6 +371,9 @@ export type RenderContext = {
   preview: boolean;
   /** Tom på eget domene, "/vis/<slug>" når nettstedet vises via plattformens adresse. */
   basePath: string;
+  /** Nettbutikk: handlekurv i menyen og varer til «Utvalgte varer»-seksjonen. */
+  shop: boolean;
+  products: CatalogProduct[];
 };
 
 function SiteHeader({ ctx }: { ctx: RenderContext }) {
@@ -369,10 +400,14 @@ function SiteHeader({ ctx }: { ctx: RenderContext }) {
             </ul>
           </nav>
         )}
-        {ctx.site.info.phone && (
-          <a href={`tel:${ctx.site.info.phone.replace(/\s/g, "")}`} className="font-semibold">
-            Ring {ctx.site.info.phone}
-          </a>
+        {ctx.shop ? (
+          <CartLink siteId={ctx.site.id} href={siteHref(ctx.basePath, "/handlekurv")} />
+        ) : (
+          ctx.site.info.phone && (
+            <a href={`tel:${ctx.site.info.phone.replace(/\s/g, "")}`} className="font-semibold">
+              Ring {ctx.site.info.phone}
+            </a>
+          )
         )}
       </Container>
     </header>
@@ -424,6 +459,33 @@ function StructuredData({ ctx, url }: { ctx: RenderContext; url?: string }) {
   return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: json }} />;
 }
 
+/** Rammen rundt alle sider på nettstedet: tema, meny, bunntekst og «Hopp til innhold». */
+export function SiteChrome({
+  style,
+  ctx,
+  children,
+  canonicalUrl,
+}: {
+  style: CSSProperties;
+  ctx: RenderContext;
+  children: ReactNode;
+  canonicalUrl?: string;
+}) {
+  return (
+    <div style={style} className="flex min-h-screen flex-col bg-[var(--c-bg)] font-[family-name:var(--f-body)] text-[var(--c-text)]">
+      <a href="#innhold" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-[var(--c-bg)] focus:p-3">
+        Hopp til innhold
+      </a>
+      {ctx.path === "/" && !ctx.preview && !ctx.basePath && <StructuredData ctx={ctx} url={canonicalUrl} />}
+      <SiteHeader ctx={ctx} />
+      <main id="innhold" className="flex-1">
+        {children}
+      </main>
+      <SiteFooter ctx={ctx} />
+    </div>
+  );
+}
+
 export function PageRenderer({
   content,
   style,
@@ -436,37 +498,31 @@ export function PageRenderer({
   canonicalUrl?: string;
 }) {
   return (
-    <div style={style} className="flex min-h-screen flex-col bg-[var(--c-bg)] font-[family-name:var(--f-body)] text-[var(--c-text)]">
-      <a href="#innhold" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-[var(--c-bg)] focus:p-3">
-        Hopp til innhold
-      </a>
-      {ctx.path === "/" && !ctx.preview && !ctx.basePath && <StructuredData ctx={ctx} url={canonicalUrl} />}
-      <SiteHeader ctx={ctx} />
-      <main id="innhold" className="flex-1">
-        {content.sections.map((section, i) => {
-          switch (section.type) {
-            case "hero":
-              return <Hero key={section.id} section={section} isFirst={i === 0} basePath={ctx.basePath} />;
-            case "tekst":
-              return <Tekst key={section.id} section={section} />;
-            case "bildetekst":
-              return <BildeTekst key={section.id} section={section} basePath={ctx.basePath} />;
-            case "galleri":
-              return <Galleri key={section.id} section={section} />;
-            case "omtaler":
-              return <Omtaler key={section.id} section={section} />;
-            case "faq":
-              return <Faq key={section.id} section={section} />;
-            case "tjenester":
-              return <Tjenester key={section.id} section={section} />;
-            case "kontakt":
-              return <Kontakt key={section.id} section={section} ctx={ctx} />;
-            case "cta":
-              return <Cta key={section.id} section={section} basePath={ctx.basePath} />;
-          }
-        })}
-      </main>
-      <SiteFooter ctx={ctx} />
-    </div>
+    <SiteChrome style={style} ctx={ctx} canonicalUrl={canonicalUrl}>
+      {content.sections.map((section, i) => {
+        switch (section.type) {
+          case "hero":
+            return <Hero key={section.id} section={section} isFirst={i === 0} basePath={ctx.basePath} />;
+          case "tekst":
+            return <Tekst key={section.id} section={section} />;
+          case "bildetekst":
+            return <BildeTekst key={section.id} section={section} basePath={ctx.basePath} />;
+          case "galleri":
+            return <Galleri key={section.id} section={section} />;
+          case "omtaler":
+            return <Omtaler key={section.id} section={section} />;
+          case "faq":
+            return <Faq key={section.id} section={section} />;
+          case "tjenester":
+            return <Tjenester key={section.id} section={section} />;
+          case "produkter":
+            return <Produkter key={section.id} section={section} ctx={ctx} />;
+          case "kontakt":
+            return <Kontakt key={section.id} section={section} ctx={ctx} />;
+          case "cta":
+            return <Cta key={section.id} section={section} basePath={ctx.basePath} />;
+        }
+      })}
+    </SiteChrome>
   );
 }

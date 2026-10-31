@@ -105,6 +105,15 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
       },
     ],
   },
+  produkter: {
+    // Viser de første aktive varene i nettbutikken. Gjør ingenting på nettsteder uten butikk.
+    label: "Utvalgte varer",
+    variants: [{ key: "standard", label: "Rutenett" }],
+    fields: [
+      { key: "overskrift", label: "Overskrift", type: "text" },
+      { key: "knappTekst", label: "Knappetekst til alle varer", type: "text", max: 40, optional: true },
+    ],
+  },
   tjenester: {
     label: "Tjenester og priser",
     variants: [

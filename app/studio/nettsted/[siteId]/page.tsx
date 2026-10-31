@@ -20,7 +20,7 @@ export default async function SitePage({ params }: { params: Promise<{ siteId: s
 
   return (
     <main className="mx-auto max-w-4xl px-5 py-12">
-      <SiteNav siteId={site.id} name={site.name} active="sider" unread={unread} />
+      <SiteNav siteId={site.id} name={site.name} shop={site.kind === "nettbutikk"} active="sider" unread={unread} />
       <p className="mb-8 text-sm text-neutral-600">
         <a className="underline" href={`/vis/${site.slug}`} target="_blank" rel="noreferrer">
           Se nettstedet

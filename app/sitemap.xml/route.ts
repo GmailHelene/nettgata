@@ -1,11 +1,11 @@
 import { and, asc, eq, isNotNull } from "drizzle-orm";
 import { getDb } from "@/db";
-import { pageVersions, pages } from "@/db/schema";
+import { pageVersions, pages, products } from "@/db/schema";
 import { isPlatformHost, resolveSiteByHost } from "@/lib/hosts";
 
 const escapeXml = (s: string) => s.replace(/[<>&'"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
-/** Sitemap per nettsted, bygget fra de publiserte sidene på domenet som spør. */
+/** Sitemap per nettsted, bygget fra publiserte sider og aktive varer på domenet som spør. */
 export async function GET(request: Request) {
   const host = request.headers.get("host") ?? "";
   if (isPlatformHost(host)) return new Response("Not found", { status: 404 });
@@ -19,6 +19,14 @@ export async function GET(request: Request) {
     .innerJoin(pageVersions, eq(pages.publishedVersionId, pageVersions.id))
     .where(and(eq(pages.siteId, site.id), isNotNull(pages.publishedVersionId)))
     .orderBy(asc(pages.sortOrder));
+  if (site.kind === "nettbutikk") {
+    const items = await db
+      .select({ slug: products.slug, updated: products.updatedAt })
+      .from(products)
+      .where(and(eq(products.siteId, site.id), eq(products.status, "active")));
+    if (items.length) rows.push({ path: "/produkter", updated: new Date(Math.max(...items.map((p) => p.updated.getTime()))) });
+    rows.push(...items.map((p) => ({ path: `/produkt/${p.slug}`, updated: p.updated })));
+  }
 
   const proto = request.headers.get("x-forwarded-proto") ?? new URL(request.url).protocol.replace(":", "");
   const urls = rows

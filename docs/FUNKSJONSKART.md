@@ -154,20 +154,26 @@ Sist oppdatert 31.10.2026.
 
 | Funksjon | Lag | Status |
 |---|---|---|
-| Produkter med bilder, beskrivelse og SEO | N | MVP |
-| Varianter (størrelse, farge, materiale) og attributter | N | MVP |
-| Kategorier og samlinger | N | MVP |
-| Lager per variant, lagervarsel | N | MVP |
-| Priser med MVA, førpris og prishistorikk | S | MVP |
-| Handlekurv og kasse | N | MVP |
+| Produkter med bilder, beskrivelse og egen side | N | Ferdig (egen SEO-tekst per vare: MVP) |
+| Varianter fra opptil tre valg, laget automatisk av kombinasjonene | N | Ferdig |
+| Kategorier med filter i butikken | N | Ferdig |
+| Lager per variant, atomisk trekk, «Bare X igjen» | N | Ferdig (lagervarsel på e-post: MVP) |
+| Priser med MVA (25/15/12/0), prishistorikk og automatisk førpris | S | Ferdig |
+| Handlekurv og kasse, priser alltid fra serveren | N | Ferdig |
 | Vipps (ePayment) og kort | N | MVP |
-| Frakt: Bring med etikett, hentepunkt, gratis frakt-grense | N | MVP |
-| Ordre, kvittering, ordrebekreftelse på e-post | N | MVP |
-| Retur og angrerett, kreditnota | N | MVP |
+| Betal ved henting, faktura, testbetaling i utvikling | N | Ferdig |
+| Kassen stengt til kjøpsvilkårene er publisert | S | Ferdig |
+| «Utvalgte varer»-seksjon og nettbutikkpakke med tre designretninger | N | Ferdig |
+| Faste leveringsmåter, hent selv, gratis frakt over en grense | N | Ferdig |
+| Bring med pris fra API og fraktetikett | N | MVP |
+| Ordre med fortløpende nummer, statusregler og kvitteringsside | N | Ferdig |
+| Ordrebekreftelse og varsel på e-post | S | MVP |
+| Kansellering og refusjon som status, varene legges tilbake på lager | N | Ferdig |
+| Kreditnota | A | MVP |
 | Rabattkoder og kampanjer | N | MVP |
 | Fiken-eksport og ordreeksport som stemmer mot Vipps-oppgjør | A | MVP |
 | Produktfeed til Google og Meta | S | MVP |
-| Søk og filtrering | N | MVP |
+| Søk i varer | N | MVP |
 | Masseimport og -eksport med CSV | A | MVP |
 | Kundekonto med ordrehistorikk | N | Senere |
 | Klarna, Helthjem, PostNord | N | Senere |

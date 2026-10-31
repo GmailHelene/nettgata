@@ -4,6 +4,7 @@ import { pages, sites } from "@/db/schema";
 import type { RenderContext } from "@/components/sections";
 import { schemaTypeFor } from "@/lib/packs";
 import { readSiteInfo } from "@/lib/site-info";
+import { listCatalog } from "@/lib/shop/catalog";
 
 type Site = typeof sites.$inferSelect;
 
@@ -11,6 +12,7 @@ type Site = typeof sites.$inferSelect;
 export async function buildRenderContext(db: Db, site: Site, path: string, preview: boolean, basePath = ""): Promise<RenderContext> {
   const conditions = [eq(pages.siteId, site.id), eq(pages.showInMenu, true)];
   if (!preview) conditions.push(isNotNull(pages.publishedVersionId));
+  const shop = site.kind === "nettbutikk";
   const nav = await db
     .select({ path: pages.path, title: pages.title })
     .from(pages)
@@ -22,5 +24,7 @@ export async function buildRenderContext(db: Db, site: Site, path: string, previ
     path,
     preview,
     basePath,
+    shop,
+    products: shop ? (await listCatalog(db, site.id)).slice(0, 12) : [],
   };
 }

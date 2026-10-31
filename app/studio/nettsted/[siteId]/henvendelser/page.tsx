@@ -16,7 +16,7 @@ export default async function InquiriesPage({ params }: { params: Promise<{ site
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-12">
-      <SiteNav siteId={site.id} name={site.name} active="henvendelser" unread={unread} />
+      <SiteNav siteId={site.id} name={site.name} shop={site.kind === "nettbutikk"} active="henvendelser" unread={unread} />
       {rows.length === 0 ? (
         <p className="text-neutral-700">Ingen henvendelser ennå. Meldinger fra kontaktskjemaet havner her.</p>
       ) : (

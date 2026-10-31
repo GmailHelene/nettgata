@@ -1,6 +1,7 @@
 import type { PageContent } from "@/lib/content/types";
 import type { Theme } from "@/lib/theme";
 import { handverker } from "./handverker";
+import { nettbutikk } from "./nettbutikk";
 
 export type PackInput = { name: string; city: string };
 
@@ -16,12 +17,15 @@ export type Pack = {
   description: string;
   /** schema.org-type for strukturerte data, f.eks. HomeAndConstructionBusiness. */
   schemaType: string;
+  /** Nettbutikk-pakker gir varer, kurv og kasse. Standard er vanlig nettside. */
+  kind?: "nettside" | "nettbutikk";
   designs: { key: string; label: string; theme: Theme }[];
   pages: (input: PackInput) => PackPage[];
 };
 
 export const packs: Record<string, Pack> = {
   [handverker.key]: handverker,
+  [nettbutikk.key]: nettbutikk,
 };
 
 export function getPack(key: string): Pack | null {
