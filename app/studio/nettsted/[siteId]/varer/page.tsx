@@ -47,6 +47,9 @@ export default async function ProductsPage({
           <a href={`${base}/eksport`} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
             Last ned CSV
           </a>
+          <Link href={`${base}/import`} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+            Importer CSV
+          </Link>
           <Link href={`${base}/pris-og-lager`} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
             Pris og lager
           </Link>

@@ -89,7 +89,15 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
       <section className="mt-6 grid gap-6 rounded-lg border bg-white p-5 sm:grid-cols-2">
         <div>
           <h2 className="mb-2 font-semibold">Kunde</h2>
-          <p>{order.customerName}</p>
+          <p>
+            {order.customerId ? (
+              <Link href={`/studio/nettsted/${site.id}/kunder/${order.customerId}`} className="underline">
+                {order.customerName}
+              </Link>
+            ) : (
+              order.customerName
+            )}
+          </p>
           <p>
             <a className="underline" href={`mailto:${order.customerEmail}`}>
               {order.customerEmail}

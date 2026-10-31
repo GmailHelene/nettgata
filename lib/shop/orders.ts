@@ -1,7 +1,7 @@
 import { and, eq, gte, inArray, isNull, max, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Db } from "@/db";
-import { auditLog, orderLines, orders, productVariants, products, type ShippingAddress } from "@/db/schema";
+import { auditLog, customers, orderLines, orders, productVariants, products, type ShippingAddress } from "@/db/schema";
 import { ShopError } from "./catalog";
 import { allocateDiscount, assertUsable, claimDiscount, discountAmount, findDiscount, releaseDiscount, type Discount } from "./discounts";
 import { vatOf } from "./money";
@@ -92,13 +92,27 @@ export function shippingFor(settings: ShopSettings, code: string, goodsOre: numb
   return { ...option, priceOre: free ? 0 : option.priceOre };
 }
 
-/** MVA på frakt følger varene: fordeles på satsene etter hvor mye hver sats utgjør av varebeløpet. */
+export type VatRow = { rate: number; amountOre: number; vatOre: number };
+
+/**
+ * Beløp og MVA per sats. Frakt følger varene: den fordeles på satsene etter hvor mye hver sats
+ * utgjør av varebeløpet, øre for øre, så summen av radene alltid er varer pluss frakt.
+ * Samme utregning brukes i kassen, på ordren og i MVA-rapporten.
+ */
+export function vatBreakdown(lines: Pick<PricedLine, "totalOre" | "vatRate">[], shippingOre: number): VatRow[] {
+  const shipping = allocateDiscount(lines.map((l) => l.totalOre), shippingOre);
+  const rows = new Map<number, VatRow>();
+  lines.forEach((l, i) => {
+    const row = rows.get(l.vatRate) ?? { rate: l.vatRate, amountOre: 0, vatOre: 0 };
+    row.amountOre += l.totalOre + shipping[i];
+    row.vatOre += vatOf(l.totalOre, l.vatRate) + vatOf(shipping[i], l.vatRate);
+    rows.set(l.vatRate, row);
+  });
+  return [...rows.values()].sort((a, b) => b.rate - a.rate);
+}
+
 export function totalVat(lines: Pick<PricedLine, "totalOre" | "vatRate">[], shippingOre: number): number {
-  const subtotal = lines.reduce((sum, l) => sum + l.totalOre, 0);
-  const goodsVat = lines.reduce((sum, l) => sum + vatOf(l.totalOre, l.vatRate), 0);
-  if (shippingOre === 0 || subtotal === 0) return goodsVat;
-  const shippingVat = lines.reduce((sum, l) => sum + vatOf(Math.round((shippingOre * l.totalOre) / subtotal), l.vatRate), 0);
-  return goodsVat + shippingVat;
+  return vatBreakdown(lines, shippingOre).reduce((sum, r) => sum + r.vatOre, 0);
 }
 
 export type CartTotals = ReturnType<typeof cartTotals>;
@@ -217,6 +231,18 @@ export async function createOrder(db: Db, siteId: string, settings: ShopSettings
       }
     }
     if (!order) throw new ShopError("Kunne ikke lagre ordren");
+
+    // Kunden opprettes ved første kjøp og får nytt navn og telefon ved neste.
+    const [customer] = await db
+      .insert(customers)
+      .values({ siteId, email: data.email.toLowerCase(), name: data.name, phone: data.phone || null })
+      .onConflictDoUpdate({
+        target: [customers.siteId, customers.email],
+        set: { name: sql`excluded.name`, phone: sql`coalesce(excluded.phone, ${customers.phone})` },
+      })
+      .returning({ id: customers.id });
+    await db.update(orders).set({ customerId: customer.id }).where(eq(orders.id, order.id));
+    order.customerId = customer.id;
 
     await db.insert(orderLines).values(
       lines.map((l) => ({

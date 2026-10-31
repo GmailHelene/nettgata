@@ -18,6 +18,8 @@ import {
   type VariantChange,
 } from "@/lib/shop/catalog";
 import { saveDiscount, type DiscountInput } from "@/lib/shop/discounts";
+import { setCustomerNote } from "@/lib/shop/customers";
+import { applyImport, planImport, type ImportPlan } from "@/lib/shop/import";
 import { setOrderStatus, setStaffNote, setTracking, type OrderStatus } from "@/lib/shop/orders";
 import { shopSettingsSchema, type ShopSettings } from "@/lib/shop/settings";
 import type { ActionState } from "./actions";
@@ -226,5 +228,37 @@ export async function setDiscountActiveAction(siteId: string, discountId: string
     return { ok: true, message: active ? "Koden er slått på" : "Koden er slått av" };
   } catch (err) {
     return toState(err);
+  }
+}
+
+export async function saveCustomerNoteAction(siteId: string, customerId: string, note: string): Promise<ActionState> {
+  try {
+    const { site } = await requireSiteAccess(siteId);
+    await setCustomerNote(await getDb(), site.id, customerId, note);
+    revalidatePath(`/studio/nettsted/${site.id}/kunder/${customerId}`);
+    return { ok: true, message: "Notatet er lagret" };
+  } catch (err) {
+    return toState(err);
+  }
+}
+
+export async function previewImportAction(siteId: string, text: string): Promise<{ ok: boolean; message: string; plan?: ImportPlan }> {
+  try {
+    const { site } = await requireSiteAccess(siteId);
+    const plan = await planImport(await getDb(), site.id, text);
+    return { ok: plan.errors.length === 0, message: plan.errors.length ? "Filen har feil som må rettes" : "Filen ser bra ut", plan };
+  } catch (err) {
+    return toState(err) as { ok: boolean; message: string };
+  }
+}
+
+export async function applyImportAction(siteId: string, text: string): Promise<{ ok: boolean; message: string; plan?: ImportPlan }> {
+  try {
+    const { site, user } = await requireSiteAccess(siteId);
+    const plan = await applyImport(await getDb(), site.id, text, user.id);
+    revalidatePath(`/studio/nettsted/${site.id}`, "layout");
+    return { ok: true, message: `Importert: ${plan.creates.length} nye varer og ${plan.updates.length} varer endret`, plan };
+  } catch (err) {
+    return toState(err) as { ok: boolean; message: string };
   }
 }

@@ -258,6 +258,26 @@ export const variantPriceHistory = pgTable(
   (t) => [index("variant_price_history_idx").on(t.variantId, t.createdAt)],
 );
 
+/**
+ * Kundene i én butikk, én rad per e-postadresse. Opprettes eller oppdateres ved hvert kjøp,
+ * så butikken ser hvem som handler igjen. Kunden logger ikke inn; det er butikkens kundeliste.
+ */
+export const customers = pgTable(
+  "customers",
+  {
+    id: id(),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    /** Alltid lagret med små bokstaver. */
+    email: text("email").notNull(),
+    name: text("name").notNull(),
+    phone: text("phone"),
+    /** Internt notat for butikken. Vises aldri for kunden. */
+    note: text("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("customers_site_email_idx").on(t.siteId, t.email)],
+);
+
 export type ShippingChoice = { code: string; name: string; priceOre: number };
 export type ShippingAddress = { name: string; street: string; postalCode: string; city: string; country: string };
 
@@ -272,6 +292,7 @@ export const orders = pgTable(
     customerName: text("customer_name").notNull(),
     customerEmail: text("customer_email").notNull(),
     customerPhone: text("customer_phone"),
+    customerId: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
     shippingAddress: jsonb("shipping_address").$type<ShippingAddress | null>(),
     shipping: jsonb("shipping").$type<ShippingChoice>().notNull(),
     subtotalOre: integer("subtotal_ore").notNull(),
@@ -299,6 +320,7 @@ export const orders = pgTable(
     uniqueIndex("orders_site_number_idx").on(t.siteId, t.number),
     index("orders_site_created_idx").on(t.siteId, t.createdAt),
     index("orders_site_status_idx").on(t.siteId, t.status),
+    index("orders_customer_idx").on(t.customerId),
   ],
 );
 

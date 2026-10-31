@@ -37,7 +37,7 @@ describe("norsk tid", () => {
 describe("CSV", () => {
   it("bruker semikolon, BOM og hindrer formler i Excel", () => {
     const csv = toCsv(["Navn", "Beløp"], [["=HYPERLINK(\"x\")", "1299,00"], ["Ola; Nordmann", 5]]);
-    expect(csv.startsWith("﻿")).toBe(true);
+    expect(csv.charCodeAt(0) === 0xfeff).toBe(true);
     expect(csv).toContain(`"'=HYPERLINK(""x"")";1299,00`);
     expect(csv).toContain(`"Ola; Nordmann";5`);
   });

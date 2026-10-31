@@ -8,7 +8,9 @@ const tabs = [
   { key: "sider", label: "Sider", href: "/sider", shopOnly: false },
   { key: "varer", label: "Varer", href: "/varer", shopOnly: true },
   { key: "ordre", label: "Ordre", href: "/ordre", shopOnly: true },
+  { key: "kunder", label: "Kunder", href: "/kunder", shopOnly: true },
   { key: "rabatter", label: "Rabatter", href: "/rabatter", shopOnly: true },
+  { key: "rapporter", label: "Rapporter", href: "/rapporter", shopOnly: true },
   { key: "henvendelser", label: "Henvendelser", href: "/henvendelser", shopOnly: false },
   { key: "innstillinger", label: "Innstillinger", href: "/innstillinger", shopOnly: false },
 ] as const;
@@ -28,7 +30,7 @@ export async function SiteNav({
   siteId: string;
   name: string;
   active: SiteTab;
-  /** Varer, Ordre og Rabatter vises bare for nettbutikker, så en vanlig nettside ikke får faner den ikke trenger. */
+  /** Butikkfanene vises bare for nettbutikker, så en vanlig nettside ikke får faner den ikke trenger. */
   shop?: boolean;
 }) {
   const db = await getDb();

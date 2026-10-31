@@ -204,6 +204,7 @@ export async function listVariantsForGrid(db: Db, siteId: string) {
     .orderBy(asc(products.name), asc(productVariants.position));
 }
 
+/** Én rad per variant. Samme kolonner leses av importen, så filen kan endres i Excel og lastes opp igjen. */
 export async function productsCsv(db: Db, siteId: string): Promise<string> {
   const rows = await db
     .select({ product: products, variant: productVariants, category: productCategories.name })
@@ -214,12 +215,13 @@ export async function productsCsv(db: Db, siteId: string): Promise<string> {
     .orderBy(asc(products.name), asc(productVariants.position));
   const statusLabel = { active: "I butikken", draft: "Kladd", archived: "Arkivert" } as const;
   return toCsv(
-    ["Varenavn", "Adresse", "Status", "Kategori", "Variant", "Varenummer", "Pris (kr)", "Lager", "MVA-sats", "Vekt (g)"],
+    ["Varenavn", "Adresse", "Status", "Kategori", "Valg", "Variant", "Varenummer", "Pris (kr)", "Lager", "MVA-sats", "Vekt (g)"],
     rows.map(({ product, variant, category }) => [
       product.name,
       product.slug,
       statusLabel[product.status],
       category,
+      product.options.map((o) => o.name).join(" / "),
       variant.optionValues.join(" / "),
       variant.sku,
       csvKroner(variant.priceOre),

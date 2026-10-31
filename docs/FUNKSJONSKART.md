@@ -7,7 +7,7 @@ Grunnlag: markedsanalysen (funksjonskart, funksjonsrevisjon og MVP-liste), produ
 
 **Lag:** N = synlig for nybegynneren. A = avansert lag. U = utviklerlaget. S = skjult automatikk som bare virker.
 
-Sist oppdatert 31.10.2026 (kvalitetsløft 2, del 1: adminpanelet).
+Sist oppdatert 31.10.2026 (kvalitetsløft 2, del 1 og 2: adminpanelet).
 
 ---
 
@@ -154,7 +154,7 @@ Sist oppdatert 31.10.2026 (kvalitetsløft 2, del 1: adminpanelet).
 | E-postvarsel til bedriften ved ny henvendelse (Brevo) | S | MVP |
 | Tilbudsforespørsel med bildeopplasting (håndverker) | N | MVP |
 | Egne skjema med valgfrie felt | A | Senere |
-| Enkel kundeoversikt (CRM-lett) | A | Senere |
+| Kundeliste med ordrehistorikk, hvor mye hver har handlet for, søk, internt notat og CSV | A | Ferdig (segmenter og samtykke til nyhetsbrev: Senere) |
 
 ## 10. Nettbutikk (Magento- og Shopify-nivå)
 
@@ -185,12 +185,13 @@ Sist oppdatert 31.10.2026 (kvalitetsløft 2, del 1: adminpanelet).
 | Kansellering og refusjon som status, varene legges tilbake på lager | N | Ferdig |
 | Kreditnota | A | MVP |
 | Rabattkoder: prosent, beløp eller fri frakt, minstebeløp, periode og bruksgrense | N | Ferdig (automatiske kampanjer: MVP) |
+| Salgs- og MVA-rapport per måned, termin, år eller egen periode, med MVA per sats og CSV | A | Ferdig |
 | Fiken-eksport og ordreeksport som stemmer mot Vipps-oppgjør | A | MVP |
 | Produktfeed til Google og Meta | S | MVP |
 | Sortering (pris, nyeste) og filtre på valg og lager | N | Ferdig |
 | Søk i varer for kunden | N | MVP |
 | Eksport av varer og ordre som CSV (norsk Excel) | A | Ferdig |
-| Import av varer fra CSV | A | MVP |
+| Import av varer fra CSV med forhåndsvisning, nye varer og endring av pris, lager, status og kategori | A | Ferdig (bilder via import: Senere) |
 | Kundekonto med ordrehistorikk | N | Senere |
 | Klarna, Helthjem, PostNord | N | Senere |
 | Gavekort | N | Senere |
