@@ -19,6 +19,8 @@
   // Med ruter slår wrangler av workers.dev-adressen hvis den ikke er satt. Den beholdes som reserveinngang
   // til studioet hvis nettgata.no skulle få problemer (står også i PLATFORM_HOSTS).
   "workers_dev": true,
+  // Egne adresser per opplastet versjon trengs ikke, og gamle versjoner skal ikke kunne nås.
+  "preview_urls": false,
   // Gratis underdomener per kunde: <navn>.nettgata.no. Nettstedene vises også på /vis/<slug> på plattformens adresse.
   "vars": {
     "PLATFORM_HOSTS": "nettgata.no,plattformen.helene721.workers.dev",
