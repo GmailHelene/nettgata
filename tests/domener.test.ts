@@ -9,7 +9,7 @@ import { addDomain, checkSiteDomains, dropApex, removeDomain, setPrimaryDomain, 
 import { displayHost, parseDomainInput } from "@/lib/domains/parse";
 import { DNS_TYPE, type DnsResolver, type DomainProvider, type DomainServices, type HostnameState } from "@/lib/domains/services";
 import { resolveHost } from "@/lib/hosts";
-import { platformRedirect } from "@/lib/platform-redirect";
+import { httpsRedirect, platformRedirect } from "@/lib/platform-redirect";
 
 const TARGET = "kunder.plattform.test";
 const HOUR = 3_600_000;
@@ -323,5 +323,13 @@ describe("plattformens ekstra adresser", () => {
     expect(platformRedirect("https://firma.nettgata.no/", aliases, "nettgata.no")).toBeNull();
     expect(platformRedirect("https://nettgata.com/", "", "")).toBeNull();
     expect(platformRedirect("https://nettgata.com/", aliases, undefined)).toBeNull();
+  });
+  it("sender http til https på alle adresser, men lar sertifikatsjekker og localhost være", () => {
+    expect(httpsRedirect("http://nettgata.no/studio/logg-inn?neste=1")).toBe("https://nettgata.no/studio/logg-inn?neste=1");
+    expect(httpsRedirect("http://www.frisor-modum.no/")).toBe("https://www.frisor-modum.no/");
+    expect(httpsRedirect("https://nettgata.no/")).toBeNull();
+    expect(httpsRedirect("http://www.frisor-modum.no/.well-known/acme-challenge/abc")).toBeNull();
+    expect(httpsRedirect("http://localhost:8787/")).toBeNull();
+    expect(httpsRedirect("http://app.localhost:3000/")).toBeNull();
   });
 });

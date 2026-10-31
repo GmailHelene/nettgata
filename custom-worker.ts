@@ -5,7 +5,7 @@
 // @ts-ignore .open-next/worker.js lages av «opennextjs-cloudflare build»
 import { default as handler } from "./.open-next/worker.js";
 import { cronKey } from "./lib/cron";
-import { platformRedirect } from "./lib/platform-redirect";
+import { httpsRedirect, platformRedirect } from "./lib/platform-redirect";
 
 type Env = {
   WORKER_SELF_REFERENCE: { fetch(input: string, init?: RequestInit): Promise<Response> };
@@ -19,8 +19,12 @@ type Context = { waitUntil(promise: Promise<unknown>): void };
 
 const worker = {
   fetch(request: Request, env: Env, ctx: Context) {
-    const target = platformRedirect(request.url, env.PLATFORM_ALIASES, env.PLATFORM_CANONICAL_HOST);
-    if (target) return Response.redirect(target, 301);
+    // Ekstra adresser går rett til https://nettgata.no i ett hopp. Alt annet over http går til https.
+    const alias = platformRedirect(request.url, env.PLATFORM_ALIASES, env.PLATFORM_CANONICAL_HOST);
+    if (alias) return Response.redirect(alias, 301);
+    // 308 beholder metoden, så et skjema sendt over http ikke blir til en tom GET.
+    const secure = httpsRedirect(request.url);
+    if (secure) return Response.redirect(secure, 308);
     return handler.fetch(request, env, ctx);
   },
 
