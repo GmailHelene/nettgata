@@ -2,6 +2,7 @@ import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { memberships, sites } from "@/db/schema";
+import { getPack } from "@/lib/packs";
 import { requireUser } from "@/lib/session";
 import { logout } from "./actions";
 
@@ -41,7 +42,7 @@ export default async function StudioHome() {
               <Link href={`/studio/nettsted/${site.id}`} className="block rounded-lg border bg-white p-5 hover:border-neutral-900">
                 <span className="block font-semibold">{site.name}</span>
                 <span className="text-sm text-neutral-600">
-                  {site.kind === "nettbutikk" ? "Nettbutikk" : "Nettside"} · {site.industryPack}
+                  {site.kind === "nettbutikk" ? "Nettbutikk" : "Nettside"} · {getPack(site.industryPack)?.label ?? site.industryPack}
                 </span>
               </Link>
             </li>

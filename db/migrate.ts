@@ -1,8 +1,9 @@
 import "dotenv/config";
-import { createPgliteDb } from "./index";
+import { runScript } from "./run-script";
+import { createPgliteDb } from "./pglite";
 
 async function main() {
-  const url = process.env.DATABASE_URL;
+  const url = process.env.DATABASE_URL?.trim();
   if (url) {
     const { neon } = await import("@neondatabase/serverless");
     const { drizzle } = await import("drizzle-orm/neon-http");
@@ -14,9 +15,4 @@ async function main() {
   console.log("Migrering ferdig");
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+runScript(main);

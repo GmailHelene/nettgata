@@ -8,7 +8,7 @@ import { readSiteInfo } from "@/lib/site-info";
 type Site = typeof sites.$inferSelect;
 
 /** Menyen viser publiserte sider. I forhåndsvisning vises også upubliserte, så kunden ser helheten. */
-export async function buildRenderContext(db: Db, site: Site, path: string, preview: boolean): Promise<RenderContext> {
+export async function buildRenderContext(db: Db, site: Site, path: string, preview: boolean, basePath = ""): Promise<RenderContext> {
   const conditions = [eq(pages.siteId, site.id), eq(pages.showInMenu, true)];
   if (!preview) conditions.push(isNotNull(pages.publishedVersionId));
   const nav = await db
@@ -21,5 +21,6 @@ export async function buildRenderContext(db: Db, site: Site, path: string, previ
     nav,
     path,
     preview,
+    basePath,
   };
 }

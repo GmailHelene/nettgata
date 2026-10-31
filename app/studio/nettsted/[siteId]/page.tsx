@@ -14,17 +14,26 @@ export default async function SitePage({ params }: { params: Promise<{ siteId: s
     db.select().from(domains).where(eq(domains.siteId, site.id)),
     db.select({ unread: count() }).from(inquiries).where(and(eq(inquiries.siteId, site.id), isNull(inquiries.readAt))),
   ]);
-  const freeHost = `${site.slug}.${process.env.SITES_ROOT_DOMAIN ?? "localhost"}`;
+  const root = process.env.SITES_ROOT_DOMAIN ?? "localhost";
+  const freeHost = root ? `${site.slug}.${root}` : null;
   const protocol = process.env.NODE_ENV === "production" ? "https" : "http";
 
   return (
     <main className="mx-auto max-w-4xl px-5 py-12">
       <SiteNav siteId={site.id} name={site.name} active="sider" unread={unread} />
       <p className="mb-8 text-sm text-neutral-600">
-        Gratis adresse:{" "}
-        <a className="underline" href={`${protocol}://${freeHost}`} target="_blank" rel="noreferrer">
-          {freeHost}
+        <a className="underline" href={`/vis/${site.slug}`} target="_blank" rel="noreferrer">
+          Se nettstedet
         </a>
+        {freeHost && (
+          <>
+            {" "}
+            · Gratis adresse:{" "}
+            <a className="underline" href={`${protocol}://${freeHost}`} target="_blank" rel="noreferrer">
+              {freeHost}
+            </a>
+          </>
+        )}
         {domainRows.map((d) => (
           <span key={d.id}>
             {" "}

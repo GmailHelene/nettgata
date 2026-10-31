@@ -1,6 +1,5 @@
 import { defineCloudflareConfig } from "@opennextjs/cloudflare";
-import r2IncrementalCache from "@opennextjs/cloudflare/overrides/incremental-cache/r2-incremental-cache";
 
-export default defineCloudflareConfig({
-  incrementalCache: r2IncrementalCache,
-});
+// Ingen inkrementell cache ennå: alle sider rendres per forespørsel.
+// Når kantcaching kommer, legges R2-cachen inn her (krever at R2 er slått på i kontoen).
+export default defineCloudflareConfig({});

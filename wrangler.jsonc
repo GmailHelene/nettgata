@@ -6,7 +6,11 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "plattformen" }],
-  "r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "plattformen-opennext-cache" }],
-  "images": { "binding": "IMAGES" }
-  // Hemmeligheter (DATABASE_URL, SESSION_SECRET) settes med `wrangler secret put`, aldri her.
+  "observability": { "enabled": true },
+  // Gratis underdomener per kunde krever eget domene på Cloudflare; til da vises nettstedene på /vis/<slug>.
+  "vars": {
+    "PLATFORM_HOSTS": "plattformen.helene721.workers.dev",
+    "SITES_ROOT_DOMAIN": ""
+  }
+  // Hemmeligheter (DATABASE_URL, SESSION_SECRET) settes med scripts/oppsett-produksjon.ps1, aldri her.
 }

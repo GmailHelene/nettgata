@@ -13,12 +13,15 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
     variants: [
       { key: "standard", label: "Venstrestilt" },
       { key: "sentrert", label: "Sentrert" },
+      { key: "bilde", label: "Med bilde ved siden av" },
+      { key: "bakgrunn", label: "Bilde som bakgrunn" },
     ],
     fields: [
       { key: "overskrift", label: "Overskrift", type: "text", max: 90 },
       { key: "undertekst", label: "Undertekst", type: "textarea", max: 300, optional: true },
       { key: "knappTekst", label: "Knappetekst", type: "text", max: 40, optional: true },
       { key: "knappLenke", label: "Knappelenke", type: "link", optional: true },
+      { key: "bilde", label: "Bilde", type: "image", optional: true },
     ],
   },
   tekst: {
@@ -27,6 +30,79 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
     fields: [
       { key: "overskrift", label: "Overskrift", type: "text", optional: true },
       { key: "brodtekst", label: "Tekst", type: "textarea", max: 6000 },
+    ],
+  },
+  bildetekst: {
+    label: "Bilde og tekst",
+    variants: [
+      { key: "bilde-venstre", label: "Bilde til venstre" },
+      { key: "bilde-hoyre", label: "Bilde til høyre" },
+    ],
+    fields: [
+      { key: "overskrift", label: "Overskrift", type: "text", optional: true },
+      { key: "brodtekst", label: "Tekst", type: "textarea", max: 3000 },
+      { key: "bilde", label: "Bilde", type: "image" },
+      { key: "knappTekst", label: "Knappetekst", type: "text", max: 40, optional: true },
+      { key: "knappLenke", label: "Knappelenke", type: "link", optional: true },
+    ],
+  },
+  galleri: {
+    label: "Bildegalleri",
+    variants: [
+      { key: "rutenett", label: "Rutenett" },
+      { key: "store", label: "Store bilder" },
+    ],
+    fields: [
+      { key: "overskrift", label: "Overskrift", type: "text", optional: true },
+      {
+        key: "bilder",
+        label: "Bilder",
+        type: "list",
+        itemLabel: "Bilde",
+        max: 40,
+        fields: [
+          { key: "bilde", label: "Bilde", type: "image" },
+          { key: "tekst", label: "Bildetekst", type: "text", max: 160, optional: true },
+        ],
+      },
+    ],
+  },
+  omtaler: {
+    // Bare ekte omtaler fra ekte kunder. Oppdiktede omtaler er ulovlig etter markedsføringsloven.
+    label: "Kundeomtaler",
+    variants: [{ key: "standard", label: "Kort" }],
+    fields: [
+      { key: "overskrift", label: "Overskrift", type: "text" },
+      {
+        key: "omtaler",
+        label: "Omtaler",
+        type: "list",
+        itemLabel: "Omtale",
+        max: 12,
+        fields: [
+          { key: "sitat", label: "Hva kunden sa", type: "textarea", max: 600 },
+          { key: "navn", label: "Navn", type: "text", max: 80 },
+          { key: "sted", label: "Sted eller firma", type: "text", max: 80, optional: true },
+        ],
+      },
+    ],
+  },
+  faq: {
+    label: "Spørsmål og svar",
+    variants: [{ key: "standard", label: "Utvidbare" }],
+    fields: [
+      { key: "overskrift", label: "Overskrift", type: "text" },
+      {
+        key: "sporsmal",
+        label: "Spørsmål",
+        type: "list",
+        itemLabel: "Spørsmål",
+        max: 30,
+        fields: [
+          { key: "sporsmal", label: "Spørsmål", type: "text", max: 200 },
+          { key: "svar", label: "Svar", type: "textarea", max: 2000 },
+        ],
+      },
     ],
   },
   tjenester: {

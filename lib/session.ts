@@ -54,21 +54,32 @@ export async function requireUser() {
   return user;
 }
 
-/**
- * Tilgangssjekk som må kjøres i hver Server Action og side som rører et nettsted.
- * Plattformadmin (Helene) har tilgang til alt.
- */
-export async function requireSiteAccess(siteId: string) {
-  const user = await requireUser();
+type SiteAccess = { user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>; site: typeof sites.$inferSelect; role: "owner" | "editor" | "developer" };
+
+/** Som requireSiteAccess, men returnerer null i stedet for å omdirigere. Til API-ruter. */
+export async function checkSiteAccess(siteId: string): Promise<SiteAccess | null> {
+  if (!/^[0-9a-f-]{36}$/.test(siteId)) return null;
+  const user = await getCurrentUser();
+  if (!user) return null;
   const db = await getDb();
   const [site] = await db.select().from(sites).where(eq(sites.id, siteId)).limit(1);
-  if (!site) redirect("/studio");
-  if (user.isPlatformAdmin) return { user, site, role: "owner" as const };
+  if (!site) return null;
+  if (user.isPlatformAdmin) return { user, site, role: "owner" };
   const [membership] = await db
     .select({ role: memberships.role })
     .from(memberships)
     .where(and(eq(memberships.orgId, site.orgId), eq(memberships.userId, user.id)))
     .limit(1);
-  if (!membership) redirect("/studio");
-  return { user, site, role: membership.role };
+  return membership ? { user, site, role: membership.role } : null;
+}
+
+/**
+ * Tilgangssjekk som må kjøres i hver Server Action og side som rører et nettsted.
+ * Plattformadmin (Helene) har tilgang til alt.
+ */
+export async function requireSiteAccess(siteId: string): Promise<SiteAccess> {
+  await requireUser();
+  const access = await checkSiteAccess(siteId);
+  if (!access) redirect("/studio");
+  return access;
 }

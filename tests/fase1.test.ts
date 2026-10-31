@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPgliteDb, type Db } from "@/db";
+import type { Db } from "@/db";
+import { createPgliteDb } from "@/db/pglite";
 import { demoInfo } from "@/db/demo";
 import { pages, sites, users } from "@/db/schema";
 import { isValidOrgnr, lookupOrgnr, tidyName } from "@/lib/brreg";

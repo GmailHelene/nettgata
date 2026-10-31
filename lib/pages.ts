@@ -7,7 +7,7 @@ import { siteInfoSchema, type SiteInfo } from "@/lib/site-info";
 import { themeContrastProblems } from "@/lib/theme";
 
 // Stier som brukes av plattformen selv og derfor ikke kan være sider.
-const RESERVED_PATHS = ["/studio", "/sitemap.xml", "/robots.txt", "/api", "/_next"];
+const RESERVED_PATHS = ["/studio", "/media", "/vis", "/sitemap.xml", "/robots.txt", "/api", "/_next"];
 
 export function isValidPagePath(path: string): boolean {
   if (!/^\/[a-z0-9æøå-]+(\/[a-z0-9æøå-]+)*$/.test(path)) return false;

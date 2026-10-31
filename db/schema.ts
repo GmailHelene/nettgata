@@ -156,3 +156,21 @@ export const rateLimitEvents = pgTable(
   },
   (t) => [index("rate_limit_key_idx").on(t.key, t.createdAt)],
 );
+
+/** Opplastede bilder. Selve filen ligger i R2 (lokalt: .data/media) under nøkkelen <siteId>/<id>.<ext>. */
+export const media = pgTable(
+  "media",
+  {
+    id: id(),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    key: text("key").notNull().unique(),
+    contentType: text("content_type").notNull(),
+    size: integer("size").notNull(),
+    width: integer("width"),
+    height: integer("height"),
+    alt: text("alt").notNull().default(""),
+    uploadedBy: uuid("uploaded_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("media_site_idx").on(t.siteId, t.createdAt)],
+);

@@ -20,29 +20,20 @@ export function setDbForTests(db: Db) {
 }
 
 async function createDb(): Promise<Db> {
-  const url = process.env.DATABASE_URL;
+  // trim(): verdier limt inn via terminal kan få med linjeskift.
+  const url = process.env.DATABASE_URL?.trim();
   if (url) {
     const { neon } = await import("@neondatabase/serverless");
     const { drizzle } = await import("drizzle-orm/neon-http");
     return drizzle(neon(url), { schema }) as unknown as Db;
   }
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("DATABASE_URL mangler i produksjon");
+  // NODE_ENV byttes ut med en fast verdi ved bygging. I produksjon blir grenen død kode,
+  // slik at PGlite (flere MB WebAssembly) aldri havner i Cloudflare-pakken.
+  if (process.env.NODE_ENV !== "production") {
+    const { createPgliteDb } = await import("./pglite");
+    return createPgliteDb(".data/pglite");
   }
-  return createPgliteDb(".data/pglite");
-}
-
-export async function createPgliteDb(dataDir?: string): Promise<Db> {
-  if (dataDir) {
-    const { mkdirSync } = await import("node:fs");
-    mkdirSync(dataDir, { recursive: true });
-  }
-  const { PGlite } = await import("@electric-sql/pglite");
-  const { drizzle } = await import("drizzle-orm/pglite");
-  const { migrate } = await import("drizzle-orm/pglite/migrator");
-  const db = drizzle(new PGlite(dataDir), { schema });
-  await migrate(db, { migrationsFolder: "drizzle" });
-  return db as unknown as Db;
+  throw new Error("DATABASE_URL mangler i produksjon");
 }
 
 export { schema };

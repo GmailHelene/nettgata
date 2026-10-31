@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import type { Field } from "@/lib/content/fields";
+import type { CSSProperties } from "react";
+import { PageRenderer, type RenderContext } from "@/components/sections";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { ImageInput, SiteIdContext } from "@/components/studio/image-input";
+import type { Field, ImageValue } from "@/lib/content/fields";
 import { sectionRegistry } from "@/lib/content/registry";
 import { sectionTypes, type PageContent, type Section, type SectionType } from "@/lib/content/types";
 import { previewLinkAction, publishAction, restoreAction, saveDraftAction, type ActionState } from "@/app/studio/actions";
 
 type Props = {
+  siteId: string;
+  preview: { ctx: RenderContext; style: CSSProperties };
   pageId: string;
   path: string;
   initialTitle: string;
@@ -18,12 +23,15 @@ type Props = {
 type Value = Record<string, unknown>;
 
 function emptyValue(fields: Field[]): Value {
-  return Object.fromEntries(fields.map((f) => [f.key, f.type === "list" ? [] : ""]));
+  return Object.fromEntries(fields.map((f) => [f.key, f.type === "list" ? [] : f.type === "image" ? null : ""]));
 }
 
 const inputClass = "w-full rounded-md border border-neutral-400 bg-white px-3 py-2";
 
 function FieldInput({ field, value, onChange }: { field: Field; value: unknown; onChange: (v: unknown) => void }) {
+  if (field.type === "image") {
+    return <ImageInput label={field.label} optional={field.optional} value={value as ImageValue | null} onChange={onChange} />;
+  }
   if (field.type === "list") {
     const items = Array.isArray(value) ? (value as Value[]) : [];
     const update = (next: Value[]) => onChange(next);
@@ -77,7 +85,37 @@ function FieldGroup({ fields, value, onChange }: { fields: Field[]; value: Value
   );
 }
 
-export function PageEditor({ pageId, path, initialTitle, initialContent, publishedNumber, versions }: Props) {
+const PREVIEW_WIDTH = 1280;
+
+/**
+ * Tegner siden i full desktopbredde og skalerer den ned til kolonnen. Uten dette ville
+ * sidens skjermbredde-regler slå inn for hele vinduet, mens innholdet bare har en halv kolonne.
+ * Lenker er slått av, så du ikke navigerer bort fra redigeringen.
+ */
+function ScaledPreview({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.5);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => setScale(Math.min(1, entry.contentRect.width / PREVIEW_WIDTH)));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <div
+      ref={ref}
+      className="sticky top-20 h-[calc(100vh-6rem)] overflow-y-auto overflow-x-hidden rounded-lg border bg-white shadow-sm"
+      onClickCapture={(e) => {
+        if ((e.target as HTMLElement).closest("a")) e.preventDefault();
+      }}
+    >
+      <div style={{ width: PREVIEW_WIDTH, zoom: scale }}>{children}</div>
+    </div>
+  );
+}
+
+export function PageEditor({ siteId, preview, pageId, path, initialTitle, initialContent, publishedNumber, versions }: Props) {
   const [title, setTitle] = useState(initialTitle);
   const [content, setContent] = useState<PageContent>(initialContent);
   const [dirty, setDirty] = useState(false);
@@ -107,163 +145,205 @@ export function PageEditor({ pageId, path, initialTitle, initialContent, publish
   const run = (fn: () => Promise<ActionState>) => startTransition(async () => setStatus(await fn()));
 
   return (
-    <div className="mt-4">
-      <div className="sticky top-0 z-10 -mx-5 mb-8 flex flex-wrap items-center gap-3 border-b bg-neutral-50/95 px-5 py-3 backdrop-blur">
-        <span className="mr-auto text-sm text-neutral-700">
-          {path} · {publishedNumber ? `Live: versjon ${publishedNumber}` : "Ikke publisert"}
-          {dirty ? " · Ulagrede endringer" : ""}
-        </span>
-        <button disabled={pending} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold" onClick={() => run(save)}>
-          Lagre kladd
-        </button>
-        <button
-          disabled={pending}
-          className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold"
-          onClick={() =>
-            run(async () => {
-              const saved = await save();
-              if (!saved?.ok) return saved;
-              const res = await previewLinkAction(pageId);
-              if (res.ok && res.url) window.open(res.url, "_blank", "noopener");
-              return res.ok ? { ok: true, message: "Forhåndsvisning åpnet i ny fane. Lenken kan deles i 7 dager." } : { ok: false, message: res.message ?? "Feil" };
-            })
-          }
-        >
-          Forhåndsvis
-        </button>
-        <button
-          disabled={pending}
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white"
-          onClick={() =>
-            run(async () => {
-              const saved = await save();
-              return saved?.ok ? publishAction(pageId) : saved;
-            })
-          }
-        >
-          Publiser
-        </button>
-      </div>
+    <SiteIdContext.Provider value={siteId}>
+      <div className="mt-4">
+        <div className="sticky top-0 z-10 -mx-5 mb-8 flex flex-wrap items-center gap-3 border-b bg-neutral-50/95 px-5 py-3 backdrop-blur">
+          <span className="mr-auto text-sm text-neutral-700">
+            {path} · {publishedNumber ? `Live: versjon ${publishedNumber}` : "Ikke publisert"}
+            {dirty ? " · Ulagrede endringer" : ""}
+          </span>
+          <button
+            disabled={pending}
+            className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold"
+            onClick={() => run(save)}
+          >
+            Lagre kladd
+          </button>
+          <button
+            disabled={pending}
+            className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold"
+            onClick={() =>
+              run(async () => {
+                const saved = await save();
+                if (!saved?.ok) return saved;
+                const res = await previewLinkAction(pageId);
+                if (res.ok && res.url) window.open(res.url, "_blank", "noopener");
+                return res.ok
+                  ? { ok: true, message: "Forhåndsvisning åpnet i ny fane. Lenken kan deles i 7 dager." }
+                  : { ok: false, message: res.message ?? "Feil" };
+              })
+            }
+          >
+            Forhåndsvis
+          </button>
+          <button
+            disabled={pending}
+            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white"
+            onClick={() =>
+              run(async () => {
+                const saved = await save();
+                return saved?.ok ? publishAction(pageId) : saved;
+              })
+            }
+          >
+            Publiser
+          </button>
+        </div>
 
-      {status && (
-        <p role="status" className={`mb-6 whitespace-pre-line rounded-md p-3 text-sm ${status.ok ? "bg-green-100 text-green-900" : "bg-red-100 text-red-900"}`}>
-          {status.message}
-        </p>
-      )}
-
-      <label className="mb-8 block">
-        <span className="mb-1 block text-sm font-medium">Sidetittel</span>
-        <input
-          className={inputClass}
-          value={title}
-          onChange={(e) => {
-            setTitle(e.target.value);
-            setDirty(true);
-          }}
-        />
-      </label>
-
-      <ol className="space-y-6">
-        {content.sections.map((section, i) => {
-          const def = sectionRegistry[section.type];
-          return (
-            <li key={section.id} className="rounded-lg border bg-white p-5">
-              <div className="mb-4 flex flex-wrap items-center gap-3">
-                <h2 className="mr-auto font-semibold">{def.label}</h2>
-                {def.variants.length > 1 && (
-                  <select
-                    aria-label="Variant"
-                    className="rounded-md border border-neutral-400 px-2 py-1 text-sm"
-                    value={section.variant}
-                    onChange={(e) => setSection(i, { ...section, variant: e.target.value })}
-                  >
-                    {def.variants.map((v) => (
-                      <option key={v.key} value={v.key}>
-                        {v.label}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <button type="button" className="text-sm underline disabled:opacity-40" disabled={i === 0} onClick={() => move(i, -1)}>
-                  Flytt opp
-                </button>
-                <button type="button" className="text-sm underline disabled:opacity-40" disabled={i === content.sections.length - 1} onClick={() => move(i, 1)}>
-                  Flytt ned
-                </button>
-                <button
-                  type="button"
-                  className="text-sm text-red-800 underline"
-                  onClick={() => edit({ ...content, sections: content.sections.filter((_, j) => j !== i) })}
-                >
-                  Slett
-                </button>
-              </div>
-              <FieldGroup fields={def.fields} value={section.props} onChange={(props) => setSection(i, { ...section, props })} />
-            </li>
-          );
-        })}
-      </ol>
-
-      <div className="mt-6 flex items-center gap-3">
-        <select aria-label="Seksjonstype" className="rounded-md border border-neutral-400 px-2 py-2" value={newType} onChange={(e) => setNewType(e.target.value as SectionType)}>
-          {sectionTypes.map((t) => (
-            <option key={t} value={t}>
-              {sectionRegistry[t].label}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold"
-          onClick={() =>
-            edit({
-              ...content,
-              sections: [
-                ...content.sections,
-                { id: crypto.randomUUID().slice(0, 8), type: newType, variant: sectionRegistry[newType].variants[0].key, props: emptyValue(sectionRegistry[newType].fields) },
-              ],
-            })
-          }
-        >
-          Legg til seksjon
-        </button>
-      </div>
-
-      <section className="mt-12">
-        <h2 className="mb-3 text-lg font-semibold">Versjoner</h2>
-        {versions.length === 0 ? (
-          <p className="text-sm text-neutral-600">Siden er ikke publisert ennå.</p>
-        ) : (
-          <ul className="divide-y rounded-lg border bg-white">
-            {versions.map((v) => (
-              <li key={v.id} className="flex items-center justify-between p-3 text-sm">
-                <span>
-                  Versjon {v.number} · {new Date(v.createdAt).toLocaleString("nb-NO")}
-                  {v.number === publishedNumber ? " · live nå" : ""}
-                </span>
-                {v.number !== publishedNumber && (
-                  <button
-                    type="button"
-                    disabled={pending}
-                    className="underline"
-                    onClick={() => {
-                      if (!confirm(`Publisere versjon ${v.number} på nytt? Kladden blir erstattet med denne versjonen.`)) return;
-                      startTransition(async () => {
-                        const result = await restoreAction(pageId, v.id);
-                        setStatus(result);
-                        // Kladden er byttet ut på serveren; last inn på nytt så skjemaet viser den.
-                        if (result?.ok) window.location.reload();
-                      });
-                    }}
-                  >
-                    Gå tilbake hit
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
+        {status && (
+          <p
+            role="status"
+            className={`mb-6 whitespace-pre-line rounded-md p-3 text-sm ${status.ok ? "bg-green-100 text-green-900" : "bg-red-100 text-red-900"}`}
+          >
+            {status.message}
+          </p>
         )}
-      </section>
-    </div>
+
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div>
+            <label className="mb-8 block">
+              <span className="mb-1 block text-sm font-medium">Sidetittel</span>
+              <input
+                className={inputClass}
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  setDirty(true);
+                }}
+              />
+            </label>
+
+            <ol className="space-y-6">
+              {content.sections.map((section, i) => {
+                const def = sectionRegistry[section.type];
+                return (
+                  <li key={section.id} className="rounded-lg border bg-white p-5">
+                    <div className="mb-4 flex flex-wrap items-center gap-3">
+                      <h2 className="mr-auto font-semibold">{def.label}</h2>
+                      {def.variants.length > 1 && (
+                        <select
+                          aria-label="Variant"
+                          className="rounded-md border border-neutral-400 px-2 py-1 text-sm"
+                          value={section.variant}
+                          onChange={(e) => setSection(i, { ...section, variant: e.target.value })}
+                        >
+                          {def.variants.map((v) => (
+                            <option key={v.key} value={v.key}>
+                              {v.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      <button
+                        type="button"
+                        className="text-sm underline disabled:opacity-40"
+                        disabled={i === 0}
+                        onClick={() => move(i, -1)}
+                      >
+                        Flytt opp
+                      </button>
+                      <button
+                        type="button"
+                        className="text-sm underline disabled:opacity-40"
+                        disabled={i === content.sections.length - 1}
+                        onClick={() => move(i, 1)}
+                      >
+                        Flytt ned
+                      </button>
+                      <button
+                        type="button"
+                        className="text-sm text-red-800 underline"
+                        onClick={() => edit({ ...content, sections: content.sections.filter((_, j) => j !== i) })}
+                      >
+                        Slett
+                      </button>
+                    </div>
+                    <FieldGroup fields={def.fields} value={section.props} onChange={(props) => setSection(i, { ...section, props })} />
+                  </li>
+                );
+              })}
+            </ol>
+
+            <div className="mt-6 flex items-center gap-3">
+              <select
+                aria-label="Seksjonstype"
+                className="rounded-md border border-neutral-400 px-2 py-2"
+                value={newType}
+                onChange={(e) => setNewType(e.target.value as SectionType)}
+              >
+                {sectionTypes.map((t) => (
+                  <option key={t} value={t}>
+                    {sectionRegistry[t].label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold"
+                onClick={() =>
+                  edit({
+                    ...content,
+                    sections: [
+                      ...content.sections,
+                      {
+                        id: crypto.randomUUID().slice(0, 8),
+                        type: newType,
+                        variant: sectionRegistry[newType].variants[0].key,
+                        props: emptyValue(sectionRegistry[newType].fields),
+                      },
+                    ],
+                  })
+                }
+              >
+                Legg til seksjon
+              </button>
+            </div>
+
+            <section className="mt-12">
+              <h2 className="mb-3 text-lg font-semibold">Versjoner</h2>
+              {versions.length === 0 ? (
+                <p className="text-sm text-neutral-600">Siden er ikke publisert ennå.</p>
+              ) : (
+                <ul className="divide-y rounded-lg border bg-white">
+                  {versions.map((v) => (
+                    <li key={v.id} className="flex items-center justify-between p-3 text-sm">
+                      <span>
+                        Versjon {v.number} · {new Date(v.createdAt).toLocaleString("nb-NO")}
+                        {v.number === publishedNumber ? " · live nå" : ""}
+                      </span>
+                      {v.number !== publishedNumber && (
+                        <button
+                          type="button"
+                          disabled={pending}
+                          className="underline"
+                          onClick={() => {
+                            if (!confirm(`Publisere versjon ${v.number} på nytt? Kladden blir erstattet med denne versjonen.`)) return;
+                            startTransition(async () => {
+                              const result = await restoreAction(pageId, v.id);
+                              setStatus(result);
+                              // Kladden er byttet ut på serveren; last inn på nytt så skjemaet viser den.
+                              if (result?.ok) window.location.reload();
+                            });
+                          }}
+                        >
+                          Gå tilbake hit
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+
+          {/* Forhåndsvisning som oppdateres mens du skriver. Lenker er slått av, så du ikke navigerer bort fra redigeringen. */}
+          <aside aria-label="Forhåndsvisning" className="hidden xl:block">
+            <ScaledPreview>
+              <PageRenderer content={content} style={preview.style} ctx={preview.ctx} />
+            </ScaledPreview>
+          </aside>
+        </div>
+      </div>
+    </SiteIdContext.Provider>
   );
 }

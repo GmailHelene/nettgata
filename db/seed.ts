@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { runScript } from "./run-script";
 import bcrypt from "bcryptjs";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "./index";
@@ -48,9 +49,4 @@ async function main() {
   console.log("Ferdig. Studio: http://localhost:3000/studio  Nettsted: http://demo.localhost:3000");
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+runScript(main);

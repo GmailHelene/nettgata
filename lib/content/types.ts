@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const sectionTypes = ["hero", "tekst", "tjenester", "kontakt", "cta"] as const;
+export const sectionTypes = ["hero", "tekst", "bildetekst", "tjenester", "galleri", "omtaler", "faq", "kontakt", "cta"] as const;
 export type SectionType = (typeof sectionTypes)[number];
 
 export const sectionSchema = z.object({

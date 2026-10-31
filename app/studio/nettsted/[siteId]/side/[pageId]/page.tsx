@@ -4,6 +4,8 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { pages } from "@/db/schema";
 import { listVersions } from "@/lib/publishing";
+import { buildRenderContext } from "@/lib/render";
+import { themeToCssVars } from "@/lib/theme";
 import { requireSiteAccess } from "@/lib/session";
 import { PageEditor } from "./page-editor";
 
@@ -21,11 +23,13 @@ export default async function EditPage({ params }: { params: Promise<{ siteId: s
   const publishedNumber = versions.find((v) => v.id === page.publishedVersionId)?.number ?? null;
 
   return (
-    <main className="mx-auto max-w-4xl px-5 py-12">
+    <main className="mx-auto max-w-[1600px] px-5 py-12">
       <Link href={`/studio/nettsted/${site.id}`} className="text-sm underline">
         {site.name}
       </Link>
       <PageEditor
+        siteId={site.id}
+        preview={{ ctx: await buildRenderContext(db, site, page.path, true), style: themeToCssVars(site.theme) }}
         pageId={page.id}
         path={page.path}
         initialTitle={page.title}

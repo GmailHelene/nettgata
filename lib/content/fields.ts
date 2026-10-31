@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { mediaSrcPattern } from "@/lib/media-types";
 
 /**
  * Feltdefinisjonene er én kilde for både validering og redigeringsskjemaet (lag 1).
@@ -8,6 +9,7 @@ export type Field =
   | { key: string; label: string; type: "text"; max?: number; optional?: boolean }
   | { key: string; label: string; type: "textarea"; max?: number; optional?: boolean }
   | { key: string; label: string; type: "link"; optional?: boolean }
+  | { key: string; label: string; type: "image"; optional?: boolean }
   | { key: string; label: string; type: "list"; itemLabel: string; fields: Field[]; max?: number };
 
 /** Bare trygge lenker: ingen javascript:, data: eller lignende. */
@@ -39,6 +41,15 @@ function fieldToZod(field: Field): z.ZodType {
         .refine((v) => v === "" || isSafeHref(v), `${field.label}: ugyldig lenke`);
       return field.optional ? base.optional().default("") : base.refine((v) => v !== "", required);
     }
+    case "image": {
+      // Alt-tekst er påkrevd for universell utforming. Rent pyntebilder kan ha tom alt, men da må det velges aktivt.
+      const image = z.object({
+        src: z.string().regex(mediaSrcPattern, `${field.label}: ugyldig bilde`),
+        alt: z.string().trim().max(200, `${field.label}: alt-teksten er for lang`),
+        decorative: z.boolean().optional(),
+      }).refine((v) => v.decorative || v.alt !== "", `${field.label}: beskriv bildet for dem som ikke ser det (alt-tekst)`);
+      return field.optional ? image.nullable().optional().default(null) : image.nullable().refine((v) => v !== null, required);
+    }
     case "list":
       return z
         .array(fieldsToZod(field.fields), { error: `${field.label} mangler` })
@@ -49,3 +60,5 @@ function fieldToZod(field: Field): z.ZodType {
 export function fieldsToZod(fields: Field[]) {
   return z.object(Object.fromEntries(fields.map((f) => [f.key, fieldToZod(f)])));
 }
+
+export type ImageValue = { src: string; alt: string; decorative?: boolean };

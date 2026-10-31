@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createPgliteDb, type Db } from "@/db";
+import type { Db } from "@/db";
+import { createPgliteDb } from "@/db/pglite";
 import { demoFrontpage, demoTheme } from "@/db/demo";
 import { domains, organizations, pages, sites, users } from "@/db/schema";
 import { resolveSiteByHost } from "@/lib/hosts";
