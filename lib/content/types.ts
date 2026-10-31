@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { mediaSrcPattern } from "@/lib/media-types";
 
 export const sectionTypes = [
   "hero",
@@ -32,8 +33,13 @@ export type Section = z.infer<typeof sectionSchema>;
 export const pageContentSchema = z.object({
   seo: z
     .object({
-      title: z.string().max(70).optional(),
-      description: z.string().max(170).optional(),
+      title: z.string().max(70, "Tittelen for Google kan ha maks 70 tegn").optional(),
+      description: z.string().max(170, "Beskrivelsen for Google kan ha maks 170 tegn").optional(),
+      // Bildet som vises når siden deles. Uten det brukes det første bildet på siden.
+      image: z
+        .object({ src: z.string().regex(mediaSrcPattern, "Delingsbildet er ugyldig"), alt: z.string().trim().max(200).default("") })
+        .nullable()
+        .optional(),
     })
     .default({}),
   sections: z.array(sectionSchema).max(40),

@@ -113,8 +113,12 @@ export function Container({ children, className = "" }: { children: ReactNode; c
   return <div className={`mx-auto max-w-5xl px-5 ${className}`}>{children}</div>;
 }
 
-export function Heading({ children, level = 2 }: { children: ReactNode; level?: 1 | 2 }) {
-  const Tag = level === 1 ? "h1" : "h2";
+/**
+ * `level` styrer utseendet. `first` gjør overskriften til sidens H1 uten å endre utseendet, så en side
+ * som starter med for eksempel en tekstseksjon også har én hovedoverskrift for Google og skjermlesere.
+ */
+export function Heading({ children, level = 2, first = false }: { children: ReactNode; level?: 1 | 2; first?: boolean }) {
+  const Tag = level === 1 || first ? "h1" : "h2";
   return (
     <Tag
       className={`font-[family-name:var(--f-heading)] font-bold tracking-tight ${level === 1 ? "text-4xl md:text-5xl" : "mb-6 text-3xl"}`}
@@ -172,7 +176,7 @@ function Hero({ section, isFirst, basePath }: { section: Section; isFirst: boole
   );
 }
 
-function BildeTekst({ section, basePath }: { section: Section; basePath: string }) {
+function BildeTekst({ section, basePath, first }: { section: Section; basePath: string; first: boolean }) {
   const p = section.props;
   const bilde = image(p, "bilde");
   const imageFirst = section.variant !== "bilde-hoyre";
@@ -187,7 +191,7 @@ function BildeTekst({ section, basePath }: { section: Section; basePath: string 
           />
         )}
         <div>
-          {str(p, "overskrift") && <Heading>{str(p, "overskrift")}</Heading>}
+          {str(p, "overskrift") && <Heading first={first}>{str(p, "overskrift")}</Heading>}
           <Paragraphs text={str(p, "brodtekst")} />
           {str(p, "knappTekst") && (
             <div className="mt-6">
@@ -202,7 +206,7 @@ function BildeTekst({ section, basePath }: { section: Section; basePath: string 
   );
 }
 
-function Galleri({ section }: { section: Section }) {
+function Galleri({ section, first }: { section: Section; first: boolean }) {
   const p = section.props;
   const items = list(p, "bilder")
     .map((item) => ({ bilde: image(item, "bilde"), tekst: str(item, "tekst") }))
@@ -211,7 +215,7 @@ function Galleri({ section }: { section: Section }) {
   return (
     <section className="py-14">
       <Container>
-        {str(p, "overskrift") && <Heading>{str(p, "overskrift")}</Heading>}
+        {str(p, "overskrift") && <Heading first={first}>{str(p, "overskrift")}</Heading>}
         <ul className={`grid gap-4 ${large ? "md:grid-cols-2" : "grid-cols-2 md:grid-cols-3"}`}>
           {items.map((item, i) => (
             <li key={i}>
@@ -231,12 +235,12 @@ function Galleri({ section }: { section: Section }) {
   );
 }
 
-function Omtaler({ section }: { section: Section }) {
+function Omtaler({ section, first }: { section: Section; first: boolean }) {
   const p = section.props;
   return (
     <section className="py-14">
       <Container>
-        <Heading>{str(p, "overskrift")}</Heading>
+        <Heading first={first}>{str(p, "overskrift")}</Heading>
         <ul className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {list(p, "omtaler").map((o, i) => (
             <li key={i}>
@@ -255,13 +259,13 @@ function Omtaler({ section }: { section: Section }) {
   );
 }
 
-function Faq({ section }: { section: Section }) {
+function Faq({ section, first }: { section: Section; first: boolean }) {
   const p = section.props;
   return (
     <section className="py-14">
       <Container>
         <div className="max-w-3xl">
-          <Heading>{str(p, "overskrift")}</Heading>
+          <Heading first={first}>{str(p, "overskrift")}</Heading>
           <div className="divide-y divide-[var(--c-muted)]/30 border-y border-[var(--c-muted)]/30">
             {list(p, "sporsmal").map((q, i) => (
               <details key={i} className="group py-4">
@@ -283,13 +287,13 @@ function Faq({ section }: { section: Section }) {
   );
 }
 
-function Tekst({ section }: { section: Section }) {
+function Tekst({ section, first }: { section: Section; first: boolean }) {
   const p = section.props;
   return (
     <section className="py-14">
       <Container>
         <div className="max-w-3xl">
-          {str(p, "overskrift") && <Heading>{str(p, "overskrift")}</Heading>}
+          {str(p, "overskrift") && <Heading first={first}>{str(p, "overskrift")}</Heading>}
           <Paragraphs text={str(p, "brodtekst")} />
         </div>
       </Container>
@@ -297,13 +301,13 @@ function Tekst({ section }: { section: Section }) {
   );
 }
 
-function Tjenester({ section }: { section: Section }) {
+function Tjenester({ section, first }: { section: Section; first: boolean }) {
   const p = section.props;
   const items = list(p, "tjenester");
   return (
     <section className="py-14">
       <Container>
-        <Heading>{str(p, "overskrift")}</Heading>
+        <Heading first={first}>{str(p, "overskrift")}</Heading>
         {section.variant === "liste" ? (
           <dl className="divide-y divide-[var(--c-muted)]/30 border-y border-[var(--c-muted)]/30">
             {items.map((item, i) => (
@@ -330,7 +334,7 @@ function Tjenester({ section }: { section: Section }) {
   );
 }
 
-function Produkter({ section, ctx }: { section: Section; ctx: RenderContext }) {
+function Produkter({ section, ctx, first }: { section: Section; ctx: RenderContext; first: boolean }) {
   const p = section.props;
   if (!ctx.shop) return null;
   const all = ctx.products;
@@ -348,7 +352,7 @@ function Produkter({ section, ctx }: { section: Section; ctx: RenderContext }) {
     <section className="py-14">
       <Container>
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-          <Heading>{str(p, "overskrift")}</Heading>
+          <Heading first={first}>{str(p, "overskrift")}</Heading>
           {str(p, "knappTekst") && (
             <Link href={siteHref(ctx.basePath, "/produkter")} className="mb-6 font-semibold underline underline-offset-4">
               {str(p, "knappTekst")} →
@@ -367,14 +371,14 @@ function Produkter({ section, ctx }: { section: Section; ctx: RenderContext }) {
   );
 }
 
-function Fordeler({ section }: { section: Section }) {
+function Fordeler({ section, first }: { section: Section; first: boolean }) {
   const p = section.props;
   const items = list(p, "punkter");
   const cards = section.variant === "kort";
   return (
     <section className={cards ? "py-14" : "py-8"}>
       <Container>
-        {str(p, "overskrift") && <Heading>{str(p, "overskrift")}</Heading>}
+        {str(p, "overskrift") && <Heading first={first}>{str(p, "overskrift")}</Heading>}
         <ul className={`grid gap-6 ${items.length >= 4 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
           {items.map((item, i) => (
             <li key={i} className={`flex gap-3 ${cards ? "rounded-[var(--radius)] bg-[var(--c-surface)] p-6" : "items-start"}`}>
@@ -404,7 +408,7 @@ function Fordeler({ section }: { section: Section }) {
   );
 }
 
-function Kategorikort({ section, basePath }: { section: Section; basePath: string }) {
+function Kategorikort({ section, basePath, first }: { section: Section; basePath: string; first: boolean }) {
   const p = section.props;
   const items = list(p, "kort").map((k) => ({
     tittel: str(k, "tittel"),
@@ -416,7 +420,7 @@ function Kategorikort({ section, basePath }: { section: Section; basePath: strin
   return (
     <section className="py-14">
       <Container>
-        {str(p, "overskrift") && <Heading>{str(p, "overskrift")}</Heading>}
+        {str(p, "overskrift") && <Heading first={first}>{str(p, "overskrift")}</Heading>}
         <ul className={`grid gap-5 ${large ? "md:grid-cols-2" : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}`}>
           {items.map((k, i) => (
             <li key={i}>
@@ -478,7 +482,7 @@ function SectionBackground({ background, children }: { background?: string; chil
   return <>{children}</>;
 }
 
-function Kontakt({ section, ctx }: { section: Section; ctx: RenderContext }) {
+function Kontakt({ section, ctx, first }: { section: Section; ctx: RenderContext; first: boolean }) {
   const p = section.props;
   const { info } = ctx.site;
   const address = formatAddress(info);
@@ -486,7 +490,7 @@ function Kontakt({ section, ctx }: { section: Section; ctx: RenderContext }) {
     <section id="kontakt" className="scroll-mt-20 py-14">
       <Container className="grid gap-10 md:grid-cols-2">
         <div>
-          <Heading>{str(p, "overskrift")}</Heading>
+          <Heading first={first}>{str(p, "overskrift")}</Heading>
           {str(p, "tekst") && <p className="mb-6 text-[var(--c-muted)]">{str(p, "tekst")}</p>}
           <address className="space-y-2 not-italic">
             {info.phone && (
@@ -527,13 +531,13 @@ function Kontakt({ section, ctx }: { section: Section; ctx: RenderContext }) {
   );
 }
 
-function Cta({ section, basePath }: { section: Section; basePath: string }) {
+function Cta({ section, basePath, first }: { section: Section; basePath: string; first: boolean }) {
   const p = section.props;
   return (
     <section className="py-14">
       <Container>
         <div className="rounded-[var(--radius)] bg-[var(--c-surface)] px-8 py-12 text-center">
-          <Heading>{str(p, "overskrift")}</Heading>
+          <Heading first={first}>{str(p, "overskrift")}</Heading>
           {str(p, "tekst") && <p className="mx-auto mb-8 max-w-2xl text-[var(--c-muted)]">{str(p, "tekst")}</p>}
           <Button href={str(p, "knappLenke")} basePath={basePath}>
             {str(p, "knappTekst")}
@@ -813,26 +817,26 @@ function renderSection(section: Section, i: number, ctx: RenderContext) {
     case "hero":
       return <Hero key={section.id} section={section} isFirst={i === 0} basePath={ctx.basePath} />;
     case "tekst":
-      return <Tekst key={section.id} section={section} />;
+      return <Tekst key={section.id} section={section} first={i === 0} />;
     case "bildetekst":
-      return <BildeTekst key={section.id} section={section} basePath={ctx.basePath} />;
+      return <BildeTekst key={section.id} section={section} first={i === 0} basePath={ctx.basePath} />;
     case "galleri":
-      return <Galleri key={section.id} section={section} />;
+      return <Galleri key={section.id} section={section} first={i === 0} />;
     case "omtaler":
-      return <Omtaler key={section.id} section={section} />;
+      return <Omtaler key={section.id} section={section} first={i === 0} />;
     case "faq":
-      return <Faq key={section.id} section={section} />;
+      return <Faq key={section.id} section={section} first={i === 0} />;
     case "tjenester":
-      return <Tjenester key={section.id} section={section} />;
+      return <Tjenester key={section.id} section={section} first={i === 0} />;
     case "produkter":
-      return <Produkter key={section.id} section={section} ctx={ctx} />;
+      return <Produkter key={section.id} section={section} first={i === 0} ctx={ctx} />;
     case "kontakt":
-      return <Kontakt key={section.id} section={section} ctx={ctx} />;
+      return <Kontakt key={section.id} section={section} first={i === 0} ctx={ctx} />;
     case "cta":
-      return <Cta key={section.id} section={section} basePath={ctx.basePath} />;
+      return <Cta key={section.id} section={section} first={i === 0} basePath={ctx.basePath} />;
     case "fordeler":
-      return <Fordeler key={section.id} section={section} />;
+      return <Fordeler key={section.id} section={section} first={i === 0} />;
     case "kategorikort":
-      return <Kategorikort key={section.id} section={section} basePath={ctx.basePath} />;
+      return <Kategorikort key={section.id} section={section} first={i === 0} basePath={ctx.basePath} />;
   }
 }

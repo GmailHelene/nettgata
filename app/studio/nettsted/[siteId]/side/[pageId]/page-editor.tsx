@@ -11,6 +11,7 @@ import type { FrameCommand } from "@/app/studio/ramme/protocol";
 import { historyReducer, initHistory, type Doc } from "./editor-history";
 import { inputClass } from "./fields";
 import { PreviewFrame, type Device } from "./preview-frame";
+import { SeoPanel } from "./seo-panel";
 import { SectionLibrary } from "./section-library";
 import { SectionList } from "./section-list";
 import { useAutosave } from "./use-autosave";
@@ -59,6 +60,7 @@ export function PageEditor({ siteId, preview, pageId, path, initialTitle, initia
   const [library, setLibrary] = useState<number | null>(null);
   const [device, setDevice] = useState<Device>("datamaskin");
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [seoOpen, setSeoOpen] = useState(false);
   const [scrollTo, setScrollTo] = useState<{ id: string; seq: number } | null>(null);
   const [reveal, setReveal] = useState<{ id: string; focus: boolean; seq: number } | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
@@ -322,6 +324,16 @@ export function PageEditor({ siteId, preview, pageId, path, initialTitle, initia
               <span className="mb-1 block text-sm font-medium">Sidetittel</span>
               <input className={inputClass} value={title} onChange={(e) => commit({ title: e.target.value, content }, "tittel")} />
             </label>
+
+            <SeoPanel
+              open={seoOpen}
+              onToggle={() => setSeoOpen((v) => !v)}
+              siteName={preview.ctx.site.name}
+              path={path}
+              pageTitle={trimmedTitle || "Sidetittel"}
+              content={content}
+              onChange={(seo) => commit({ title, content: { ...content, seo } }, "seo")}
+            />
 
             <h2 className="mb-3 text-lg font-semibold">Seksjoner</h2>
             {sections.length === 0 ? (

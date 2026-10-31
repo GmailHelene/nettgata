@@ -5,7 +5,8 @@ import { headers } from "next/headers";
 import { notFound, permanentRedirect } from "next/navigation";
 import { cache } from "react";
 import { PageRenderer, SiteChrome } from "@/components/sections";
-import { ProductPage, ProductsPage, OrderPage, CartPage, shopTitle, type ShopRoute } from "@/components/shop/pages";
+import { ProductPage, ProductsPage, OrderPage, CartPage, shopMeta, type ShopRoute } from "@/components/shop/pages";
+import { effectiveTitle, firstContentImage, shareImageSrc } from "@/lib/content/seo";
 import { getDb } from "@/db";
 import { productCategories, sites } from "@/db/schema";
 import { isPlatformHost, resolveHost } from "@/lib/hosts";
@@ -91,20 +92,41 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const indexing =
     target.kind === "host" ? { alternates: { canonical: `${origin}${normalizePath(path)}` } } : { robots: { index: false, follow: false } };
 
+  /** Tittel, beskrivelse og bilde også når siden deles på Facebook, LinkedIn og i meldinger. */
+  const sharing = (title: string, description: string | undefined, image: { src: string; alt: string } | null | undefined): Metadata => ({
+    title,
+    description,
+    openGraph: {
+      siteName: site.name,
+      locale: "nb_NO",
+      type: "website",
+      title,
+      description,
+      ...(image && { images: [{ url: `${origin}${shareImageSrc(image.src)}`, ...(image.alt && { alt: image.alt }) }] }),
+    },
+    twitter: { card: image ? "summary_large_image" : "summary" },
+  });
+
   const route = site.kind === "nettbutikk" ? shopRoute(target.segments) : null;
   if (route) {
-    const title = await shopTitle(db, site, route);
+    const meta = await shopMeta(db, site, route);
     // Handlekurv og ordre skal aldri i søkemotorer.
     const noindex = route.kind === "cart" || route.kind === "order";
-    return { title: `${title} | ${site.name}`, ...(noindex ? { robots: { index: false, follow: false } } : indexing) };
+    return {
+      ...sharing(`${meta.title} | ${site.name}`, meta.description, meta.image),
+      ...(noindex ? { robots: { index: false, follow: false } } : indexing),
+    };
   }
 
   const page = await getPublishedPage(db, site.id, path);
   if (!page) return {};
+  const seo = page.content.seo ?? {};
   return {
-    title: page.content.seo.title || `${page.title} | ${site.name}`,
-    description: page.content.seo.description || undefined,
-    openGraph: { siteName: site.name, locale: "nb_NO", type: "website" },
+    ...sharing(
+      effectiveTitle(seo.title, page.title, site.name),
+      seo.description?.trim() || undefined,
+      seo.image ?? firstContentImage(page.content),
+    ),
     ...indexing,
   };
 }

@@ -7,7 +7,7 @@ Grunnlag: markedsanalysen (funksjonskart, funksjonsrevisjon og MVP-liste), produ
 
 **Lag:** N = synlig for nybegynneren. A = avansert lag. U = utviklerlaget. S = skjult automatikk som bare virker.
 
-Sist oppdatert 31.10.2026 (byggeverktøyet og bildebiblioteket).
+Sist oppdatert 31.10.2026 (byggeverktøyet, bildebiblioteket og SEO-runden).
 
 ---
 
@@ -99,16 +99,18 @@ Sist oppdatert 31.10.2026 (byggeverktøyet og bildebiblioteket).
 
 | Funksjon | Lag | Status |
 |---|---|---|
-| Server-rendrede sider, én H1, kanonisk lenke | S | Ferdig |
+| Server-rendrede sider, kanonisk lenke | S | Ferdig |
+| Én H1 på hver side: den første overskriften blir H1 også når siden ikke starter med en toppseksjon | S | Bygget |
 | Sitemap og robots per domene | S | Ferdig |
 | Strukturerte data (schema.org per bransje) | S | Ferdig |
-| SEO-tittel og beskrivelse per side | N | Ferdig |
+| SEO-tittel og beskrivelse per side, med forhåndsvisning av Google-treffet | N | Bygget (feltene ble brukt, men kunne ikke redigeres i studioet før nå) |
 | Visning via plattformen er merket noindex | S | Ferdig |
 | 301-omdirigeringer og importkart ved flytting | A | MVP |
-| Open Graph-bilde per side (deling i sosiale medier) | N | MVP |
-| Én linje «fiks nå» i stedet for SEO-poeng (mangler alt-tekst, for kort tittel) | N | MVP |
+| Open Graph-bilde per side (deling i sosiale medier), ellers første bilde på siden, varebilde på varesider | N | Bygget |
+| Én linje «fiks nå» i stedet for SEO-poeng (mangler beskrivelse, for lang tittel, mangler H1, mangler bilde) | N | Bygget |
 | Google Bedriftsprofil: veiviser og synk av åpningstider | N | MVP |
-| Strukturerte data for produkter, arrangementer og spørsmål | S | MVP |
+| Strukturerte data for produkter (pris, lager, fulle bildeadresser) | S | Bygget |
+| Strukturerte data for arrangementer og spørsmål | S | MVP |
 | AI-synlighetsrapport (hva sier ChatGPT og Google om bedriften) | N | Senere |
 | Flere språk med hreflang, nynorsk som fullverdig språk | A | Senere |
 

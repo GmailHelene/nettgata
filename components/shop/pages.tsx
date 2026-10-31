@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import type { Db } from "@/db";
 import { orderLines, orders, products, sites } from "@/db/schema";
 import { Container, Heading } from "@/components/sections";
+import { mediaSrcPattern } from "@/lib/media-types";
 import type { CatalogProduct } from "@/lib/shop/catalog";
 import { formatNok } from "@/lib/shop/money";
 import { carrierLabel, trackingUrl } from "@/lib/shop/tracking";
@@ -20,21 +21,39 @@ export type ShopRoute =
   | { kind: "cart" }
   | { kind: "order"; orderId: string };
 
-export async function shopTitle(db: Db, site: typeof sites.$inferSelect, route: ShopRoute): Promise<string> {
+/** Kort beskrivelse for Google og deling: hele ord, maks rundt 160 tegn. */
+function summarize(text: string, max = 160): string | undefined {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (!clean) return undefined;
+  if (clean.length <= max) return clean;
+  const short = clean.slice(0, max - 1);
+  return `${short.slice(0, Math.max(short.lastIndexOf(" "), max / 2)).trimEnd()} …`;
+}
+
+export type ShopMeta = { title: string; description?: string; image?: { src: string; alt: string } };
+
+/** Tittel, beskrivelse og delingsbilde for butikkens egne sider. Varesiden bruker varens første bilde. */
+export async function shopMeta(db: Db, site: typeof sites.$inferSelect, route: ShopRoute): Promise<ShopMeta> {
   switch (route.kind) {
     case "products":
-      return "Alle varer";
+      return { title: "Alle varer" };
     case "cart":
-      return "Handlekurv";
+      return { title: "Handlekurv" };
     case "order":
-      return "Bestilling";
+      return { title: "Bestilling" };
     case "product": {
       const [p] = await db
-        .select({ name: products.name })
+        .select({ name: products.name, description: products.description, images: products.images })
         .from(products)
         .where(and(eq(products.siteId, site.id), eq(products.slug, route.slug), eq(products.status, "active")))
         .limit(1);
-      return p?.name ?? "Vare";
+      if (!p) return { title: "Vare" };
+      const image = p.images.find((i) => mediaSrcPattern.test(i.src));
+      return {
+        title: p.name,
+        description: summarize(p.description),
+        image: image && { src: image.src, alt: image.decorative ? "" : image.alt },
+      };
     }
   }
 }
@@ -110,7 +129,8 @@ function ProductStructuredData({ product, url, siteName }: { product: CatalogPro
     "@type": "Product",
     name: product.name,
     description: product.description.slice(0, 500) || undefined,
-    image: product.images.map((i) => i.src),
+    // Google vil ha fulle adresser til bildene, ikke /media/... alene.
+    image: product.images.map((i) => new URL(i.src, url).toString()),
     brand: { "@type": "Brand", name: siteName },
     offers: product.variants.map((v) => ({
       "@type": "Offer",
