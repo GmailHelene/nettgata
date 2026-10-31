@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { focusStyle, mediaSrcSet } from "@/lib/media-types";
 import type { CatalogProduct } from "@/lib/shop/catalog";
 import { Price } from "./price";
 
@@ -11,7 +12,19 @@ function stockLabel(p: CatalogProduct): { text: string; tone: "ok" | "out" } | n
   return { text: "På lager", tone: "ok" };
 }
 
-export function ProductCard({ product: p, basePath }: { product: CatalogProduct; basePath: string }) {
+/** Bildebredden i rutenettet (2, 3 eller 4 kolonner) og i karusellen, så nettleseren henter riktig størrelse. */
+const gridSizes = "(min-width: 1024px) 231px, (min-width: 768px) calc(33vw - 27px), calc(50vw - 30px)";
+const carouselSizes = "(min-width: 1024px) 23vw, (min-width: 640px) 30vw, 45vw";
+
+export function ProductCard({
+  product: p,
+  basePath,
+  sizes = gridSizes,
+}: {
+  product: CatalogProduct;
+  basePath: string;
+  sizes?: string;
+}) {
   const [image, hover] = p.images;
   const variesInPrice = new Set(p.variants.map((v) => v.priceOre)).size > 1;
   const cheapest = p.variants.reduce((a, b) => (b.priceOre < a.priceOre ? b : a));
@@ -24,15 +37,26 @@ export function ProductCard({ product: p, basePath }: { product: CatalogProduct;
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={image.src}
+            srcSet={mediaSrcSet(image.src)}
+            sizes={sizes}
             alt={image.decorative ? "" : image.alt}
             loading="lazy"
+            style={focusStyle(image.focus)}
             className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
           />
         )}
         {hover && (
           // Andre bilde vises ved hover, som i de fleste motebutikker.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={hover.src} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover opacity-0 transition duration-500 group-hover:opacity-100" />
+          <img
+            src={hover.src}
+            srcSet={mediaSrcSet(hover.src)}
+            sizes={sizes}
+            alt=""
+            loading="lazy"
+            style={focusStyle(hover.focus)}
+            className="absolute inset-0 h-full w-full object-cover opacity-0 transition duration-500 group-hover:opacity-100"
+          />
         )}
         {onSale && (
           <span className="absolute left-3 top-3 rounded-[var(--radius)] bg-[var(--c-primary)] px-2.5 py-1 text-xs font-semibold text-[var(--c-on-primary)]">Salg</span>
@@ -65,7 +89,7 @@ export function ProductCarousel({ products, basePath }: { products: CatalogProdu
     <ul className="-mx-5 flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-px-5 px-5 pb-4 [scrollbar-width:thin]">
       {products.map((p) => (
         <li key={p.id} className="w-[45%] shrink-0 snap-start sm:w-[30%] lg:w-[23%]">
-          <ProductCard product={p} basePath={basePath} />
+          <ProductCard product={p} basePath={basePath} sizes={carouselSizes} />
         </li>
       ))}
     </ul>

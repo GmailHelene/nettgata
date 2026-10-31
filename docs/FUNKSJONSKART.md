@@ -88,8 +88,9 @@ Sist oppdatert 31.10.2026 (byggeverktøyet og bildebiblioteket).
 | Oversikt over alle bilder med størrelse, standard alt-tekst og hvor hvert bilde brukes | N | Bygget |
 | Slette et bilde helt fra lageret, bare når det ikke er i bruk | N | Bygget |
 | Publisering stopper hvis en side bruker et bilde som er slettet | S | Bygget |
-| Fokuspunkt og beskjæring | N | MVP |
-| Responsive bildestørrelser (flere bredder) | S | MVP |
+| Fokuspunkt: klikk på det viktigste i bildet, så beholdes det når bildet beskjæres (sider og varer) | N | Bygget |
+| Manuell beskjæring (dra et utsnitt) | N | Senere |
+| Responsive bildestørrelser: 640, 1280 og 2000 px, mobilen henter den minste som holder | S | Bygget (bilder fra før har bare originalen) |
 | Alt-tekst-forslag fra AI, som kunden godkjenner | N | MVP |
 | Bildebank med lisensfrie bilder | N | Senere |
 | Sletting av ubrukte bilder | S | Senere |

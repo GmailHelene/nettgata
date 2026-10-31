@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "@/db";
 import { createPgliteDb } from "@/db/pglite";
 import { demoTheme } from "@/db/demo";
@@ -7,10 +7,11 @@ import { auditLog, media, organizations, pages, sites, users } from "@/db/schema
 import { validatePageContent } from "@/lib/content/registry";
 import type { PageContent } from "@/lib/content/types";
 import { deleteMedia, listMedia, MediaError, mediaUsage, saveImage, setMediaAlt } from "@/lib/media";
-import { mediaKeyPattern, mediaKeysIn, mediaSrcPattern, sniffImageType } from "@/lib/media-types";
+import { GET } from "@/app/media/[...key]/route";
+import { focusStyle, mediaFileKeyPattern, mediaKeyPattern, mediaKeysIn, mediaSrcPattern, mediaSrcSet, mediaThumb, originalKey, sniffImageType, variantKey } from "@/lib/media-types";
 import { publishPage, restoreVersion, saveDraft } from "@/lib/publishing";
 import { createProduct } from "@/lib/shop/catalog";
-import type { MediaStore, StoredObject } from "@/lib/storage";
+import { setMediaStoreForTests, type MediaStore, type StoredObject } from "@/lib/storage";
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16]);
@@ -205,5 +206,107 @@ describe("bildebiblioteket", () => {
     const [other] = await db.insert(sites).values({ orgId: org.id, name: "A", slug: "a", industryPack: "handverker", theme: demoTheme }).returning();
     await expect(setMediaAlt(db, { siteId: other.id, mediaId, alt: "Tatt over" })).rejects.toThrow(/Fant ikke/);
     await expect(deleteMedia(db, store, { siteId: other.id, mediaId, userId })).rejects.toThrow(/Fant ikke/);
+  });
+});
+
+describe("flere bildestørrelser og fokuspunkt", () => {
+  const key = "11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222.webp";
+  const src = `/media/${key}`;
+
+  it("lager nøkler og srcset for de mindre utgavene", () => {
+    expect(variantKey(key, 640)).toBe("11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222-w640.webp");
+    expect(originalKey(variantKey(key, 1280))).toBe(key);
+    expect(originalKey(key)).toBeNull();
+    expect(mediaSrcSet(src)).toBe(`${variantKey(src, 640)} 640w, ${variantKey(src, 1280)} 1280w, ${src} 2000w`);
+    // GIF beholder animasjonen, eksempelbilder og fremmede adresser får ingen srcset.
+    expect(mediaSrcSet(src.replace(".webp", ".gif"))).toBeUndefined();
+    expect(mediaSrcSet("eksempelbilde")).toBeUndefined();
+    expect(mediaSrcSet("https://evil.example/x.webp")).toBeUndefined();
+    // Miniatyrer i studioet bruker 640-utgaven, men aldri for GIF eller fremmede adresser.
+    expect(mediaThumb(src)).toBe(variantKey(src, 640));
+    expect(mediaThumb(src.replace(".webp", ".gif"))).toBe(src.replace(".webp", ".gif"));
+    expect(mediaThumb("eksempelbilde")).toBe("eksempelbilde");
+  });
+
+  it("bilderuten godtar bare originalen og de faste breddene", () => {
+    expect(mediaFileKeyPattern.test(key)).toBe(true);
+    expect(mediaFileKeyPattern.test(variantKey(key, 640))).toBe(true);
+    expect(mediaFileKeyPattern.test(key.replace(".webp", "-w999.webp"))).toBe(false);
+    expect(mediaFileKeyPattern.test(`../${key}`)).toBe(false);
+  });
+
+  it("fokuspunktet blir object-position, og bare gyldige verdier slipper gjennom", () => {
+    expect(focusStyle({ x: 30, y: 75 })).toEqual({ objectPosition: "30% 75%" });
+    for (const bad of [null, "50% 50%", { x: 150, y: 10 }, { x: -1, y: 10 }, { x: "1;color:red", y: 2 }, { x: Number.NaN, y: 2 }]) {
+      expect(focusStyle(bad)).toBeUndefined();
+    }
+    const page = (focus: unknown) => ({
+      seo: {},
+      sections: [{ id: "b", type: "bildetekst", variant: "bilde-venstre", props: { brodtekst: "Tekst", bilde: { src, alt: "Bad", focus } } }],
+    });
+    const ok = validatePageContent(page({ x: 30, y: 75 }));
+    expect(ok.ok && (ok.content.sections[0].props.bilde as { focus?: unknown }).focus).toEqual({ x: 30, y: 75 });
+    expect(validatePageContent(page({ x: 130, y: 75 })).ok).toBe(false);
+    expect(validatePageContent(page({ x: 33.5, y: 75 })).ok).toBe(false);
+  });
+
+  describe("lagring og levering", () => {
+    let db: Db;
+    let siteId: string;
+    let userId: string;
+    let store: ReturnType<typeof memoryStore>;
+
+    beforeEach(async () => {
+      db = await createPgliteDb();
+      store = memoryStore();
+      setMediaStoreForTests(store);
+      const [user] = await db.insert(users).values({ email: "a@b.no", passwordHash: "x" }).returning();
+      const [org] = await db.insert(organizations).values({ name: "Org" }).returning();
+      const [site] = await db.insert(sites).values({ orgId: org.id, name: "S", slug: "s", industryPack: "handverker", theme: demoTheme }).returning();
+      siteId = site.id;
+      userId = user.id;
+    });
+    afterEach(() => setMediaStoreForTests(null));
+
+    const get = (fileKey: string) => GET(new Request(`http://localhost/media/${fileKey}`), { params: Promise.resolve({ key: fileKey.split("/") }) });
+
+    it("lagrer gyldige mindre utgaver, hopper over resten, og sletter alt sammen", async () => {
+      const { id, src: saved } = await saveImage(db, store, {
+        siteId,
+        userId,
+        bytes: WEBP,
+        width: 2000,
+        height: 1500,
+        variants: [
+          { width: 640, bytes: WEBP },
+          { width: 1280, bytes: PNG }, // feil filtype i forhold til originalen
+          { width: 999, bytes: WEBP }, // ikke en fast bredde
+        ],
+      });
+      const savedKey = saved.slice("/media/".length);
+      expect([...store.objects.keys()].sort()).toEqual([savedKey, variantKey(savedKey, 640)].sort());
+
+      await deleteMedia(db, store, { siteId, mediaId: id, userId });
+      expect(store.objects.size).toBe(0);
+    });
+
+    it("bilderuten leverer den mindre utgaven, og originalen når den mangler", async () => {
+      const { src: withVariants } = await saveImage(db, store, { siteId, userId, bytes: WEBP, variants: [{ width: 640, bytes: WEBP }] });
+      const k = withVariants.slice("/media/".length);
+      store.objects.set(variantKey(k, 640), { body: new Uint8Array([1, 2, 3]), contentType: "image/webp", size: 3 });
+
+      const small = await get(variantKey(k, 640));
+      expect(small.status).toBe(200);
+      expect(new Uint8Array(await small.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+
+      // Ingen 1280-utgave lagret: da svarer ruten med originalen, med samme lange cache.
+      const fallback = await get(variantKey(k, 1280));
+      expect(fallback.status).toBe(200);
+      expect(fallback.headers.get("cache-control")).toContain("immutable");
+      expect(new Uint8Array(await fallback.arrayBuffer())).toEqual(WEBP);
+
+      expect((await get(`${siteId}/33333333-3333-4333-8333-333333333333-w640.webp`)).status).toBe(404);
+      expect((await get("ikke/en/nokkel.webp")).status).toBe(404);
+    });
   });
 });

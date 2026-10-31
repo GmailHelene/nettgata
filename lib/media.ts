@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db";
 import { auditLog, media, pageVersions, pages, products, sites } from "@/db/schema";
-import { imageTypes, MAX_IMAGE_BYTES, mediaKeysIn, sniffImageType } from "@/lib/media-types";
+import { imageTypes, MAX_IMAGE_BYTES, mediaKeysIn, sniffImageType, VARIANT_WIDTHS, variantKey } from "@/lib/media-types";
 import type { MediaStore } from "@/lib/storage";
 
 export class MediaError extends Error {}
@@ -101,18 +101,30 @@ export async function deleteMedia(db: Db, store: MediaStore, input: { siteId: st
   if (usedIn.length) {
     throw new MediaError(`Bildet brukes fortsatt: ${usedIn.map((u) => u.label).join(", ")}. Ta det ut der først.`);
   }
-  // Filen slettes før raden. Feiler noe midt i, står bildet fortsatt i biblioteket og kan slettes på nytt,
-  // i stedet for å ligge usynlig igjen i lageret.
+  // Filene slettes før raden. Feiler noe midt i, står bildet fortsatt i biblioteket og kan slettes på nytt,
+  // i stedet for å ligge usynlig igjen i lageret. Mindre utgaver som ikke finnes, er ingen feil.
+  for (const width of VARIANT_WIDTHS) await store.delete(variantKey(row.key, width));
   await store.delete(row.key);
   await db.delete(media).where(eq(media.id, row.id));
   await db.insert(auditLog).values({ siteId: input.siteId, userId: input.userId, action: "media.deleted", detail: { key: row.key } });
 }
 
-/** Validerer og lagrer et bilde. Returnerer stien som brukes i innholdet. */
+/**
+ * Validerer og lagrer et bilde, med de mindre utgavene nettleseren har laget. Returnerer stien som brukes
+ * i innholdet. En mindre utgave som ikke er gyldig, hoppes over: bilderuten svarer da med originalen.
+ */
 export async function saveImage(
   db: Db,
   store: MediaStore,
-  input: { siteId: string; userId: string; bytes: Uint8Array; width?: number; height?: number; alt?: string },
+  input: {
+    siteId: string;
+    userId: string;
+    bytes: Uint8Array;
+    width?: number;
+    height?: number;
+    alt?: string;
+    variants?: { width: number; bytes: Uint8Array }[];
+  },
 ) {
   if (input.bytes.byteLength === 0) throw new MediaError("Filen er tom");
   if (input.bytes.byteLength > MAX_IMAGE_BYTES) throw new MediaError("Bildet er større enn 5 MB");
@@ -122,6 +134,16 @@ export async function saveImage(
   const id = crypto.randomUUID();
   const key = `${input.siteId}/${id}.${imageTypes[contentType]}`;
   const dimension = (n?: number) => (n && Number.isInteger(n) && n > 0 && n < 20000 ? n : null);
+  for (const variant of input.variants ?? []) {
+    const width = VARIANT_WIDTHS.find((w) => w === variant.width);
+    const valid =
+      width !== undefined &&
+      variant.bytes.byteLength > 0 &&
+      variant.bytes.byteLength <= MAX_IMAGE_BYTES &&
+      // Samme filtype som originalen, så filendelsen stemmer.
+      sniffImageType(variant.bytes) === contentType;
+    if (valid) await store.put(variantKey(key, width), variant.bytes, contentType);
+  }
   await store.put(key, input.bytes, contentType);
   await db.insert(media).values({
     id,

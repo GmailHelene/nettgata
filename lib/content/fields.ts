@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { mediaSrcPattern } from "@/lib/media-types";
+import { mediaSrcPattern, type ImageFocus } from "@/lib/media-types";
 
 /**
  * Feltdefinisjonene er én kilde for både validering og redigeringsskjemaet (lag 1).
@@ -24,6 +24,12 @@ export function isSafeHref(value: string): boolean {
     return false;
   }
 }
+
+/** Fokuspunktet i et bilde, i hele prosent. */
+export const imageFocusSchema = z.object({
+  x: z.number().int().min(0).max(100),
+  y: z.number().int().min(0).max(100),
+});
 
 /**
  * Plassholder for bilder i seksjonsbiblioteket. Den kan stå i en kladd, men stopper publisering,
@@ -67,6 +73,7 @@ function fieldToZod(field: Field, mode: ValidationMode): z.ZodType {
         src,
         alt: z.string().trim().max(200, `${field.label}: alt-teksten er for lang`),
         decorative: z.boolean().optional(),
+        focus: imageFocusSchema.optional(),
       });
       // Alt-tekst er påkrevd for universell utforming. Rent pyntebilder kan ha tom alt, men da må det velges aktivt.
       const checked =
@@ -90,4 +97,4 @@ export function fieldsToZod(fields: Field[], mode: ValidationMode = "publish") {
   return z.object(Object.fromEntries(fields.map((f) => [f.key, fieldToZod(f, mode)])));
 }
 
-export type ImageValue = { src: string; alt: string; decorative?: boolean };
+export type ImageValue = { src: string; alt: string; decorative?: boolean; focus?: ImageFocus };

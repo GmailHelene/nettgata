@@ -162,6 +162,7 @@ export function ProductEditor({
             <ImageInput
               key={i}
               label={i === 0 ? "Hovedbilde" : `Bilde ${i + 1}`}
+              withFocus
               value={img}
               onChange={(v) => setImages(v ? images.map((x, j) => (j === i ? v : x)) : images.filter((_, j) => j !== i))}
             />

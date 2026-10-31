@@ -29,7 +29,7 @@ function FieldInput({ field, value, onChange }: { field: Field; value: unknown; 
     );
   }
   if (field.type === "image") {
-    return <ImageInput label={field.label} optional={field.optional} value={value as ImageValue | null} onChange={onChange} />;
+    return <ImageInput label={field.label} optional={field.optional} withFocus value={value as ImageValue | null} onChange={onChange} />;
   }
   if (field.type === "list") {
     const items = Array.isArray(value) ? (value as Value[]) : [];

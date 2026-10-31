@@ -220,7 +220,8 @@ export const productCategories = pgTable(
 );
 
 export type ProductOption = { name: string; values: string[] };
-export type ProductImage = { src: string; alt: string; decorative?: boolean };
+/** focus er fokuspunktet i prosent (se lib/media-types). Lagres i jsonb, så det trengs ingen migrering. */
+export type ProductImage = { src: string; alt: string; decorative?: boolean; focus?: { x: number; y: number } };
 
 export const products = pgTable(
   "products",

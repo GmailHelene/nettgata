@@ -1,7 +1,8 @@
 import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Db } from "@/db";
-import { auditLog, productCategories, productVariants, products, variantPriceHistory } from "@/db/schema";
+import { auditLog, productCategories, productVariants, products, variantPriceHistory, type ProductImage } from "@/db/schema";
+import { imageFocusSchema } from "@/lib/content/fields";
 import { mediaSrcPattern } from "@/lib/media-types";
 import { vatRates } from "./money";
 import { beforePrice } from "./pricing";
@@ -24,7 +25,12 @@ export function productSlug(text: string): string {
 }
 
 const imageSchema = z
-  .object({ src: z.string().regex(mediaSrcPattern), alt: z.string().trim().max(200), decorative: z.boolean().optional() })
+  .object({
+    src: z.string().regex(mediaSrcPattern),
+    alt: z.string().trim().max(200),
+    decorative: z.boolean().optional(),
+    focus: imageFocusSchema.optional(),
+  })
   .refine((v) => v.decorative || v.alt !== "", "Alle produktbilder trenger en kort beskrivelse (alt-tekst)");
 
 const optionSchema = z.object({
@@ -188,7 +194,7 @@ export type CatalogProduct = {
   name: string;
   slug: string;
   description: string;
-  images: { src: string; alt: string; decorative?: boolean }[];
+  images: ProductImage[];
   options: { name: string; values: string[] }[];
   vatRate: number;
   categoryId: string | null;

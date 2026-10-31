@@ -1,4 +1,4 @@
-import { mediaKeyPattern } from "@/lib/media-types";
+import { mediaFileKeyPattern, originalKey } from "@/lib/media-types";
 import { getMediaStore } from "@/lib/storage";
 
 /**
@@ -7,9 +7,12 @@ import { getMediaStore } from "@/lib/storage";
  */
 export async function GET(_request: Request, { params }: { params: Promise<{ key: string[] }> }) {
   const key = (await params).key.join("/");
-  if (!mediaKeyPattern.test(key)) return new Response("Not found", { status: 404 });
+  if (!mediaFileKeyPattern.test(key)) return new Response("Not found", { status: 404 });
 
-  const object = await (await getMediaStore()).get(key);
+  const store = await getMediaStore();
+  // Bilder lastet opp før de mindre utgavene fantes, har bare originalen. Da svarer vi med den.
+  const fallback = originalKey(key);
+  const object = (await store.get(key)) ?? (fallback ? await store.get(fallback) : null);
   if (!object) return new Response("Not found", { status: 404 });
 
   return new Response(object.body as BodyInit, {

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { listMediaAction } from "@/app/studio/media-actions";
 import type { MediaItem } from "@/lib/media";
+import { mediaThumb } from "@/lib/media-types";
 
 const dateFormat = new Intl.DateTimeFormat("nb-NO", { day: "numeric", month: "short", year: "numeric" });
 
@@ -80,7 +81,7 @@ export function MediaPicker({
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element -- bilder fra eget lager, allerede krympet ved opplasting */}
                     <img
-                      src={item.src}
+                      src={mediaThumb(item.src)}
                       alt=""
                       loading="lazy"
                       decoding="async"

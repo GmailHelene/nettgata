@@ -2,6 +2,14 @@
 
 import { useState } from "react";
 import type { ProductImage } from "@/db/schema";
+import { focusStyle, mediaSrcSet } from "@/lib/media-types";
+
+/** Bildebredden i varesiden: hele bredden på mobil, halve på større skjermer (to kolonner, maks 460 px). */
+const sizes = {
+  mobile: "calc(100vw - 40px)",
+  main: "(min-width: 1024px) 460px, calc(50vw - 40px)",
+  thumb: "(min-width: 1024px) 82px, calc(10vw - 10px)",
+};
 
 /** Stort bilde med miniatyrer under. På mobil kan bildene sveipes sideveis. */
 export function Gallery({ images }: { images: ProductImage[] }) {
@@ -16,7 +24,15 @@ export function Gallery({ images }: { images: ProductImage[] }) {
         {images.map((img, i) => (
           <li key={i} className="w-full shrink-0 snap-center px-5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={img.src} alt={img.decorative ? "" : img.alt} loading={i === 0 ? "eager" : "lazy"} className="aspect-square w-full rounded-[var(--radius)] object-cover" />
+            <img
+              src={img.src}
+              srcSet={mediaSrcSet(img.src)}
+              sizes={sizes.mobile}
+              alt={img.decorative ? "" : img.alt}
+              loading={i === 0 ? "eager" : "lazy"}
+              style={focusStyle(img.focus)}
+              className="aspect-square w-full rounded-[var(--radius)] object-cover"
+            />
           </li>
         ))}
       </ul>
@@ -25,7 +41,14 @@ export function Gallery({ images }: { images: ProductImage[] }) {
       {/* Desktop: stort bilde og miniatyrer. */}
       <div className="hidden md:block">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={current.src} alt={current.decorative ? "" : current.alt} className="aspect-square w-full rounded-[var(--radius)] object-cover" />
+        <img
+          src={current.src}
+          srcSet={mediaSrcSet(current.src)}
+          sizes={sizes.main}
+          alt={current.decorative ? "" : current.alt}
+          style={focusStyle(current.focus)}
+          className="aspect-square w-full rounded-[var(--radius)] object-cover"
+        />
         {images.length > 1 && (
           <ul className="mt-3 grid grid-cols-5 gap-3">
             {images.map((img, i) => (
@@ -38,7 +61,15 @@ export function Gallery({ images }: { images: ProductImage[] }) {
                   className="block w-full overflow-hidden rounded-[var(--radius)] ring-offset-2 aria-[current=true]:ring-2 aria-[current=true]:ring-[var(--c-primary)]"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.src} alt="" loading="lazy" className="aspect-square w-full object-cover" />
+                  <img
+                    src={img.src}
+                    srcSet={mediaSrcSet(img.src)}
+                    sizes={sizes.thumb}
+                    alt=""
+                    loading="lazy"
+                    style={focusStyle(img.focus)}
+                    className="aspect-square w-full object-cover"
+                  />
                 </button>
               </li>
             ))}

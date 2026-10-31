@@ -3,7 +3,7 @@ import { Fragment, type CSSProperties, type ReactNode } from "react";
 import type { PageContent, Section } from "@/lib/content/types";
 import { EXAMPLE_IMAGE_SRC, isSafeHref, type ImageValue } from "@/lib/content/fields";
 import { sectionRegistry } from "@/lib/content/registry";
-import { mediaSrcPattern } from "@/lib/media-types";
+import { focusStyle, mediaSrcPattern, mediaSrcSet } from "@/lib/media-types";
 import { formatAddress, formatOrgnr, type SiteInfo } from "@/lib/site-info";
 import { ContactForm } from "./contact-form";
 import { CartDrawer } from "@/components/shop/cart-drawer";
@@ -20,8 +20,30 @@ const image = (p: Props, key: string): ImageValue | null => {
   return v && typeof v.src === "string" && (mediaSrcPattern.test(v.src) || v.src === EXAMPLE_IMAGE_SRC) ? v : null;
 };
 
+/**
+ * Hvor bredt bildet vises, så nettleseren henter riktig størrelse. Innholdet er maks 984 px bredt
+ * (max-w-5xl minus marg), og tallene følger rutenettene i seksjonene.
+ */
+const imageSizes = {
+  full: "100vw",
+  half: "(min-width: 1024px) 472px, (min-width: 768px) calc(50vw - 40px), calc(100vw - 40px)",
+  third: "(min-width: 1024px) 317px, (min-width: 768px) calc(33vw - 24px), calc(50vw - 28px)",
+  quarter: "(min-width: 1024px) 231px, (min-width: 768px) calc(33vw - 27px), calc(50vw - 30px)",
+} as const;
+
 /** Bilder fra eget lager. next/image brukes ikke fordi bildene allerede er krympet til WebP ved opplasting. */
-function Img({ value, className = "", eager = false }: { value: ImageValue; className?: string; eager?: boolean }) {
+function Img({
+  value,
+  className = "",
+  eager = false,
+  sizes,
+}: {
+  value: ImageValue;
+  className?: string;
+  eager?: boolean;
+  /** Uten sizes hentes bare originalen, for eksempel for logoen. */
+  sizes?: (typeof imageSizes)[keyof typeof imageSizes];
+}) {
   if (value.src === EXAMPLE_IMAGE_SRC) {
     // Eksempelbilde fra seksjonsbiblioteket. Finnes bare i kladder, fordi publisering stopper det.
     return (
@@ -38,14 +60,18 @@ function Img({ value, className = "", eager = false }: { value: ImageValue; clas
       </div>
     );
   }
+  const srcSet = sizes ? mediaSrcSet(value.src) : undefined;
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={value.src}
+      srcSet={srcSet}
+      sizes={srcSet ? sizes : undefined}
       alt={value.decorative ? "" : value.alt}
       loading={eager ? "eager" : "lazy"}
       decoding="async"
       className={className}
+      style={focusStyle(value.focus)}
     />
   );
 }
@@ -123,7 +149,7 @@ function Hero({ section, isFirst, basePath }: { section: Section; isFirst: boole
     // Mørk hinne over bildet sikrer lesbar hvit tekst uansett hva bildet viser.
     return (
       <section className="relative isolate overflow-hidden py-28 text-center text-white md:py-40">
-        <Img value={bilde} eager={isFirst} className="absolute inset-0 -z-20 h-full w-full object-cover" />
+        <Img value={bilde} eager={isFirst} sizes={imageSizes.full} className="absolute inset-0 -z-20 h-full w-full object-cover" />
         <div className="absolute inset-0 -z-10 bg-black/60" />
         <Container>{text}</Container>
       </section>
@@ -134,7 +160,7 @@ function Hero({ section, isFirst, basePath }: { section: Section; isFirst: boole
       <section className="py-16 md:py-24">
         <Container className="grid items-center gap-10 md:grid-cols-2">
           {text}
-          <Img value={bilde} eager={isFirst} className="aspect-[4/3] w-full rounded-[var(--radius)] object-cover" />
+          <Img value={bilde} eager={isFirst} sizes={imageSizes.half} className="aspect-[4/3] w-full rounded-[var(--radius)] object-cover" />
         </Container>
       </section>
     );
@@ -154,7 +180,11 @@ function BildeTekst({ section, basePath }: { section: Section; basePath: string 
     <section className="py-14">
       <Container className="grid items-center gap-10 md:grid-cols-2">
         {bilde && (
-          <Img value={bilde} className={`aspect-[4/3] w-full rounded-[var(--radius)] object-cover ${imageFirst ? "" : "md:order-2"}`} />
+          <Img
+            value={bilde}
+            sizes={imageSizes.half}
+            className={`aspect-[4/3] w-full rounded-[var(--radius)] object-cover ${imageFirst ? "" : "md:order-2"}`}
+          />
         )}
         <div>
           {str(p, "overskrift") && <Heading>{str(p, "overskrift")}</Heading>}
@@ -186,7 +216,11 @@ function Galleri({ section }: { section: Section }) {
           {items.map((item, i) => (
             <li key={i}>
               <figure>
-                <Img value={item.bilde} className="aspect-square w-full rounded-[var(--radius)] object-cover" />
+                <Img
+                  value={item.bilde}
+                  sizes={large ? imageSizes.half : imageSizes.third}
+                  className="aspect-square w-full rounded-[var(--radius)] object-cover"
+                />
                 {item.tekst && <figcaption className="mt-2 text-sm text-[var(--c-muted)]">{item.tekst}</figcaption>}
               </figure>
             </li>
@@ -393,6 +427,7 @@ function Kategorikort({ section, basePath }: { section: Section; basePath: strin
                 {k.bilde ? (
                   <Img
                     value={{ ...k.bilde, decorative: true }}
+                    sizes={large ? imageSizes.half : imageSizes.quarter}
                     className={`w-full object-cover transition-transform duration-500 group-hover:scale-105 ${large ? "aspect-[4/3]" : "aspect-[4/5]"}`}
                   />
                 ) : (

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { uploadImage } from "@/components/studio/image-input";
 import type { MediaItem, MediaUsage } from "@/lib/media";
+import { mediaThumb } from "@/lib/media-types";
 import type { ActionState } from "../../../actions";
 import { deleteMediaAction, setMediaAltAction } from "../../../media-actions";
 
@@ -114,7 +115,7 @@ export function MediaLibrary({ siteId, items }: { siteId: string; items: Item[] 
                 aria-label={`Åpne bildet i full størrelse${item.alt ? `: ${item.alt}` : ""}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element -- bilder fra eget lager, allerede krympet ved opplasting */}
-                <img src={item.src} alt="" loading="lazy" decoding="async" className="aspect-[4/3] w-full rounded object-cover" />
+                <img src={mediaThumb(item.src)} alt="" loading="lazy" decoding="async" className="aspect-[4/3] w-full rounded object-cover" />
               </a>
               <p className="mt-2 text-xs text-neutral-600">
                 {item.width && item.height ? `${item.width} × ${item.height} · ` : ""}
