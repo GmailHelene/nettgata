@@ -29,6 +29,9 @@ export default async function StudioHome() {
             Nytt nettsted
           </Link>
         )}
+        <Link href="/studio/konto" className={`text-sm underline ${user.isPlatformAdmin ? "mr-4" : "ml-auto mr-4"}`}>
+          Konto
+        </Link>
         <form action={logout}>
           <button className="text-sm underline">Logg ut ({user.email})</button>
         </form>

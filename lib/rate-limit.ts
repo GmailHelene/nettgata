@@ -11,6 +11,8 @@ export const rules = {
   inquiryPerSite: { limit: 50, windowSeconds: 60 * 60 },
   /** Bare koder som ikke finnes teller, så en kunde som skriver feil et par ganger ikke stenges ute. */
   discountFailuresPerIp: { limit: 10, windowSeconds: 10 * 60 },
+  /** Koder fra appen har en million muligheter. Fem forsøk per kvarter gjør gjetting nytteløst. */
+  totpPerUser: { limit: 5, windowSeconds: 15 * 60 },
 } satisfies Record<string, RateLimitRule>;
 
 /**

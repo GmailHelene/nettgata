@@ -7,7 +7,7 @@ Grunnlag: markedsanalysen (funksjonskart, funksjonsrevisjon og MVP-liste), produ
 
 **Lag:** N = synlig for nybegynneren. A = avansert lag. U = utviklerlaget. S = skjult automatikk som bare virker.
 
-Sist oppdatert 31.10.2026 (byggeverktøyet, bildebiblioteket og SEO-runden).
+Sist oppdatert 31.10.2026 (byggeverktøyet, bildebiblioteket, SEO-runden og tofaktorinnlogging).
 
 ---
 
@@ -137,7 +137,7 @@ Sist oppdatert 31.10.2026 (byggeverktøyet, bildebiblioteket og SEO-runden).
 | Trygge lenker (ingen javascript:) og escaping av strukturerte data | S | Ferdig |
 | Studioet kan ikke legges i en ramme på andre nettsteder (vern mot clickjacking) | S | Bygget |
 | Revisjonslogg (lagres) | S | Ferdig, visning i studio MVP |
-| Tofaktorinnlogging | N | MVP |
+| Tofaktorinnlogging med kodeapp (QR-kode), reservekoder og nullstilling for plattformadmin | N | Bygget (valgfritt per bruker) |
 | Daglig backup med testet gjenoppretting | S | MVP |
 | Brannmur og botvern (Cloudflare) | S | MVP |
 | Oppetid og helsesjekk av synlig tekst og kjøpsflyt | S | MVP |

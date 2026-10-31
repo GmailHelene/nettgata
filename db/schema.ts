@@ -34,6 +34,16 @@ export const users = pgTable("users", {
   name: text("name"),
   passwordHash: text("password_hash").notNull(),
   isPlatformAdmin: boolean("is_platform_admin").notNull().default(false),
+  /**
+   * Tofaktorinnlogging. Hemmeligheten er kryptert med en nøkkel avledet av SESSION_SECRET (lib/totp),
+   * og gjelder først fra totpEnabledAt. Byttes SESSION_SECRET, må tofaktor settes opp på nytt.
+   */
+  totpSecret: text("totp_secret"),
+  totpEnabledAt: timestamp("totp_enabled_at", { withTimezone: true }),
+  /** Siste brukte tidssteg, så samme kode ikke kan brukes to ganger. */
+  totpLastStep: integer("totp_last_step"),
+  /** HMAC av reservekodene som ikke er brukt ennå. */
+  totpRecovery: jsonb("totp_recovery").$type<string[]>().notNull().default([]),
   createdAt: createdAt(),
 });
 

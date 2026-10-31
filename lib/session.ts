@@ -30,6 +30,46 @@ export async function destroySession() {
   (await cookies()).delete({ name: COOKIE, path: "/studio" });
 }
 
+/**
+ * Mellomsteg ved tofaktor: passordet var riktig, men koden mangler. Egen informasjonskapsel med eget
+ * publikum, så den aldri kan brukes som innlogget økt. Gjelder i fem minutter.
+ */
+const PENDING_COOKIE = "sesjon-kode";
+const PENDING_AUDIENCE = "studio-tofaktor";
+const PENDING_MAX_AGE = 5 * 60;
+
+export async function createPendingSecondFactor(userId: string) {
+  const token = await new SignJWT({ sub: userId })
+    .setProtectedHeader({ alg: "HS256" })
+    .setAudience(PENDING_AUDIENCE)
+    .setIssuedAt()
+    .setExpirationTime(`${PENDING_MAX_AGE}s`)
+    .sign(getSecret());
+  (await cookies()).set(PENDING_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/studio",
+    maxAge: PENDING_MAX_AGE,
+  });
+}
+
+/** Brukeren som venter på andre steg, eller null hvis mellomsteget mangler eller er utløpt. */
+export async function readPendingSecondFactor(): Promise<string | null> {
+  const token = (await cookies()).get(PENDING_COOKIE)?.value;
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, getSecret(), { audience: PENDING_AUDIENCE, algorithms: ["HS256"] });
+    return payload.sub ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function clearPendingSecondFactor() {
+  (await cookies()).delete({ name: PENDING_COOKIE, path: "/studio" });
+}
+
 export async function getCurrentUser() {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;

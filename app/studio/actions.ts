@@ -11,7 +11,15 @@ import { createPreviewToken } from "@/lib/preview";
 import { clientKey, hit, reset, rules } from "@/lib/rate-limit";
 import { getSecret } from "@/lib/secret";
 import { PublishingError, publishPage, restoreVersion, saveDraft } from "@/lib/publishing";
-import { createSession, destroySession, requireSiteAccess } from "@/lib/session";
+import {
+  clearPendingSecondFactor,
+  createPendingSecondFactor,
+  createSession,
+  destroySession,
+  readPendingSecondFactor,
+  requireSiteAccess,
+} from "@/lib/session";
+import { verifySecondFactor } from "@/lib/two-factor";
 
 export type ActionState = { ok: boolean; message: string } | null;
 
@@ -35,8 +43,30 @@ export async function login(_prev: ActionState, formData: FormData): Promise<Act
   if (!user || !valid) return { ok: false, message: "Feil e-post eller passord" };
 
   await reset(db, emailKey);
+  // Med tofaktor gir riktig passord bare et mellomsteg. Økten lages først når koden stemmer.
+  if (user.totpEnabledAt) {
+    await createPendingSecondFactor(user.id);
+    redirect("/studio/logg-inn/kode");
+  }
   await createSession(user.id);
   redirect("/studio");
+}
+
+/** Andre steg av innloggingen: kode fra appen eller en reservekode. */
+export async function verifyCodeAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const userId = await readPendingSecondFactor();
+  if (!userId) return { ok: false, message: "Innloggingen gikk ut. Gå tilbake og logg inn på nytt." };
+
+  const db = await getDb();
+  const key = `totp:${userId}`;
+  if (!(await hit(db, key, rules.totpPerUser))) return { ok: false, message: "For mange forsøk. Vent 15 minutter og prøv igjen." };
+  const result = await verifySecondFactor(db, userId, String(formData.get("code") ?? ""));
+  if (!result) return { ok: false, message: "Koden stemmer ikke. Skriv inn koden som vises i appen nå, eller en reservekode." };
+
+  await reset(db, key);
+  await clearPendingSecondFactor();
+  await createSession(userId);
+  redirect(result === "reservekode" ? "/studio/konto?reservekode=brukt" : "/studio");
 }
 
 export async function logout() {
