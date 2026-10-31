@@ -35,10 +35,26 @@ npm run lint
 
 Ferdig: datamodell, innlogging, domeneoppslag, studio med skjemaredigering, kladd, forhåndsvisningslenke, publisering, versjoner og tilbakerulling, demo for håndverkerpakken, 11 tester.
 
-Gjenstår før noe går live:
-- Rate limiting på innlogging (Cloudflare-regel eller Durable Object)
-- Cloudflare Workers betalt plan: bcrypt bruker mer CPU enn gratisnivået tillater
-- Neon-prosjekt i Frankfurt, `wrangler secret put` for hemmeligheter
+## Status fase 1a (31.10.2026)
+
+Ferdig:
+- Nettstedsinfo som én kilde (telefon, e-post, adresse, org.nr., åpningstider) som mates til meny, bunntekst, kontaktseksjon og strukturerte data
+- Meny fra sidene, bunntekst med org.nr., «Hopp til innhold»-lenke
+- Kontaktskjema med innboks i studioet, honningkrukke mot roboter, rate limiting og sletting av henvendelser
+- Strukturerte data (schema.org per bransje), kanonisk lenke, sitemap.xml og robots.txt per domene
+- Håndverkerpakken med tre designretninger og tre sider, laget fra bedriftens egne opplysninger
+- «Nytt nettsted» med oppslag i Enhetsregisteret (kontrollsiffer sjekkes først)
+- Sider: lag, slett, flytt, vis i menyen, publiser alle
+- Innstillinger: navn, kontaktinfo og designretning, live med en gang
+- Sperre mot gjentatte innloggingsforsøk (per e-post og per IP, IP lagres bare som hash)
+- 26 tester, testet i nettleser mot ekte Brreg
+
+Gjenstår før første pilot går live:
+- Cloudflare-konto (Workers betalt plan, ca. 5 USD/mnd: bcrypt bruker mer CPU enn gratisnivået tillater) og Neon-prosjekt i Frankfurt
+- Hemmeligheter med `wrangler secret put`, første deploy
 - Cloudflare for SaaS for kundedomener, og domeneveiviser i studioet
+- E-postvarsel til bedriften ved ny henvendelse (Brevo)
+- Personvernerklæring generert fra nettstedsinfo (teksten må gjennom regelverksradaren)
+- Bildeopplasting til R2 og en bildeseksjon
 - Kantcaching av publiserte sider med tømming ved publisering
-- Bildeopplasting til R2, flere seksjoner, flere sider per nettsted fra studioet
+- Lenker i menyen virker ikke i forhåndsvisning (de peker til live-stier)

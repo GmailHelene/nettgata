@@ -6,6 +6,7 @@ import { getDb } from "@/db";
 import { pages, sites } from "@/db/schema";
 import { validatePageContent } from "@/lib/content/registry";
 import { verifyPreviewToken } from "@/lib/preview";
+import { buildRenderContext } from "@/lib/render";
 import { themeToCssVars } from "@/lib/theme";
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -32,7 +33,11 @@ export default async function PreviewPage({ params }: { params: Promise<{ token:
       <p className="sticky top-0 z-50 bg-amber-300 px-4 py-2 text-center text-sm font-semibold text-black">
         Forhåndsvisning av kladd: {row.page.title}. Denne versjonen er ikke publisert.
       </p>
-      <PageRenderer content={result.content} style={themeToCssVars(row.site.theme)} />
+      <PageRenderer
+        content={result.content}
+        style={themeToCssVars(row.site.theme)}
+        ctx={await buildRenderContext(db, row.site, row.page.path, true)}
+      />
     </>
   );
 }

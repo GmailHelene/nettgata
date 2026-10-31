@@ -1,4 +1,5 @@
 import type { PageContent } from "@/lib/content/types";
+import type { SiteInfo } from "@/lib/site-info";
 import type { Theme } from "@/lib/theme";
 
 /** Demodata for håndverkerpakken. Brukes av seed-skriptet og testene. */
@@ -55,17 +56,24 @@ export const demoFrontpage: PageContent = {
     {
       id: "kontakt",
       type: "kontakt",
-      variant: "standard",
+      variant: "skjema",
       props: {
         overskrift: "Kontakt oss",
-        telefon: "900 00 000",
-        epost: "post@demo-ror.no",
-        adresse: "Storgata 1, 3340 Åmot",
-        apningstider: [
-          { dag: "Mandag til fredag", tid: "07.00 - 16.00" },
-          { dag: "Lørdag og søndag", tid: "Kun akutt" },
-        ],
+        tekst: "Beskriv jobben kort, så svarer vi innen én virkedag.",
       },
     },
+  ],
+};
+
+export const demoInfo: SiteInfo = {
+  phone: "900 00 000",
+  email: "post@demo-ror.no",
+  street: "Storgata 1",
+  postalCode: "3340",
+  city: "Åmot",
+  orgnr: "",
+  openingHours: [
+    { day: "Mandag til fredag", time: "07.00 - 16.00" },
+    { day: "Lørdag og søndag", time: "Kun akutt" },
   ],
 };

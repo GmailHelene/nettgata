@@ -52,24 +52,15 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
     ],
   },
   kontakt: {
+    // Telefon, e-post, adresse og åpningstider hentes fra nettstedets innstillinger (én kilde).
     label: "Kontakt og åpningstider",
-    variants: [{ key: "standard", label: "Standard" }],
+    variants: [
+      { key: "skjema", label: "Med kontaktskjema" },
+      { key: "standard", label: "Uten skjema" },
+    ],
     fields: [
       { key: "overskrift", label: "Overskrift", type: "text" },
-      { key: "telefon", label: "Telefon", type: "text", max: 30, optional: true },
-      { key: "epost", label: "E-post", type: "text", max: 120, optional: true },
-      { key: "adresse", label: "Adresse", type: "text", max: 160, optional: true },
-      {
-        key: "apningstider",
-        label: "Åpningstider",
-        type: "list",
-        itemLabel: "Dag",
-        max: 10,
-        fields: [
-          { key: "dag", label: "Dag", type: "text", max: 30 },
-          { key: "tid", label: "Tid", type: "text", max: 40 },
-        ],
-      },
+      { key: "tekst", label: "Tekst over skjemaet", type: "textarea", max: 600, optional: true },
     ],
   },
   cta: {

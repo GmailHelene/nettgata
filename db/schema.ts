@@ -14,6 +14,7 @@ import {
 } from "drizzle-orm/pg-core";
 import type { PageContent } from "@/lib/content/types";
 import type { Theme } from "@/lib/theme";
+import type { SiteInfo } from "@/lib/site-info";
 
 const id = () => uuid("id").primaryKey().default(sql`gen_random_uuid()`);
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -59,6 +60,8 @@ export const sites = pgTable("sites", {
   kind: siteKindEnum("kind").notNull().default("nettside"),
   industryPack: text("industry_pack").notNull(),
   theme: jsonb("theme").$type<Theme>().notNull(),
+  /** Kontaktinfo som én kilde. Les alltid via readSiteInfo(), som fyller inn standardverdier. */
+  info: jsonb("info").$type<Partial<SiteInfo>>().notNull().default({}),
   createdAt: createdAt(),
 });
 
@@ -89,6 +92,7 @@ export const pages = pgTable(
     /** Versjonen som vises live. Null betyr at siden aldri er publisert. */
     publishedVersionId: uuid("published_version_id"),
     sortOrder: integer("sort_order").notNull().default(0),
+    showInMenu: boolean("show_in_menu").notNull().default(true),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("pages_site_path_idx").on(t.siteId, t.path)],
@@ -120,4 +124,35 @@ export const auditLog = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("audit_log_site_idx").on(t.siteId, t.createdAt)],
+);
+
+/** Henvendelser fra kontaktskjemaet på kundens nettsted. */
+export const inquiries = pgTable(
+  "inquiries",
+  {
+    id: id(),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    email: text("email"),
+    phone: text("phone"),
+    message: text("message").notNull(),
+    pagePath: text("page_path"),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("inquiries_site_idx").on(t.siteId, t.createdAt)],
+);
+
+/**
+ * Hendelser for rate limiting. Ligger i databasen fordi Workers ikke deler minne
+ * mellom forespørsler. Gamle rader ryddes bort ved neste sjekk.
+ */
+export const rateLimitEvents = pgTable(
+  "rate_limit_events",
+  {
+    id: id(),
+    key: text("key").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("rate_limit_key_idx").on(t.key, t.createdAt)],
 );

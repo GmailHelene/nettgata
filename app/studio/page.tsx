@@ -23,6 +23,11 @@ export default async function StudioHome() {
     <main className="mx-auto max-w-4xl px-5 py-12">
       <header className="mb-10 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Dine nettsteder</h1>
+        {user.isPlatformAdmin && (
+          <Link href="/studio/nytt" className="ml-auto mr-6 rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white">
+            Nytt nettsted
+          </Link>
+        )}
         <form action={logout}>
           <button className="text-sm underline">Logg ut ({user.email})</button>
         </form>

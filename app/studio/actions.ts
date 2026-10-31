@@ -6,7 +6,10 @@ import { redirect, unstable_rethrow } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
 import { pages, users } from "@/db/schema";
+import { headers } from "next/headers";
 import { createPreviewToken } from "@/lib/preview";
+import { clientKey, hit, reset, rules } from "@/lib/rate-limit";
+import { getSecret } from "@/lib/secret";
 import { PublishingError, publishPage, restoreVersion, saveDraft } from "@/lib/publishing";
 import { createSession, destroySession, requireSiteAccess } from "@/lib/session";
 
@@ -21,11 +24,17 @@ export async function login(_prev: ActionState, formData: FormData): Promise<Act
   if (!email || !password) return { ok: false, message: "Fyll inn e-post og passord" };
 
   const db = await getDb();
+  const emailKey = `login-email:${email}`;
+  const ipKey = `login-ip:${await clientKey(await headers(), getSecret())}`;
+  const allowed = (await hit(db, emailKey, rules.loginPerEmail)) && (await hit(db, ipKey, rules.loginPerIp));
+  if (!allowed) return { ok: false, message: "For mange forsøk. Vent 15 minutter og prøv igjen." };
+
   const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   dummyHash ??= bcrypt.hash("ikke-en-bruker", 10);
   const valid = await bcrypt.compare(password, user?.passwordHash ?? (await dummyHash));
   if (!user || !valid) return { ok: false, message: "Feil e-post eller passord" };
 
+  await reset(db, emailKey);
   await createSession(user.id);
   redirect("/studio");
 }
