@@ -103,7 +103,8 @@ export function ImageInput({
           {value?.src && (
             <>
               <label className="block">
-                <span className="mb-1 block text-sm">Beskrivelse for svaksynte (alt-tekst)</span>
+                <span className="block text-sm">Beskrivelse av bildet (alt-tekst)</span>
+                <span className="mb-1 block text-xs text-neutral-600">Brukes av skjermlesere og Google. Én kort setning holder.</span>
                 <input
                   value={value.alt}
                   disabled={value.decorative}

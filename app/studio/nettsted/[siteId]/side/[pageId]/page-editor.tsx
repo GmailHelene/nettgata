@@ -127,8 +127,14 @@ export function PageEditor({ siteId, preview, pageId, path, initialTitle, initia
     setContent(next);
     setDirty(true);
   };
-  const setSection = (index: number, section: Section) =>
+  const setSection = (index: number, next: Section) => {
+    const prev = content.sections[index];
+    // Første bilde i en toppseksjon uten bildevariant: bytt til en variant som faktisk viser bildet.
+    const addedHeroImage = next.type === "hero" && !prev.props.bilde && next.props.bilde;
+    const section =
+      addedHeroImage && (next.variant === "standard" || next.variant === "sentrert") ? { ...next, variant: "bilde" } : next;
     edit({ ...content, sections: content.sections.map((s, i) => (i === index ? section : s)) });
+  };
   const move = (index: number, delta: number) => {
     const sections = [...content.sections];
     const [s] = sections.splice(index, 1);
@@ -199,7 +205,7 @@ export function PageEditor({ siteId, preview, pageId, path, initialTitle, initia
           </p>
         )}
 
-        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <div>
             <label className="mb-8 block">
               <span className="mb-1 block text-sm font-medium">Sidetittel</span>
@@ -337,7 +343,7 @@ export function PageEditor({ siteId, preview, pageId, path, initialTitle, initia
           </div>
 
           {/* Forhåndsvisning som oppdateres mens du skriver. Lenker er slått av, så du ikke navigerer bort fra redigeringen. */}
-          <aside aria-label="Forhåndsvisning" className="hidden xl:block">
+          <aside aria-label="Forhåndsvisning" className="hidden lg:block">
             <ScaledPreview>
               <PageRenderer content={content} style={preview.style} ctx={preview.ctx} />
             </ScaledPreview>

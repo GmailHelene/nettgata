@@ -72,6 +72,7 @@ Sist oppdatert 31.10.2026.
 | Alt-tekst påkrevd, eller aktivt merket som pynt | N | Ferdig |
 | Bildelager lokalt og i Cloudflare R2 (Vest-Europa) | S | Ferdig |
 | Mediebibliotek: gjenbruk av opplastede bilder | N | MVP |
+| Slette et bilde helt fra lageret («Fjern» tar det i dag bare ut av siden) | N | MVP |
 | Fokuspunkt og beskjæring | N | MVP |
 | Responsive bildestørrelser (flere bredder) | S | MVP |
 | Alt-tekst-forslag fra AI, som kunden godkjenner | N | MVP |

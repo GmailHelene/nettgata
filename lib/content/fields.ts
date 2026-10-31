@@ -47,7 +47,7 @@ function fieldToZod(field: Field): z.ZodType {
         src: z.string().regex(mediaSrcPattern, `${field.label}: ugyldig bilde`),
         alt: z.string().trim().max(200, `${field.label}: alt-teksten er for lang`),
         decorative: z.boolean().optional(),
-      }).refine((v) => v.decorative || v.alt !== "", `${field.label}: beskriv bildet for dem som ikke ser det (alt-tekst)`);
+      }).refine((v) => v.decorative || v.alt !== "", `${field.label}: skriv en kort beskrivelse av bildet (alt-tekst)`);
       return field.optional ? image.nullable().optional().default(null) : image.nullable().refine((v) => v !== null, required);
     }
     case "list":
