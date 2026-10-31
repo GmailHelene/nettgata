@@ -1,4 +1,4 @@
-import { createElement } from "react";
+import { createElement, type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Heading } from "@/components/sections";
@@ -31,6 +31,11 @@ describe("tittel og bilde for Google og deling", () => {
     expect(firstContentImage(page([text, galleri, hero({ src, alt: "Topp" })]))).toEqual({ src: other, alt: "Bad" });
     // Eksempelbilder fra biblioteket teller ikke.
     expect(firstContentImage(page([exampleSection("bildetekst", "bilde-venstre")]))).toBeNull();
+    // Et bilde toppseksjonen ikke viser (sentrert eller venstrestilt), blir ikke delingsbildet.
+    const hidden: Section = { ...hero({ src, alt: "Skjult" }), variant: "sentrert" };
+    const shown: Section = { id: "b", type: "bildetekst", variant: "bilde-venstre", props: { brodtekst: "x", bilde: { src: other, alt: "Synlig" } } };
+    expect(firstContentImage(page([hidden, shown]))).toEqual({ src: other, alt: "Synlig" });
+    expect(firstContentImage(page([{ ...hidden, variant: "bakgrunn" }, shown]))).toEqual({ src, alt: "Skjult" });
     expect(firstContentImage(page([]))).toBeNull();
   });
 
@@ -53,10 +58,11 @@ describe("«Fiks nå»", () => {
   });
 
   it("den første overskriften blir H1, uten å endre utseendet", () => {
-    const first = renderToStaticMarkup(createElement(Heading, { first: true, children: "Om oss" }));
-    expect(first).toMatch(/^<h1 class="[^"]*text-3xl[^"]*">Om oss<\/h1>$/);
-    expect(renderToStaticMarkup(createElement(Heading, { children: "Mer" }))).toMatch(/^<h2 /);
-    expect(renderToStaticMarkup(createElement(Heading, { level: 1, children: "Topp" }))).toMatch(/^<h1 class="[^"]*text-4xl/);
+    const heading = (props: { level?: 1 | 2; first?: boolean }, text: string) =>
+      renderToStaticMarkup(createElement(Heading, props as ComponentProps<typeof Heading>, text));
+    expect(heading({ first: true }, "Om oss")).toMatch(/^<h1 class="[^"]*text-3xl[^"]*">Om oss<\/h1>$/);
+    expect(heading({}, "Mer")).toMatch(/^<h2 /);
+    expect(heading({ level: 1 }, "Topp")).toMatch(/^<h1 class="[^"]*text-4xl/);
   });
 
   it("sier fra om manglende og for lang beskrivelse, og for lang tittel", () => {

@@ -27,6 +27,8 @@ export function firstContentImage(content: PageContent): ImageValue | null {
     return find(Object.values(v));
   };
   for (const section of content.sections) {
+    // Toppseksjonen viser bare bildet i bildevariantene. Et skjult bilde skal ikke bli delingsbildet.
+    if (section.type === "hero" && section.variant !== "bilde" && section.variant !== "bakgrunn") continue;
     const found = find(section.props);
     if (found) return found;
   }
