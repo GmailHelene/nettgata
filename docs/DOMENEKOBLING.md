@@ -39,7 +39,8 @@ og har fått Cloudflare sine navnetjenere (eloise og mark). Betalingskort ligger
 Når Cloudflare har sendt e-post om at nettgata.no er aktivt:
 
 1. **DNS:** nettgata.no, DNS, Records, «Import and Export», Import. Velg filen `docs/dns/nettgata.no.zone`
-   og huk av «Proxy imported DNS records».
+   og huk av «Proxy imported DNS records». Sjekk etterpå at alle fem AAAA-oppføringene har oransje sky.
+   31.10.2026 kom de inn med grå sky likevel, og da blir Fallback Origin stående på «Pending Deployment (Error)».
 2. **Cloudflare for SaaS:** nettgata.no, SSL/TLS, Custom Hostnames. Slå det på, og sett Fallback Origin til
    `fallback.nettgata.no`.
 3. **API-nøkkel:** Profil, API Tokens, Create Token, Custom token. Navn «Nettgata domenekobling». Tilgang:
