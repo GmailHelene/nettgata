@@ -1,0 +1,22 @@
+; DNS for nettgata.no. Importeres i Cloudflare: nettgata.no, DNS, Records, «Import and Export», Import.
+; Huk av «Proxy imported DNS records» (oransje sky). Adressene peker til 100::, som betyr «ingen server»:
+; Workeren «plattformen» svarer på alt via ruten */* på sonen.
+$ORIGIN nettgata.no.
+$TTL 300
+
+; Plattformen og studioet (nettgata.no). www sender videre til nettgata.no (custom-worker.ts).
+@          IN AAAA  100::
+www        IN AAAA  100::
+
+; Gratisadresser for kundene: <navn>.nettgata.no
+*          IN AAAA  100::
+
+; Domenekobling (Cloudflare for SaaS): reserveadressen og pekerne kundene bruker, <token>.kunder.nettgata.no
+fallback   IN AAAA  100::
+*.kunder   IN AAAA  100::
+
+; Ingen e-post fra nettgata.no ennå. Dette hindrer at andre sender falsk e-post i navnet.
+; Endres når e-post (for eksempel Brevo) settes opp på domenet.
+@          IN MX    0 .
+@          IN TXT   "v=spf1 -all"
+_dmarc     IN TXT   "v=DMARC1; p=reject"

@@ -33,12 +33,31 @@ Underdomener som `www`, `studio`, `kunder`, `fallback`, `mail` og `test` kan ald
 
 ### Helene gjør
 
-1. Kjøp `nettgata.no` hos Domeneshop i Grønberg Tech Solutions sitt navn (org.nr. 927 889 404). `nettgata.com` er også ledig og beskytter navnet, men er valgfritt.
-2. I Cloudflare: «Add a domain», skriv `nettgata.no`, velg Free. Cloudflare viser to navnetjenere.
-3. Hos Domeneshop: bytt navnetjenerne for `nettgata.no` til de to fra Cloudflare. Cloudflare sender e-post når domenet er aktivt (fra minutter til noen timer).
-4. Lag API-tokenet (steg 6 under) og legg det inn som hemmelighet `CF_API_TOKEN` under Workers, «plattformen», Settings, Variables and Secrets. Lagre det i Bitwarden.
+Ferdig 31.10.2026: nettgata.no og nettgata.com er kjøpt i Grønberg Tech Solutions sitt navn, lagt til i Cloudflare (Free)
+og har fått Cloudflare sine navnetjenere (eloise og mark). Betalingskort ligger i Cloudflare.
 
-Resten gjør Claude.
+Når Cloudflare har sendt e-post om at nettgata.no er aktivt:
+
+1. **DNS:** nettgata.no, DNS, Records, «Import and Export», Import. Velg filen `docs/dns/nettgata.no.zone`
+   og huk av «Proxy imported DNS records».
+2. **Cloudflare for SaaS:** nettgata.no, SSL/TLS, Custom Hostnames. Slå det på, og sett Fallback Origin til
+   `fallback.nettgata.no`.
+3. **API-nøkkel:** Profil, API Tokens, Create Token, Custom token. Navn «Nettgata domenekobling». Tilgang:
+   Zone, SSL and Certificates, Edit. Zone Resources: Include, Specific zone, nettgata.no. Ingen andre tilganger.
+   Lagre nøkkelen i Bitwarden.
+4. **Hemmelighet:** Workers & Pages, plattformen, Settings, Variables and Secrets, Add. Type Secret,
+   navn `CF_API_TOKEN`, lim inn nøkkelen.
+5. **Zone ID:** Står på oversiktssiden for nettgata.no, under «API». Den er ikke hemmelig og kan sendes til Claude.
+
+### Claude gjør ved oppstart
+
+- `wrangler.jsonc`: ruter `*/*` (sone nettgata.no) og `*nettgata.com/*` (sone nettgata.com), og variablene
+  `PLATFORM_HOSTS=nettgata.no,plattformen.helene721.workers.dev`, `SITES_ROOT_DOMAIN=nettgata.no`,
+  `CF_ZONE_ID`, `CUSTOM_DOMAIN_TARGET=kunder.nettgata.no`,
+  `PLATFORM_ALIASES=nettgata.com,www.nettgata.com,www.nettgata.no`, `PLATFORM_CANONICAL_HOST=nettgata.no`.
+- Deploy, så test: nettgata.no, www og nettgata.com sender videre, en gratisadresse, og et testdomene
+  (for eksempel et underdomene av helene.cloud) gjennom hele veiviseren.
+- Når kundene kommer: Workers gratisplan tåler 100 000 forespørsler i døgnet. Oppgrader til Workers Paid før det.
 
 ## Oppsett, steg for steg
 

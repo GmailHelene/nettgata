@@ -17,7 +17,10 @@
     // Domenekobling (Cloudflare for SaaS). Tomme til plattformen har eget domene; se docs/DOMENEKOBLING.md.
     // Kundene peker til <token>.<CUSTOM_DOMAIN_TARGET>. CF_API_TOKEN settes som hemmelighet, aldri her.
     "CF_ZONE_ID": "",
-    "CUSTOM_DOMAIN_TARGET": ""
+    "CUSTOM_DOMAIN_TARGET": "",
+    // Plattformens ekstra adresser som sender videre til hovedadressen (custom-worker.ts). Tomme til nettgata.no er aktiv.
+    "PLATFORM_ALIASES": "",
+    "PLATFORM_CANONICAL_HOST": ""
   },
   // Sjekker ventende kundedomener hvert tiende minutt (custom-worker.ts -> /api/cron/domener).
   "triggers": { "crons": ["*/10 * * * *"] }

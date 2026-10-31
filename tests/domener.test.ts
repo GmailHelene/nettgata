@@ -9,6 +9,7 @@ import { addDomain, checkSiteDomains, dropApex, removeDomain, setPrimaryDomain, 
 import { displayHost, parseDomainInput } from "@/lib/domains/parse";
 import { DNS_TYPE, type DnsResolver, type DomainProvider, type DomainServices, type HostnameState } from "@/lib/domains/services";
 import { resolveHost } from "@/lib/hosts";
+import { platformRedirect } from "@/lib/platform-redirect";
 
 const TARGET = "kunder.plattform.test";
 const HOUR = 3_600_000;
@@ -308,5 +309,19 @@ describe("koble til domene", () => {
     await expect(addDomain(db, flaky, siteA, "firma.no", userId)).rejects.toThrow(/fikk ikke meldt inn domenet/);
     expect(await rows(siteA)).toEqual([]);
     expect(fake.calls).toContain("remove cf-1");
+  });
+});
+
+describe("plattformens ekstra adresser", () => {
+  const aliases = "nettgata.com, www.nettgata.com,www.nettgata.no";
+  it("sender nettgata.com og www videre til nettgata.no med samme sti", () => {
+    expect(platformRedirect("https://nettgata.com/studio?x=1", aliases, "nettgata.no")).toBe("https://nettgata.no/studio?x=1");
+    expect(platformRedirect("http://WWW.nettgata.no/", aliases, "nettgata.no")).toBe("https://nettgata.no/");
+  });
+  it("rører ikke hovedadressen, kundesider eller noe når innstillingene er tomme", () => {
+    expect(platformRedirect("https://nettgata.no/", aliases, "nettgata.no")).toBeNull();
+    expect(platformRedirect("https://firma.nettgata.no/", aliases, "nettgata.no")).toBeNull();
+    expect(platformRedirect("https://nettgata.com/", "", "")).toBeNull();
+    expect(platformRedirect("https://nettgata.com/", aliases, undefined)).toBeNull();
   });
 });

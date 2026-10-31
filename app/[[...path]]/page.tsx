@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { asc, eq } from "drizzle-orm";
 import { headers } from "next/headers";
@@ -80,7 +81,7 @@ const keyOf = (t: Target) => (t.kind === "host" ? t.host : t.slug);
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const { target, origin } = await currentRequest(props);
-  if (!target) return { title: "Plattformen" };
+  if (!target) return { title: "Nettgata", description: "Nettsider og nettbutikker for norske bedrifter." };
   const loaded = await loadSite(target.kind, keyOf(target));
   if (!loaded) return {};
   if (loaded.redirectHost) await redirectToPrimary(loaded.redirectHost, props);
@@ -115,8 +116,13 @@ export default async function PublicPage(props: Props) {
     if (!isPlatformRoot) notFound();
     return (
       <main className="mx-auto max-w-2xl px-5 py-24">
-        <h1 className="text-4xl font-bold">Plattformen</h1>
-        <p className="mt-4 text-lg text-neutral-600">Under bygging. Studioet ligger på /studio.</p>
+        <h1 className="text-4xl font-bold">Nettgata</h1>
+        <p className="mt-4 text-lg text-neutral-700">Nettsider og nettbutikker for norske bedrifter. Åpner snart.</p>
+        <p className="mt-8 text-sm">
+          <Link href="/studio" className="underline">
+            Logg inn
+          </Link>
+        </p>
       </main>
     );
   }

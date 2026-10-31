@@ -3,7 +3,7 @@ import { fontVariables } from "./fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Plattformen",
+  title: "Nettgata",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
