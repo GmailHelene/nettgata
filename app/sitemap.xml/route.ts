@@ -1,7 +1,7 @@
 import { and, asc, eq, isNotNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { pageVersions, pages, products } from "@/db/schema";
-import { isPlatformHost, resolveSiteByHost } from "@/lib/hosts";
+import { isPlatformHost, resolveHost } from "@/lib/hosts";
 
 const escapeXml = (s: string) => s.replace(/[<>&'"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -10,8 +10,10 @@ export async function GET(request: Request) {
   const host = request.headers.get("host") ?? "";
   if (isPlatformHost(host)) return new Response("Not found", { status: 404 });
   const db = await getDb();
-  const site = await resolveSiteByHost(db, host);
-  if (!site) return new Response("Not found", { status: 404 });
+  const match = await resolveHost(db, host);
+  if (!match) return new Response("Not found", { status: 404 });
+  if (match.redirectHost) return Response.redirect(`https://${match.redirectHost}/sitemap.xml`, 301);
+  const { site } = match;
 
   const rows = await db
     .select({ path: pages.path, updated: pageVersions.createdAt })

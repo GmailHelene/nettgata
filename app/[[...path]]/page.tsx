@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { asc, eq } from "drizzle-orm";
 import { headers } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { cache } from "react";
 import { PageRenderer, SiteChrome } from "@/components/sections";
 import { ProductPage, ProductsPage, OrderPage, CartPage, shopTitle, type ShopRoute } from "@/components/shop/pages";
 import { getDb } from "@/db";
 import { productCategories, sites } from "@/db/schema";
-import { isPlatformHost, resolveSiteByHost } from "@/lib/hosts";
+import { isPlatformHost, resolveHost } from "@/lib/hosts";
 import { getPublishedPage, normalizePath } from "@/lib/publishing";
 import { buildRenderContext } from "@/lib/render";
 import { listCatalog } from "@/lib/shop/catalog";
@@ -26,12 +26,24 @@ type Target = { kind: "host"; host: string; segments: string[] } | { kind: "slug
 
 const loadSite = cache(async (kind: Target["kind"], key: string) => {
   const db = await getDb();
-  const site =
-    kind === "host"
-      ? await resolveSiteByHost(db, key)
-      : ((await db.select().from(sites).where(eq(sites.slug, key)).limit(1))[0] ?? null);
-  return site ? { db, site, basePath: kind === "slug" ? `/vis/${site.slug}` : "" } : null;
+  if (kind === "host") {
+    const match = await resolveHost(db, key);
+    return match ? { db, site: match.site, basePath: "", redirectHost: match.redirectHost } : null;
+  }
+  const [site] = await db.select().from(sites).where(eq(sites.slug, key)).limit(1);
+  return site ? { db, site, basePath: `/vis/${site.slug}`, redirectHost: null } : null;
 });
+
+/** Sender besøket videre til hovedadressen med samme sti og spørring (308, permanent). */
+async function redirectToPrimary(host: string, props: Props): Promise<never> {
+  const { path = [] } = await props.params;
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(await props.searchParams)) {
+    for (const v of Array.isArray(value) ? value : value === undefined ? [] : [value]) query.append(key, v);
+  }
+  const qs = query.toString();
+  permanentRedirect(`https://${host}/${path.join("/")}${qs ? `?${qs}` : ""}`);
+}
 
 /** Butikkens egne ruter. Alt annet er vanlige sider. */
 function shopRoute(segments: string[]): ShopRoute | null {
@@ -71,6 +83,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   if (!target) return { title: "Plattformen" };
   const loaded = await loadSite(target.kind, keyOf(target));
   if (!loaded) return {};
+  if (loaded.redirectHost) await redirectToPrimary(loaded.redirectHost, props);
   const { site, db } = loaded;
   const path = "/" + target.segments.join("/");
   // Visningen via plattformens adresse er en kopi og skal ikke konkurrere med kundens eget domene i Google.
@@ -110,6 +123,7 @@ export default async function PublicPage(props: Props) {
 
   const loaded = await loadSite(target.kind, keyOf(target));
   if (!loaded) notFound();
+  if (loaded.redirectHost) await redirectToPrimary(loaded.redirectHost, props);
   const { db, site, basePath } = loaded;
   const path = "/" + target.segments.join("/");
   const style = themeToCssVars(site.theme);

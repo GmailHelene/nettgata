@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { and, count, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
-import { inquiries, orders, pages } from "@/db/schema";
+import { domains, inquiries, orders, pages } from "@/db/schema";
+import { displayHost, rootOf } from "@/lib/domains";
 import { formatOsloDateTime } from "@/lib/oslo-time";
 import { getPublishedPage } from "@/lib/publishing";
 import { requireSiteAccess } from "@/lib/session";
@@ -54,10 +55,11 @@ export default async function OverviewPage({ params }: { params: Promise<{ siteI
   const base = `/studio/nettsted/${site.id}`;
   const isShop = site.kind === "nettbutikk";
 
-  const [[{ unread }], [{ unpublished }], latestInquiries] = await Promise.all([
+  const [[{ unread }], [{ unpublished }], latestInquiries, domainRows] = await Promise.all([
     db.select({ unread: count() }).from(inquiries).where(and(eq(inquiries.siteId, site.id), isNull(inquiries.readAt))),
     db.select({ unpublished: count() }).from(pages).where(and(eq(pages.siteId, site.id), isNull(pages.publishedVersionId))),
     db.select().from(inquiries).where(eq(inquiries.siteId, site.id)).orderBy(desc(inquiries.createdAt)).limit(3),
+    db.select().from(domains).where(eq(domains.siteId, site.id)),
   ]);
 
   const tasks: Task[] = [];
@@ -84,6 +86,12 @@ export default async function OverviewPage({ params }: { params: Promise<{ siteI
     if (counts.paid) tasks.push({ text: `${counts.paid} ${counts.paid === 1 ? "ordre er betalt og klar" : "ordre er betalt og klare"} til sending`, href: `${base}/ordre?status=klar` });
     if (counts.pending_payment) tasks.push({ text: `${counts.pending_payment} ordre venter på betaling`, href: `${base}/ordre?status=venter` });
     if (low.length) tasks.push({ text: `${low.length}${low.length === 8 ? "+" : ""} varianter har ${settings.lowStockAt} eller færre igjen`, href: `${base}/varer?lager=lite` });
+  }
+  for (const d of domainRows.filter((r) => r.failingSince)) {
+    tasks.push({ text: `${displayHost(d.hostname)} peker ikke hit lenger. Sjekk DNS hos domeneforhandleren`, href: `${base}/domene`, tone: "warning" });
+  }
+  for (const root of new Set(domainRows.filter((r) => r.status === "pending" && r.kind !== "apex").map(rootOf))) {
+    tasks.push({ text: `${displayHost(root)} venter på DNS-pekerne`, href: `${base}/domene` });
   }
   if (unread) tasks.push({ text: `${unread} ${unread === 1 ? "ny henvendelse" : "nye henvendelser"}`, href: `${base}/henvendelser` });
   if (unpublished) tasks.push({ text: `${unpublished} ${unpublished === 1 ? "side er" : "sider er"} ikke publisert`, href: `${base}/sider` });

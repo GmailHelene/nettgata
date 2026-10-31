@@ -7,7 +7,7 @@ Grunnlag: markedsanalysen (funksjonskart, funksjonsrevisjon og MVP-liste), produ
 
 **Lag:** N = synlig for nybegynneren. A = avansert lag. U = utviklerlaget. S = skjult automatikk som bare virker.
 
-Sist oppdatert 31.10.2026 (kvalitetsløft 2, del 1 og 2: adminpanelet).
+Sist oppdatert 31.10.2026 (kvalitetsløft 2 og domenekobling).
 
 ---
 
@@ -138,8 +138,10 @@ Sist oppdatert 31.10.2026 (kvalitetsløft 2, del 1 og 2: adminpanelet).
 | Hosting i EU-region, CDN og SSL | S | Ferdig (Cloudflare, Neon Frankfurt) |
 | Visning via plattformens adresse (/vis/navn) før domenet er koblet | N | Ferdig |
 | Gratis underdomene per kunde | S | Venter på domenevalg |
-| Koble eget domene med DNS-veiviser (Cloudflare for SaaS) | N | MVP |
-| Bestille nytt domene i samme flyt, alltid i kundens navn | N | MVP |
+| Koble eget domene med DNS-veiviser (Cloudflare for SaaS), automatisk sjekk og https | N | Bygget, slås på når plattformen har eget domene |
+| Unik peker per domene, så ingen kan koble til et domene de ikke eier | S | Bygget |
+| Hoveddomenet, ekstra domener og gratisadressen sender videre til hovedadressen | S | Bygget |
+| Bestille nytt domene i samme flyt, alltid i kundens navn | N | Senere (.no kan ikke kjøpes via Cloudflare eller Domeneshop sitt API; kunden kjøper selv og veiviseren lenker dit) |
 | SPF, DKIM og DMARC satt opp automatisk | S | MVP |
 | E-post på eget domene via partner | N | Senere |
 | Egen Norid-registrar | S | Senere |

@@ -24,6 +24,8 @@ const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull(
 export const roleEnum = pgEnum("role", ["owner", "editor", "developer"]);
 export const siteKindEnum = pgEnum("site_kind", ["nettside", "nettbutikk"]);
 export const domainStatusEnum = pgEnum("domain_status", ["pending", "active"]);
+/** apex: firma.no (sender alltid videre til www). www: www.firma.no. sub: et underdomene som butikk.firma.no. */
+export const domainKindEnum = pgEnum("domain_kind", ["apex", "www", "sub"]);
 
 export const users = pgTable("users", {
   id: id(),
@@ -76,13 +78,27 @@ export const domains = pgTable(
   {
     id: id(),
     siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
-    /** Alltid lagret med små bokstaver og uten port. */
+    /** Alltid lagret med små bokstaver og uten port. Internasjonale tegn som punycode (xn--). */
     hostname: text("hostname").notNull().unique(),
+    kind: domainKindEnum("kind").notNull().default("sub"),
+    /**
+     * Unik peker for dette domenet: kunden peker www til <token>.<CUSTOM_DOMAIN_TARGET>.
+     * Vi aktiverer bare når DNS peker nøyaktig hit, så ingen kan ta et domene de ikke eier.
+     */
+    token: text("token"),
+    /** Id hos Cloudflare for SaaS (custom hostname). */
+    cfHostnameId: text("cf_hostname_id"),
     isPrimary: boolean("is_primary").notNull().default(false),
     status: domainStatusEnum("status").notNull().default("pending"),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    checkedAt: timestamp("checked_at", { withTimezone: true }),
+    /** Forklaring til kunden fra siste sjekk, for eksempel hva DNS peker til nå. */
+    lastError: text("last_error"),
+    /** Når et aktivt domene sluttet å peke hit. Det deaktiveres etter en frist, ikke ved første feil. */
+    failingSince: timestamp("failing_since", { withTimezone: true }),
     createdAt: createdAt(),
   },
-  (t) => [index("domains_site_idx").on(t.siteId)],
+  (t) => [index("domains_site_idx").on(t.siteId), index("domains_status_checked_idx").on(t.status, t.checkedAt)],
 );
 
 export const pages = pgTable(
