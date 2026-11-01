@@ -24,6 +24,7 @@ Kort utviklerdokumentasjon. Skrevet 01.11.2026.
 | `lib/bring/config.ts` | Lagre, teste og fjerne nøkler, lagre fraktvalg |
 | `lib/bring/quote.ts` | Pris til kassen og ordren, med reservepris og ti minutters buffer |
 | `lib/bring/booking.ts` | Bestilling, etikett og sporing |
+| `lib/bring/pickup.ts` | Hentesteder for Pakke til hentested (Pickup Point API), med ti minutters buffer |
 | `lib/bring/weight.ts` | Totalvekt for handlekurven |
 
 ## Lagring
@@ -46,14 +47,23 @@ Kort utviklerdokumentasjon. Skrevet 01.11.2026.
    - 5600: «Maksimum virkelig vekt: 35 kg». Kilde: Prisliste Pakke hjem pluss fra 1. juli 2026, https://www.bring.no/tjenester/pakker-og-gods/private-nasjonalt/pakke-levert-hjem/Prisliste-Pakke-hjem-pluss_01072026.pdf
    - For 5000, 5600, 5800 og andre reviderte tjenester trengs mål for riktig pris (Shipping Guide-siden). Derfor kan butikken sette en vanlig pakkestørrelse.
 
+## Hentested
+
+- **Kassen:** velger kunden Pakke til hentested og har skrevet postnummer, hentes de seks nærmeste hentestedene (`getPickupPoints`, begrenset med `hit()`, 60 per 10 minutter per IP). Nærmeste er forhåndsvalgt. Listen annonseres med `aria-live`. Svarer ikke Bring, vises ingen velger.
+- **Lagring:** `orders.shipping.bring.pickupPoint` (id, navn, adresse, postnummer, sted) i eksisterende jsonb, ingen migrering. Serveren slår valgt id opp mot Bring sin liste for postnummeret når ordren lages, og ignorerer ukjente id-er.
+- **Bestilling:** `parties.pickupPoint { countryCode: "NO", id }` sendes bare når den bestilte tjenesten er 5800 og ordren har et valgt hentested.
+- **Kilder:** Pickup Point API https://developer.bring.com/api/pickup-point/ (`GET https://api.bring.com/pickuppoint/api/pickuppoint/NO/postalCode/{postnummer}?numberOfResponses=6`, hodene `X-Mybring-API-Uid`, `X-Mybring-API-Key`, `Accept: application/json`). Booking API https://developer.bring.com/api/booking/ (`parties.pickupPoint.id` og `.countryCode`, begge påkrevd).
+
 ## Antakelser vi ikke har fått bekreftet
 
 - At en testbestilling med `X-Bring-Test-Indicator` gir etikett tilbake. Bring skriver at testnummer bare gir testdata, men ikke noe om etiketten.
 - At etikettlenken (`labels.link` eller `links.labels`) er en PDF som kan hentes med API-nøklene. Formatet er ikke beskrevet. Eksemplet ender på `.pdf`. Vi sender nøklene bare til bring.com, mybring.com, bring.no og posten.no over https, og sjekker at svaret starter med `%PDF`.
 - At `labels.base64` er en PDF når den finnes.
-- At Pakke til hentested (5800) uten `pickupPoint` sendes til nærmeste hentested. Tjenesteporteføljen kaller hentested valgfritt (VAS 1036). Kassen lar ikke kunden velge hentested ennå.
+- At Pakke til hentested (5800) uten `pickupPoint` sendes til nærmeste hentested. Tjenesteporteføljen kaller hentested valgfritt (VAS 1036). Kassen lar kunden velge blant de nærmeste hentestedene (se under). Uten svar fra Bring, eller uten valg, sendes pakken til nærmeste hentested som før.
 - At https virker for Shipping Guide. OpenAPI-dokumentet oppgir `http://api.bring.com/shippingguide` som server.
 - At Shipping Guide og Booking godtar `X-Bring-Client-URL`. Hodet står ikke i deres OpenAPI, men API-oversikten sier at det alltid kreves.
+- At Pickup Point API godtar de samme nøklene som Shipping Guide uten kundenummer, og at `X-Bring-Client-URL` er unødvendig der (siden nevner det ikke, vi sender det likevel). Grensen er oppgitt som både 80 og 30 forespørsler i sekundet.
+- At feltene `id`, `name`, `address`, `postalCode`, `city` og `distanceInKm` er de riktige, og at `id` fra Pickup Point API er det Booking API vil ha i `parties.pickupPoint.id` for 5800. Eksemplet i Booking API gjelder tjeneste 5901.
 - Lengdegrensene for 5800 og 5600 (240 cm, og 360 cm lengde + omkrets) har vi bare fra tredjepart. Kassen sjekker bare vekt.
 - At `priceWithAdditionalServices` er riktig pris når vi ikke ber om tilleggstjenester. Vi bruker den, ellers `priceWithoutAdditionalServices`.
 - At `shippingDateTime` i UTC (`2026-11-02T08:30:00.000Z`) godtas. Bring sine eksempler har lokal tidssone.

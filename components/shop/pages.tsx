@@ -7,7 +7,7 @@ import { mediaSrcPattern } from "@/lib/media-types";
 import type { CatalogProduct } from "@/lib/shop/catalog";
 import { formatNok } from "@/lib/shop/money";
 import { carrierLabel, trackingUrl } from "@/lib/shop/tracking";
-import { isOnlinePayment, paymentInstructions, paymentLabels, type PaymentMethod, type ShopSettings } from "@/lib/shop/settings";
+import { checkoutShippingOptions, isOnlinePayment, paymentInstructions, paymentLabels, type PaymentMethod, type ShopSettings } from "@/lib/shop/settings";
 import { parsePaymentRef } from "@/lib/payments/common";
 import { AddToCart } from "./add-to-cart";
 import { Checkout, ForgetCartAfterPayment } from "./checkout";
@@ -202,7 +202,17 @@ export function ProductPage({
                       <span>{o.priceOre === 0 ? "Gratis" : formatNok(o.priceOre)}</span>
                     </li>
                   ))}
+                  {/* Bring-valgene butikken har slått på. Prisen er reserveprisen; den riktige prisen kommer i kassen etter postnummeret. */}
+                  {checkoutShippingOptions(settings)
+                    .filter((o) => o.bring)
+                    .map((o) => (
+                      <li key={o.code} className="flex justify-between gap-4">
+                        <span>{o.name}</span>
+                        <span>{o.priceOre === 0 ? "Gratis" : `fra ${formatNok(o.priceOre)}`}</span>
+                      </li>
+                    ))}
                 </ul>
+                {checkoutShippingOptions(settings).some((o) => o.bring) && <p className="text-sm text-[var(--c-muted)]">Prisen med Bring avhenger av vekt og postnummer, og vises i kassen.</p>}
                 {settings.freeShippingOverOre !== null && <p>Gratis frakt ved kjøp over {formatNok(settings.freeShippingOverOre)}.</p>}
               </Accordion>
               <Accordion title="Angrerett og retur">

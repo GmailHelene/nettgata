@@ -20,6 +20,10 @@ export const orderBringSchema = z.object({
   product: z.enum(bringProductIds),
   weightGrams: z.number().int().nullable(),
   toPostalCode: z.string(),
+  /** Hentestedet kunden valgte i kassen (bare Pakke til hentested). Mangler det, velger Bring nærmeste. */
+  pickupPoint: z
+    .object({ id: z.string(), name: z.string(), address: z.string(), postalCode: z.string(), city: z.string() })
+    .optional(),
   /** bring: pris fra Bring. reserve: butikkens reservepris. gratis: butikkens regel om gratis frakt. */
   price: z.enum(["bring", "reserve", "gratis"]),
   reason: z.enum(["vekt", "bring"]).nullable().default(null),
@@ -156,6 +160,7 @@ export async function bookBringShipment(
       weightGrams,
       packageCm: shipping.packageCm,
       shippingDateTime: now,
+      pickupPointId: product === "5800" ? readOrderBring(order.shipping)?.pickupPoint?.id : null,
     });
   } catch (err) {
     await release();

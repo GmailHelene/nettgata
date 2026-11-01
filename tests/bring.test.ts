@@ -17,7 +17,7 @@ import { setDbForTests, type Db } from "@/db";
 import { createPgliteDb } from "@/db/pglite";
 import { demoTheme } from "@/db/demo";
 import { auditLog, memberships, orders, organizations, productVariants, sites, users } from "@/db/schema";
-import { getCheckoutData } from "@/app/actions/shop";
+import { getCheckoutData, getPickupPoints } from "@/app/actions/shop";
 import { createBringLabelAction } from "@/app/studio/nettsted/[siteId]/ordre/[orderId]/bring-actions";
 import { GET as labelGet } from "@/app/studio/nettsted/[siteId]/ordre/[orderId]/etikett/route";
 import {
@@ -29,6 +29,7 @@ import {
 import { bookBringShipment, bringLabelPdf, readBringBooking, readOrderBring } from "@/lib/bring/booking";
 import { bookingRequest, readShippingGuideResponse, shippingGuideRequest } from "@/lib/bring/client";
 import { bringSetupView, loadBringAccess, removeBringKeys, saveBringKeys, saveBringShipping, testBringConnection } from "@/lib/bring/config";
+import { clearPickupPointCache } from "@/lib/bring/pickup";
 import { clearBringQuoteCache } from "@/lib/bring/quote";
 import { readBringAccount } from "@/lib/bring/state";
 import { cartWeight } from "@/lib/bring/weight";
@@ -61,7 +62,7 @@ type Call = { method: string; url: URL; headers: Record<string, string>; body: R
 /** Bring slik testene ser det: Shipping Guide, Booking og etikett-PDF bak fetch. Ingen nettverk. */
 function bringWorld() {
   const calls: Call[] = [];
-  const world = { quotes: "ok" as "ok" | "500" | "nett", extra: 0, booked: 0, bookingError: null as unknown };
+  const world = { quotes: "ok" as "ok" | "500" | "nett", pickup: "ok" as "ok" | "500" | "nett" | "tom", extra: 0, booked: 0, bookingError: null as unknown };
 
   const fetchMock = vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
     const url = new URL(typeof input === "string" || input instanceof URL ? input : input.url);
@@ -93,6 +94,20 @@ function bringWorld() {
               };
             }),
           },
+        ],
+      });
+    }
+
+    if (url.origin + url.pathname === "https://api.bring.com/pickuppoint/api/pickuppoint/NO/postalCode/0150" && method === "GET") {
+      if (world.pickup === "nett") throw new TypeError("fetch failed");
+      if (world.pickup === "500") return json(500, { fieldErrors: [{ code: "INTERNAL_ERROR", message: "Internal error", field: "" }] });
+      if (!authed) return json(401, {});
+      if (world.pickup === "tom") return json(200, { pickupPoint: [] });
+      return json(200, {
+        pickupPoint: [
+          { id: "108625", unitId: "1", name: "Rema 1000 Storgata", address: "Storgata 10", postalCode: "0155", city: "OSLO", distanceInKm: 0.4 },
+          { id: 3011, name: "Kiwi Grensen", address: "Grensen 4", postalCode: "0159", city: "OSLO", distanceInKm: 1.25 },
+          { id: "../ugyldig", name: "Skal hoppes over", address: "X", postalCode: "0150", city: "OSLO" },
         ],
       });
     }
@@ -167,6 +182,7 @@ describe("frakt med Bring", () => {
     db = await createPgliteDb();
     setDbForTests(db);
     clearBringQuoteCache();
+    clearPickupPointCache();
     jar.clear();
     const [owner, editor, stranger] = await db
       .insert(users)
@@ -609,6 +625,108 @@ describe("frakt med Bring", () => {
     await bookBringShipment(db, siteId, third.id, { product: "5800", weightGrams: 900 }, ownerId);
     expect(bring.find("/booking/api/create").slice(-1)[0].headers).not.toHaveProperty("X-Bring-Test-Indicator");
     expect(readBringBooking((await orderRow(third.id)).shipping)?.test).toBe(false);
+  });
+
+  it("hentesteder: kunden velger, valget lagres på ordren og sendes med i bookingen", async () => {
+    expect((await connect()).ok).toBe(true);
+
+    // Listen kommer fra Pickup Point API med samme nøkler, nærmest først. Poster med ugyldig id hoppes over, tall-id blir tekst.
+    const points = await getPickupPoints(siteId, "0150");
+    expect(points).toEqual([
+      { id: "108625", name: "Rema 1000 Storgata", address: "Storgata 10", postalCode: "0155", city: "OSLO", distanceKm: 0.4 },
+      { id: "3011", name: "Kiwi Grensen", address: "Grensen 4", postalCode: "0159", city: "OSLO", distanceKm: 1.25 },
+    ]);
+    const [call] = bring.find("/pickuppoint/");
+    expect(call.method).toBe("GET");
+    expect(call.url.searchParams.get("numberOfResponses")).toBe("6");
+    expect(call.headers).toMatchObject({ "X-Mybring-API-Uid": UID, "X-Mybring-API-Key": API_KEY, Accept: "application/json" });
+    // Samme postnummer gir samme liste uten nytt kall. Ugyldig postnummer spør ikke Bring.
+    await getPickupPoints(siteId, "0150");
+    expect(await getPickupPoints(siteId, "01")).toEqual([]);
+    expect(await getPickupPoints(siteId, "0150; drop")).toEqual([]);
+    expect(bring.find("/pickuppoint/")).toHaveLength(1);
+
+    // Valget lagres på ordren, og sendes med til Bring som parties.pickupPoint.
+    const chosen = await paidOrder({ pickupPointId: "3011" });
+    expect(readOrderBring(chosen.shipping)).toMatchObject({
+      product: "5800",
+      pickupPoint: { id: "3011", name: "Kiwi Grensen", address: "Grensen 4", postalCode: "0159", city: "OSLO" },
+    });
+    await bookBringShipment(db, siteId, chosen.id, { product: "5800", weightGrams: 650 }, ownerId);
+    const [booked] = bring.find("/booking/api/create");
+    const parties = (booked.body!.consignments as { parties: Record<string, unknown> }[])[0].parties;
+    expect(parties.pickupPoint).toEqual({ countryCode: "NO", id: "3011" });
+
+    // En id som ikke finnes for postnummeret, ignoreres: ingen hentested lagres, og Bring velger nærmeste.
+    const forged = await paidOrder({ pickupPointId: "999999" });
+    expect(readOrderBring(forged.shipping)?.pickupPoint).toBeUndefined();
+    await bookBringShipment(db, siteId, forged.id, { product: "5800", weightGrams: 650 }, ownerId);
+    const lastParties = (bring.find("/booking/api/create").slice(-1)[0].body!.consignments as { parties: Record<string, unknown> }[])[0].parties;
+    expect(lastParties).not.toHaveProperty("pickupPoint");
+
+    // Hentested hører bare til Pakke til hentested.
+    const home = await paidOrder({ pickupPointId: "3011", shippingCode: "bring-5600" });
+    expect(readOrderBring(home.shipping)?.pickupPoint).toBeUndefined();
+    // Bestilles en annen tjeneste enn 5800, sendes ikke hentested selv om ordren har ett.
+    const other = await paidOrder({ pickupPointId: "108625" });
+    expect(readOrderBring(other.shipping)?.pickupPoint?.id).toBe("108625");
+    await bookBringShipment(db, siteId, other.id, { product: "3584", weightGrams: 650 }, ownerId);
+    expect(bring.find("/booking/api/create").slice(-1)[0].body).not.toHaveProperty("consignments.0.parties.pickupPoint");
+  });
+
+  it("hentesteder: uten svar fra Bring finnes ingen velger, og bestillingen går som før", async () => {
+    expect((await connect()).ok).toBe(true);
+
+    for (const mode of ["500", "nett", "tom"] as const) {
+      clearPickupPointCache();
+      bring.world.pickup = mode;
+      expect(await getPickupPoints(siteId, "0150")).toEqual([]);
+      const o = await paidOrder({ pickupPointId: "3011" });
+      expect(readOrderBring(o.shipping)).toMatchObject({ product: "5800", toPostalCode: "0150" });
+      expect(readOrderBring(o.shipping)?.pickupPoint).toBeUndefined();
+      await bookBringShipment(db, siteId, o.id, { product: "5800", weightGrams: 650 }, ownerId);
+      expect(bring.find("/booking/api/create").slice(-1)[0].body).not.toHaveProperty("consignments.0.parties.pickupPoint");
+    }
+    expect(logged.join("\n")).toMatch(/Bring ga ikke hentesteder/);
+
+    // Tomme svar og feil huskes ikke: kommer Bring tilbake, vises listen med en gang.
+    bring.world.pickup = "ok";
+    expect(await getPickupPoints(siteId, "0150")).toHaveLength(2);
+
+    // Uten at butikken har slått på Pakke til hentested, spørres ikke Bring.
+    await saveBringShipping(db, siteId, { ...shippingSettings, products: [{ id: "5600", fallbackOre: 19900 }] }, ownerId);
+    clearPickupPointCache();
+    const calls = bring.find("/pickuppoint/").length;
+    expect(await getPickupPoints(siteId, "0150")).toEqual([]);
+    expect(bring.find("/pickuppoint/")).toHaveLength(calls);
+  });
+
+  it("varesiden viser Bring-valgene butikken har slått på, med reserveprisen som «fra»-pris", async () => {
+    expect((await connect()).ok).toBe(true);
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { createElement } = await import("react");
+    const { ProductPage } = await import("@/components/shop/pages");
+    const product = { id: "p", slug: "lue", name: "Strikket lue", description: "", images: [], options: [], vatRate: 25, variants: [{ id: lueId, optionValues: [], label: "", priceOre: 39900, stock: 20 }] } as never;
+    const render = async () =>
+      renderToStaticMarkup(
+        createElement(ProductPage, { siteId, siteName: "Ullstua", product, basePath: "", settings: readShopSettings((await site()).shop), origin: "http://localhost:3000" }),
+      );
+
+    const html = await render();
+    expect(html).toContain("Pakke i postkassen (Bring)");
+    expect(html).toContain("Pakke til hentested (Bring)");
+    expect(html).toContain("Pakke levert hjem (Bring)");
+    expect(html).toMatch(/fra[^<]*79[^<]*kr/);
+    expect(html).toMatch(/fra[^<]*149[^<]*kr/);
+    expect(html).toMatch(/fra[^<]*199[^<]*kr/);
+    // De faste fraktvalgene står der de gjorde.
+    expect(html).toContain("Hent selv");
+
+    // Slår butikken av en tjeneste, forsvinner den fra listen.
+    await saveBringShipping(db, siteId, { ...shippingSettings, products: [{ id: "5600", fallbackOre: 19900 }] }, ownerId);
+    const fewer = await render();
+    expect(fewer).toContain("Pakke levert hjem (Bring)");
+    expect(fewer).not.toContain("Pakke til hentested (Bring)");
   });
 
   it("lagrer nøklene kryptert, og verken kassen eller studioet får dem", async () => {

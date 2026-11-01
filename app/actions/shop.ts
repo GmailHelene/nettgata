@@ -11,6 +11,7 @@ import { getEmailProvider } from "@/lib/email/send";
 import { clientKey, hit, isLimited, rules } from "@/lib/rate-limit";
 import { getSecret } from "@/lib/secret";
 import { getPublishedPage } from "@/lib/publishing";
+import { findPickupPoints } from "@/lib/bring/pickup";
 import { quoteBring, type BringPrice } from "@/lib/bring/quote";
 import { cartWeight } from "@/lib/bring/weight";
 import { ShopError } from "@/lib/shop/catalog";
@@ -113,6 +114,18 @@ export async function getCheckoutData(siteId: string, items: unknown, shippingCo
     totalOre: totals.totalOre,
     vatOre: totals.vatOre,
   };
+}
+
+/**
+ * Offentlig: de nærmeste hentestedene for et postnummer, til Pakke til hentested i kassen. Tom liste når butikken
+ * ikke tilbyr tjenesten eller Bring ikke svarer; da går pakken til nærmeste hentested. Aldri noe om nøklene.
+ */
+export async function getPickupPoints(siteId: string, postalCode: unknown) {
+  const postal = postalCodeSchema.safeParse(postalCode);
+  const ctx = await shopSite(siteId);
+  if (!ctx || !postal.success) return [];
+  if (!(await hit(ctx.db, `pickup-ip:${await clientKey(await headers(), getSecret())}`, { limit: 60, windowSeconds: 600 }))) return [];
+  return findPickupPoints(ctx.db, ctx.site.id, postal.data);
 }
 
 export type PlaceOrderResult = { ok: true; orderId: string; token: string } | { ok: false; message: string };

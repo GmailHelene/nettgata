@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Db } from "@/db";
 import { auditLog, customers, orderLines, orders, productVariants, products, type ShippingAddress, type ShippingChoice } from "@/db/schema";
 import type { OrderBring } from "@/lib/bring/booking";
+import { findPickupPoints } from "@/lib/bring/pickup";
 import { quoteBring } from "@/lib/bring/quote";
 import { cartWeight } from "@/lib/bring/weight";
 import { ShopError } from "./catalog";
@@ -39,6 +40,11 @@ export const checkoutSchema = z.object({
    * stoppes bestillingen, så kunden aldri betaler en annen frakt enn den som sto på knappen.
    */
   seenShippingOre: z.number().int().min(0).max(10_000_000).optional(),
+  /**
+   * Hentestedet kunden valgte for Pakke til hentested. Serveren slår det opp hos Bring for postnummeret og bruker det
+   * bare hvis det finnes i listen. Ellers ignoreres det, og pakken går til nærmeste hentested.
+   */
+  pickupPointId: z.string().trim().max(40).optional(),
 });
 export type CheckoutInput = z.input<typeof checkoutSchema>;
 
@@ -199,6 +205,7 @@ async function bringPriceForOrder(
   lines: PricedLine[],
   discount: Discount | null,
   address: ShippingAddress | null,
+  pickupPointId?: string,
 ): Promise<{ priceOre: number | undefined; bring: OrderBring | null }> {
   if (!option.bring || !address) return { priceOre: undefined, bring: null };
   const weightGrams = cartWeight(lines);
@@ -207,7 +214,14 @@ async function bringPriceForOrder(
   }
   const subtotalOre = lines.reduce((sum, l) => sum + l.totalOre, 0);
   const goodsOre = subtotalOre - (discount ? discountAmount(discount, subtotalOre) : 0);
-  const base = { product: option.bring.product, weightGrams, toPostalCode: address.postalCode };
+  const chosen =
+    pickupPointId && option.bring.product === "5800" ? (await findPickupPoints(db, siteId, address.postalCode)).find((p) => p.id === pickupPointId) : undefined;
+  const base = {
+    product: option.bring.product,
+    weightGrams,
+    toPostalCode: address.postalCode,
+    ...(chosen && { pickupPoint: { id: chosen.id, name: chosen.name, address: chosen.address, postalCode: chosen.postalCode, city: chosen.city } }),
+  };
   if (freeShippingApplies(settings, goodsOre, discount?.kind === "free_shipping")) {
     return { priceOre: 0, bring: { ...base, price: "gratis", reason: null } };
   }
@@ -249,7 +263,7 @@ export async function createOrder(db: Db, siteId: string, settings: ShopSettings
   }
 
   // Frakten regnes ut og låses her. En pris fra nettleseren brukes aldri.
-  const bringPrice = await bringPriceForOrder(db, siteId, settings, option, lines, discount, address);
+  const bringPrice = await bringPriceForOrder(db, siteId, settings, option, lines, discount, address, data.pickupPointId);
   const totals = cartTotals(settings, lines, option.code, discount, bringPrice.priceOre);
   const shipping = totals.shipping;
   if (!shipping) throw new ShopError("Velg en leveringsmåte");

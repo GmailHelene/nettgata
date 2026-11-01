@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { getCheckoutData, placeOrder } from "@/app/actions/shop";
+import { getCheckoutData, getPickupPoints, placeOrder } from "@/app/actions/shop";
+import { bringShippingCode } from "@/lib/bring/products";
 import { onlinePaymentInfo, placeOrderWithOnlinePayment } from "@/lib/payments/checkout-action";
 import type { ReadyProviders } from "@/lib/payments/state";
 import { formatNok } from "@/lib/shop/money";
@@ -11,6 +12,7 @@ import { isOnlinePayment, type PaymentMethod } from "@/lib/shop/settings";
 import { useCart, writeCart } from "./cart-store";
 
 type Data = NonNullable<Awaited<ReturnType<typeof getCheckoutData>>>;
+type PickupPoint = Awaited<ReturnType<typeof getPickupPoints>>[number];
 
 const input = "w-full rounded-[var(--radius)] border border-[var(--c-muted)] bg-[var(--c-bg)] px-3 py-2";
 
@@ -117,6 +119,30 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
     };
   }, [siteId, items, shippingCode, appliedCode, quotePostalCode, refresh]);
 
+  // Pakke til hentested: kunden velger blant de nærmeste hentestedene når postnummeret er skrevet. Svarer ikke Bring,
+  // vises ingen velger, og pakken går til nærmeste hentested.
+  const pickupWanted = shippingCode === bringShippingCode("5800") && quotePostalCode !== "";
+  const [pickup, setPickup] = useState<{ postalCode: string; points: PickupPoint[] } | null>(null);
+  const [chosenPickupId, setChosenPickupId] = useState("");
+  useEffect(() => {
+    if (!pickupWanted) return;
+    let cancelled = false;
+    getPickupPoints(siteId, quotePostalCode)
+      .then((points) => {
+        if (!cancelled) setPickup({ postalCode: quotePostalCode, points });
+      })
+      .catch(() => {
+        if (!cancelled) setPickup({ postalCode: quotePostalCode, points: [] });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [siteId, pickupWanted, quotePostalCode]);
+  const pickupLoading = pickupWanted && pickup?.postalCode !== quotePostalCode;
+  const pickupPoints = pickupWanted && !pickupLoading ? (pickup?.points ?? []) : [];
+  // Nærmeste hentested er forhåndsvalgt, og et valg fra et annet postnummer gjelder ikke lenger.
+  const pickupId = pickupPoints.find((p) => p.id === chosenPickupId)?.id ?? pickupPoints[0]?.id ?? "";
+
   const setQuantity = (variantId: string, quantity: number) =>
     writeCart(siteId, quantity <= 0 ? items.filter((i) => i.variantId !== variantId) : items.map((i) => (i.variantId === variantId ? { ...i, quantity } : i)));
 
@@ -166,6 +192,7 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
         discountCode: data.discount?.code ?? "",
         // Bare til kontroll: serveren regner ut frakten selv og stopper bestillingen hvis den er en annen enn kunden så.
         seenShippingOre: data.shippingOre,
+        pickupPointId: pickupId || undefined,
       };
 
       if (isOnlinePayment(payment)) {
@@ -295,6 +322,34 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
               <p id="postnummer-frakt" className="text-sm text-[var(--c-muted)]">
                 Fraktprisen regnes ut når du har skrevet postnummeret.
               </p>
+            )}
+            {pickupWanted && (
+              <fieldset className="space-y-2" aria-describedby="hentested-status">
+                <legend className="mb-1 font-medium">Velg hentested</legend>
+                {/* Alltid på siden, så skjermlesere melder når listen er lastet. */}
+                <p id="hentested-status" role="status" aria-live="polite" className="text-sm text-[var(--c-muted)]">
+                  {pickupLoading
+                    ? "Henter hentesteder i nærheten..."
+                    : pickupPoints.length > 0
+                      ? `${pickupPoints.length} ${pickupPoints.length === 1 ? "hentested" : "hentesteder"} i nærheten av ${quotePostalCode}. Nærmeste er valgt.`
+                      : "Vi fant ingen hentesteder å velge mellom akkurat nå. Pakken sendes til nærmeste hentested."}
+                </p>
+                {pickupPoints.map((p) => (
+                  <label
+                    key={p.id}
+                    className="flex cursor-pointer items-start gap-3 rounded-[var(--radius)] border border-[var(--c-muted)]/40 p-4 has-[:checked]:border-[var(--c-primary)]"
+                  >
+                    <input type="radio" name="hentested" value={p.id} checked={pickupId === p.id} onChange={() => setChosenPickupId(p.id)} className="mt-1" />
+                    <span>
+                      {p.name}
+                      <span className="block text-sm text-[var(--c-muted)]">
+                        {[p.address, [p.postalCode, p.city].filter(Boolean).join(" ")].filter(Boolean).join(", ")}
+                        {p.distanceKm !== null && `. ${p.distanceKm.toLocaleString("nb-NO", { maximumFractionDigits: 1 })} km unna`}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
             )}
           </section>
         )}

@@ -181,6 +181,49 @@ export async function fetchQuotes(creds: BringCredentials, q: QuoteInput, opts: 
   return readShippingGuideResponse(res.body);
 }
 
+// ---------- Hentesteder (Pickup Point API) ----------
+
+export const BRING_PICKUP_POINT_URL = "https://api.bring.com/pickuppoint/api/pickuppoint";
+
+export type PickupPoint = {
+  id: string;
+  name: string;
+  address: string;
+  postalCode: string;
+  city: string;
+  /** Avstand i kilometer fra postnummerets sentrum, når Bring oppgir den. */
+  distanceKm: number | null;
+};
+
+/** Hentestedene fra svaret, i rekkefølgen Bring ga dem (nærmest først). Poster uten id eller navn hoppes over. */
+export function readPickupPointsResponse(body: unknown): PickupPoint[] {
+  const result: PickupPoint[] = [];
+  for (const raw of asArray(asRecord(body).pickupPoint)) {
+    const p = asRecord(raw);
+    const id = asString(p.id) ?? (typeof p.id === "number" ? String(p.id) : undefined);
+    const name = asString(p.name);
+    if (!id || !name || !/^[A-Za-z0-9_-]{1,40}$/.test(id)) continue;
+    const km = typeof p.distanceInKm === "number" ? p.distanceInKm : Number(asString(p.distanceInKm)?.replace(",", "."));
+    result.push({
+      id,
+      name: name.slice(0, 80),
+      address: (asString(p.visitingAddress) ?? asString(p.address) ?? "").slice(0, 80),
+      postalCode: asString(p.visitingPostalCode) ?? asString(p.postalCode) ?? "",
+      city: (asString(p.visitingCity) ?? asString(p.city) ?? "").slice(0, 60),
+      distanceKm: Number.isFinite(km) && km >= 0 ? km : null,
+    });
+  }
+  return result;
+}
+
+/** De nærmeste hentestedene for et postnummer. Samme nøkler som Shipping Guide. Kaster BringError når Bring ikke svarer. */
+export async function fetchPickupPoints(creds: BringCredentials, postalCode: string, opts: { limit?: number; timeoutMs?: number } = {}): Promise<PickupPoint[]> {
+  const url = `${BRING_PICKUP_POINT_URL}/NO/postalCode/${encodeURIComponent(postalCode)}?numberOfResponses=${opts.limit ?? 6}`;
+  const res = await callBring(url, { method: "GET", headers: authHeaders(creds) }, opts.timeoutMs ?? 6_000);
+  if (!res.ok) throw httpError(res, "søket etter hentesteder");
+  return readPickupPointsResponse(res.body);
+}
+
 // ---------- Bestilling og etikett (Booking API) ----------
 
 export type BookingInput = {
@@ -192,6 +235,8 @@ export type BookingInput = {
   weightGrams: number;
   packageCm: PackageCm | null;
   shippingDateTime: Date;
+  /** Hentestedet kunden valgte i kassen (Pakke til hentested). Uten det velger Bring nærmeste hentested. */
+  pickupPointId?: string | null;
 };
 
 /** Bring vil ha telefonnummer med landskode. Norske nummer med åtte siffer får +47. Andre formater sendes ikke. */
@@ -241,6 +286,8 @@ export function bookingRequest(b: BookingInput) {
             // Hentested og varsel om pakken krever e-post eller telefon hos mottakeren.
             contact: { name: cut(b.recipient.name, 35), email: cut(b.recipient.email, 60), ...(recipientPhone && { phoneNumber: recipientPhone }) },
           },
+          // Bare for Pakke til hentested, og bare når kunden har valgt. Feltene ligger under parties.pickupPoint i Booking API.
+          ...(b.pickupPointId && b.product === "5800" && { pickupPoint: { countryCode: "NO", id: b.pickupPointId } }),
         },
         product: { id: b.product, customerNumber: b.customerNumber },
         packages: [
