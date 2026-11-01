@@ -13,6 +13,7 @@ import { paymentLabels, type PaymentMethod } from "@/lib/shop/settings";
 import { carrierLabel, trackingUrl } from "@/lib/shop/tracking";
 import { formatOsloDateTime } from "@/lib/oslo-time";
 import { orderStatusLabel } from "../order-status";
+import { LabelPrintHelp } from "@/components/studio/label-print-help";
 import { BringLabelForm } from "./bring-label";
 import { OrderActions } from "./order-actions";
 import { StaffNoteForm, TrackingForm } from "./order-extras";
@@ -218,6 +219,7 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
               ) : (
                 <p>Bring sendte ingen etikett hit. Du finner den i Mybring.</p>
               )}
+              {booking.hasLabel && <LabelPrintHelp />}
             </div>
           ) : !bringReady ? (
             <p className="text-sm text-neutral-700">

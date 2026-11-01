@@ -24,6 +24,8 @@ Kort utviklerdokumentasjon. Skrevet 01.11.2026.
 | `lib/bring/config.ts` | Lagre, teste og fjerne nøkler, lagre fraktvalg |
 | `lib/bring/quote.ts` | Pris til kassen og ordren, med reservepris og ti minutters buffer |
 | `lib/bring/booking.ts` | Bestilling, etikett og sporing |
+| `lib/bring/bulk.ts` | Bulk: velg ordre, book de som mangler etikett, hent etikettene, merkelapp i ordrelista |
+| `lib/bring/merge.ts` | Slår etikett-PDF-er sammen til én (pdf-lib, rent JS) |
 | `lib/bring/pickup.ts` | Hentesteder for Pakke til hentested (Pickup Point API), med ti minutters buffer |
 | `lib/bring/weight.ts` | Totalvekt for handlekurven |
 
@@ -46,6 +48,24 @@ Kort utviklerdokumentasjon. Skrevet 01.11.2026.
    - 5800: «Maksimum virkelig vekt: 35 kg». Kilde: Prisliste Pakke til hentested fra 1. juli 2026, https://www.bring.no/tjenester/pakker-og-gods/private-nasjonalt/pakke-til-hentested/Prisliste-Pakke-til-hentested_01072026.pdf
    - 5600: «Maksimum virkelig vekt: 35 kg». Kilde: Prisliste Pakke hjem pluss fra 1. juli 2026, https://www.bring.no/tjenester/pakker-og-gods/private-nasjonalt/pakke-levert-hjem/Prisliste-Pakke-hjem-pluss_01072026.pdf
    - For 5000, 5600, 5800 og andre reviderte tjenester trengs mål for riktig pris (Shipping Guide-siden). Derfor kan butikken sette en vanlig pakkestørrelse.
+
+## Flere etiketter om gangen
+
+- **Ordrelista** (`/studio/nettsted/<id>/ordre`): når Bring er koblet til og avsenderen er fylt inn, får betalte og sendte ordre en avkrysningsboks, med «Velg alle». Alle med tilgang til butikken kan bruke dem, som enkelt-etiketten. Nøklene finnes bare på serveren: nettleseren sender ordre-id-er.
+- **Lag etiketter** (`bulk-actions.ts`, `lib/bring/bulk.ts`): maks 25 ordre per gang, fordi Workers har grense på CPU-tid og antall kall. Hver ordre tas for seg, med `bookBringShipment`, så den samme holdes av i databasen og aldri bookes to ganger. Hoppes over, med forklaring: har etikett fra før, ikke betalt, kansellert, hentes i butikken eller mangler adresse, kunden valgte ikke Bring i kassen, eller vekten mangler. Én feil stopper ikke de andre. Svaret sier hvor mange som ble booket, hoppet over og feilet, og hvorfor. Bulk har egen grense: 12 kjøringer i timen per butikk.
+- **Skriv ut etiketter:** gir en lenke til `/studio/nettsted/<id>/ordre/etiketter?ids=a,b,c` (maks 25). Ruten krever innlogging med tilgang til butikken, henter PDF-ene (fra lageret, ellers fra Bring) og slår dem sammen til én PDF med `pdf-lib`, en etikett per side. Svaret har `cache-control: private, no-store`. Feiler sammenslåingen, eller kan en etikett ikke hentes, får brukeren en side med lenker til de enkelte etikettene i stedet.
+- **Status:** ordrelista viser «Etikett laget, sporing <nummer>» eller «Ikke booket» (bare for ordre med adresse som er betalt eller sendt).
+- **Bare Bring-ordre:** bulk bruker tjenesten og vekten kassen lagret på ordren. Ordre med butikkens egen postfrakt har ingen av delene, og hoppes over. Lag etiketten fra ordresiden.
+
+## Utskrift på termoskriver
+
+Etikettene fra Bring er A6 (10 x 15 cm) og passer en termoskriver som Zebra GK420d. Samme tekst står i studioet, under ordrelista og på ordresiden.
+
+1. Sett etikettstørrelsen i skriverdriveren til 102 x 152 mm.
+2. Sett skaleringen til 100 %.
+3. Velg ingen marger i utskriftsvinduet i nettleseren, og la skaleringen stå på standard.
+
+Da blir strekkoden skarp og etiketten fyller hele arket. Kilde: Helenes plugin Enkel Fraktlabel.
 
 ## Hentested
 

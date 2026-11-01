@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { LabelPrintHelp } from "@/components/studio/label-print-help";
 import { getDb } from "@/db";
+import { bringLabelsReady, labelBadge } from "@/lib/bring/bulk";
 import { formatOsloDateTime } from "@/lib/oslo-time";
 import { requireSiteAccess } from "@/lib/session";
 import { listOrders, orderFilters, ORDERS_PER_PAGE, parseOrderQuery, type OrderFilter } from "@/lib/shop/admin";
@@ -7,6 +9,7 @@ import { formatNok } from "@/lib/shop/money";
 import { orderCounts } from "@/lib/shop/reports";
 import { SiteNav } from "../site-nav";
 import { orderStatusLabel } from "./order-status";
+import { OrderList } from "./order-list";
 
 export default async function OrdersPage({
   params,
@@ -23,6 +26,7 @@ export default async function OrdersPage({
   const rows = found.slice(0, ORDERS_PER_PAGE);
   const hasNext = found.length > ORDERS_PER_PAGE;
   const base = `/studio/nettsted/${site.id}/ordre`;
+  const bringReady = bringLabelsReady(site.shop);
 
   const countFor = (key: OrderFilter) => {
     const statuses = orderFilters[key].statuses;
@@ -85,30 +89,33 @@ export default async function OrdersPage({
         </ul>
       </nav>
 
+      {bringReady && (
+        <div className="mb-4">
+          <LabelPrintHelp />
+        </div>
+      )}
+
       {rows.length === 0 ? (
         <p className="rounded-lg border bg-white p-6 text-neutral-700">
           {query.search ? `Ingen ordre passer «${query.search}».` : countFor("alle") === 0 ? "Ingen ordre ennå." : "Ingen ordre med denne statusen."}
         </p>
       ) : (
-        <ul className="divide-y rounded-lg border bg-white">
-          {rows.map((o) => (
-            <li key={o.id}>
-              <Link href={`${base}/${o.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 p-4 hover:bg-neutral-50">
-                <span className="w-16 font-semibold">#{o.number}</span>
-                <span className="mr-auto min-w-40">
-                  <span className="block">{o.customerName}</span>
-                  <span className="text-sm text-neutral-600">
-                    {formatOsloDateTime(o.createdAt)} · {o.shipping.name}
-                    {o.discountCode && ` · ${o.discountCode}`}
-                    {o.trackingNumber && " · sporing lagt inn"}
-                  </span>
-                </span>
-                <span className="font-medium tabular-nums">{formatNok(o.totalOre)}</span>
-                <span className={`rounded-full px-3 py-1 text-sm ${orderStatusLabel[o.status].className}`}>{orderStatusLabel[o.status].text}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <OrderList
+          siteId={site.id}
+          base={base}
+          bulk={bringReady}
+          rows={rows.map((o) => ({
+            id: o.id,
+            number: o.number,
+            customerName: o.customerName,
+            meta: `${formatOsloDateTime(o.createdAt)} · ${o.shipping.name}${o.discountCode ? ` · ${o.discountCode}` : ""}${o.trackingNumber ? " · sporing lagt inn" : ""}`,
+            total: formatNok(o.totalOre),
+            statusText: orderStatusLabel[o.status].text,
+            statusClass: orderStatusLabel[o.status].className,
+            selectable: bringReady && (o.status === "paid" || o.status === "fulfilled"),
+            label: labelBadge(o, bringReady),
+          }))}
+        />
       )}
 
       {(query.page > 1 || hasNext) && (

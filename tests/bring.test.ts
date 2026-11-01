@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { PDFDocument } from "pdf-lib";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Innlogging i studioet: informasjonskapslene ligger i et kart, så serverhandlingene kan kjøres som eier eller ansatt.
@@ -20,6 +21,8 @@ import { auditLog, memberships, orders, organizations, productVariants, sites, u
 import { getCheckoutData, getPickupPoints } from "@/app/actions/shop";
 import { createBringLabelAction } from "@/app/studio/nettsted/[siteId]/ordre/[orderId]/bring-actions";
 import { GET as labelGet } from "@/app/studio/nettsted/[siteId]/ordre/[orderId]/etikett/route";
+import { bulkCreateLabelsAction, bulkPrintLabelsAction } from "@/app/studio/nettsted/[siteId]/ordre/bulk-actions";
+import { GET as labelsGet } from "@/app/studio/nettsted/[siteId]/ordre/etiketter/route";
 import {
   removeBringKeysAction,
   saveBringKeysAction,
@@ -27,6 +30,7 @@ import {
   testBringConnectionAction,
 } from "@/app/studio/nettsted/[siteId]/innstillinger/bring/actions";
 import { bookBringShipment, bringLabelPdf, readBringBooking, readOrderBring } from "@/lib/bring/booking";
+import { bulkBookLabels, labelBadge, MAX_BULK_LABELS } from "@/lib/bring/bulk";
 import { bookingRequest, readShippingGuideResponse, shippingGuideRequest } from "@/lib/bring/client";
 import { bringSetupView, loadBringAccess, removeBringKeys, saveBringKeys, saveBringShipping, testBringConnection } from "@/lib/bring/config";
 import { clearPickupPointCache } from "@/lib/bring/pickup";
@@ -46,7 +50,12 @@ const UID = "bring-testbruker@ullstua.no";
 const API_KEY = "falsk-bring-api-nokkel-0000";
 const LABEL_TOKEN = "falsk-etikett-token-1234";
 const SECRETS = [UID, API_KEY, LABEL_TOKEN];
-const PDF = new TextEncoder().encode("%PDF-1.4\n% falsk fraktetikett\n%%EOF");
+/** En ekte PDF med én side, så sammenslåingen kan lese den. */
+const PDF = await (async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([283, 425]);
+  return doc.save();
+})();
 
 const json = (status: number, body?: unknown) =>
   body === undefined ? new Response(null, { status }) : new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -62,7 +71,7 @@ type Call = { method: string; url: URL; headers: Record<string, string>; body: R
 /** Bring slik testene ser det: Shipping Guide, Booking og etikett-PDF bak fetch. Ingen nettverk. */
 function bringWorld() {
   const calls: Call[] = [];
-  const world = { quotes: "ok" as "ok" | "500" | "nett", pickup: "ok" as "ok" | "500" | "nett" | "tom", extra: 0, booked: 0, bookingError: null as unknown };
+  const world = { quotes: "ok" as "ok" | "500" | "nett", pickup: "ok" as "ok" | "500" | "nett" | "tom", extra: 0, booked: 0, bookingError: null as unknown, failFor: null as string | null };
 
   const fetchMock = vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
     const url = new URL(typeof input === "string" || input instanceof URL ? input : input.url);
@@ -115,6 +124,9 @@ function bringWorld() {
     if (url.href === "https://api.bring.com/booking/api/create" && method === "POST") {
       if (!authed) return json(401, {});
       if (world.bookingError) return json(400, { consignments: [{ errors: [world.bookingError] }] });
+      if (world.failFor && String(init.body ?? "").includes(world.failFor)) {
+        return json(400, { consignments: [{ errors: [{ uniqueId: "x2", code: "BOOK-INPUT-021", messages: [{ lang: "no", message: "Ugyldig adresse" }] }] }] });
+      }
       const n = ++world.booked;
       const consignmentNumber = `7043810126379${7400 + n}`;
       return json(200, {
@@ -131,7 +143,7 @@ function bringWorld() {
     }
 
     if (url.hostname === "www.mybring.com" && url.pathname.startsWith("/booking/labels/")) {
-      return url.searchParams.get("auth-token") === LABEL_TOKEN ? new Response(PDF, { status: 200, headers: { "content-type": "application/pdf" } }) : json(403, {});
+      return url.searchParams.get("auth-token") === LABEL_TOKEN ? new Response(PDF as BodyInit, { status: 200, headers: { "content-type": "application/pdf" } }) : json(403, {});
     }
     return json(404, {});
   });
@@ -833,5 +845,188 @@ describe("frakt med Bring", () => {
     jar.clear();
     expect((await get()).status).toBe(403);
     expect(await db.select().from(auditLog).where(and(eq(auditLog.siteId, siteId), eq(auditLog.action, "bring.booked")))).toHaveLength(1);
+  });
+
+  // ---------- Bulk ----------
+
+  const bookingCalls = () => bring.find("/booking/api/create").length;
+  const pageCount = async (res: Response) => (await PDFDocument.load(new Uint8Array(await res.arrayBuffer()))).getPageCount();
+  const etiketter = (ids: string[]) =>
+    labelsGet(new Request(`http://localhost:3000/studio/nettsted/${siteId}/ordre/etiketter?ids=${ids.join(",")}`), { params: Promise.resolve({ siteId }) });
+
+  it("lager etiketter for en blanding av ordre: booker, hopper over med forklaring, og én feil stopper ikke de andre", async () => {
+    await connect();
+    const a = await paidOrder({ name: "Anne Ok" });
+    const b = await paidOrder({ name: "Bjørn Ok", shippingCode: "bring-3584" });
+    const hent = await paidOrder({ shippingCode: "hent", address: undefined });
+    const post = await paidOrder({ shippingCode: "post" });
+    const venter = await order();
+    const feil = await paidOrder({ name: "Feil Person" });
+    const uvekt = await paidOrder({ lines: [{ variantId: kaffeId, quantity: 1 }] });
+    const fraFor = await paidOrder({ name: "Fra Før" });
+    await loginAs(editorId);
+    expect(await bookBringShipment(db, siteId, fraFor.id, { product: "5800", weightGrams: 600 }, editorId)).toBeTruthy();
+    const before = bookingCalls();
+
+    bring.world.failFor = "Feil Person";
+    const result = await bulkCreateLabelsAction(siteId, [a.id, b.id, hent.id, post.id, venter.id, feil.id, uvekt.id, fraFor.id]);
+    expect(bookingCalls() - before).toBe(3);
+    expect(result).toMatchObject({ booked: 2, skipped: 5, failed: 1, ok: false });
+    expect(result.message).toBe("2 etiketter ble booket, 5 ordre ble hoppet over og 1 feilet.");
+    const why = Object.fromEntries(result.problems.map((p) => [p.number, `${p.status}: ${p.reason}`]));
+    expect(why[hent.number]).toBe("skipped: Hentes i butikken, så den trenger ingen etikett");
+    expect(why[post.number]).toMatch(/^skipped: Kunden valgte ikke Bring i kassen/);
+    expect(why[venter.number]).toBe("skipped: Ikke betalt ennå");
+    expect(why[uvekt.number]).toMatch(/^skipped: Vekten mangler/);
+    expect(why[fraFor.number]).toBe("skipped: Har etikett fra før");
+    expect(why[feil.number]).toBe("failed: Bring avviste bestillingen: Ugyldig adresse (BOOK-INPUT-021)");
+    expect(why[a.number]).toBeUndefined();
+
+    // De to første har etikett og sporing. Den som feilet, ble sluppet og kan prøves på nytt.
+    for (const o of [a, b]) {
+      const row = await orderRow(o.id);
+      expect(readBringBooking(row.shipping)).toMatchObject({ test: true, labelKey: `fraktetiketter/${siteId}/${o.id}.pdf` });
+      expect(row.trackingCarrier).toBe("posten");
+      expect(row.trackingNumber).toBe(readBringBooking(row.shipping)!.consignmentNumber);
+    }
+    expect((await orderRow(feil.id)).shipping).not.toHaveProperty("bringBooking");
+    bring.world.failFor = null;
+    expect(await bulkCreateLabelsAction(siteId, [feil.id])).toMatchObject({ booked: 1, skipped: 0, failed: 0, ok: true });
+  });
+
+  it("booker aldri det samme to ganger, heller ikke når valget har dubletter eller kjøres på nytt", async () => {
+    await connect();
+    const a = await paidOrder();
+    const b = await paidOrder();
+    await loginAs(editorId);
+
+    expect(await bulkCreateLabelsAction(siteId, [a.id, a.id, b.id, a.id])).toMatchObject({ booked: 2, skipped: 0, failed: 0 });
+    expect(bookingCalls()).toBe(2);
+
+    const again = await bulkCreateLabelsAction(siteId, [a.id, b.id]);
+    expect(again).toMatchObject({ booked: 0, skipped: 2, failed: 0 });
+    expect(again.problems.map((p) => p.reason)).toEqual(["Har etikett fra før", "Har etikett fra før"]);
+    expect(bookingCalls()).toBe(2);
+
+    // To samtidige kjøringer for samme ordre gir én bestilling.
+    const c = await paidOrder();
+    const results = await Promise.all([bulkBookLabels(db, siteId, [c.id], editorId), bulkBookLabels(db, siteId, [c.id], editorId)]);
+    expect(results.reduce((n, r) => n + r.booked, 0)).toBe(1);
+    expect(results.reduce((n, r) => n + r.failed + r.skipped, 0)).toBe(1);
+    expect(bookingCalls()).toBe(3);
+    expect(await db.select().from(auditLog).where(and(eq(auditLog.siteId, siteId), eq(auditLog.action, "bring.booked")))).toHaveLength(3);
+  });
+
+  it("tar maks 25 ordre per gang og avviser flere uten å bestille noe", async () => {
+    await connect();
+    const a = await paidOrder();
+    await loginAs(editorId);
+    expect(MAX_BULK_LABELS).toBe(25);
+
+    const tooMany = [a.id, ...Array.from({ length: 25 }, () => crypto.randomUUID())];
+    expect(tooMany).toHaveLength(26);
+    expect(await bulkCreateLabelsAction(siteId, tooMany)).toMatchObject({ ok: false, message: "Du kan velge maks 25 ordre om gangen. Du valgte 26.", booked: 0 });
+    expect(await bulkPrintLabelsAction(siteId, tooMany)).toMatchObject({ ok: false, url: null });
+    expect((await etiketter(tooMany)).status).toBe(400);
+    expect(bookingCalls()).toBe(0);
+    expect((await orderRow(a.id)).shipping).not.toHaveProperty("bringBooking");
+
+    // Dubletter telles én gang, og nøyaktig 25 er innenfor.
+    const exactly = [a.id, ...Array.from({ length: 24 }, () => crypto.randomUUID())];
+    expect(await bulkCreateLabelsAction(siteId, [...exactly, a.id])).toMatchObject({ booked: 1, skipped: 24, failed: 0 });
+    expect(bookingCalls()).toBe(1);
+
+    expect(await bulkCreateLabelsAction(siteId, [])).toMatchObject({ ok: false, message: "Velg minst én ordre." });
+    expect(await bulkCreateLabelsAction(siteId, ["ikke-en-id"])).toMatchObject({ ok: false, message: expect.stringMatching(/ugyldig/) });
+  });
+
+  it("sier fra én gang når Bring ikke er koblet til, og bestiller ikke noe", async () => {
+    await loginAs(ownerId);
+    const o = await paidOrder({ shippingCode: "post" });
+    expect(await bulkCreateLabelsAction(siteId, [o.id])).toMatchObject({ ok: false, message: expect.stringMatching(/^Bring er ikke koblet til/), booked: 0, failed: 0 });
+    expect(bookingCalls()).toBe(0);
+  });
+
+  it("slår etikettene sammen til én PDF, og faller tilbake til lenker når det ikke går", async () => {
+    await connect();
+    const a = await paidOrder();
+    const b = await paidOrder();
+    const c = await paidOrder();
+    const ikke = await paidOrder();
+    await loginAs(editorId);
+    await bulkCreateLabelsAction(siteId, [a.id, b.id, c.id]);
+
+    // Handlingen sier hvilke som har etikett, og gir lenken. Ordren uten etikett hoppes over med forklaring.
+    const print = await bulkPrintLabelsAction(siteId, [a.id, ikke.id, b.id, c.id]);
+    expect(print).toMatchObject({ ok: true, count: 3, url: `/studio/nettsted/${siteId}/ordre/etiketter?ids=${a.id},${b.id},${c.id}` });
+    expect(print.skipped).toEqual([{ number: ikke.number, reason: "Ingen etikett laget ennå" }]);
+    expect(print.message).toBe("3 etiketter er klare til utskrift. 1 ordre hoppet over.");
+    expect(await bulkPrintLabelsAction(siteId, [ikke.id])).toMatchObject({ ok: false, url: null, count: 0 });
+
+    const callsBefore = bring.calls.length;
+    const merged = await etiketter([a.id, b.id, c.id]);
+    expect(merged.status).toBe(200);
+    expect(merged.headers.get("content-type")).toBe("application/pdf");
+    expect(merged.headers.get("cache-control")).toBe("private, no-store");
+    expect(merged.headers.get("content-disposition")).toContain("fraktetiketter-samlet.pdf");
+    expect(await pageCount(merged)).toBe(3);
+    // Etikettene ligger i lageret, så Bring spørres ikke på nytt.
+    expect(bring.calls.length).toBe(callsBefore);
+
+    // Sammenslåing som feiler: en etikett som ikke er en gyldig PDF. Da kommer lenker til hver etikett, ikke en tom PDF.
+    store.files.set(`fraktetiketter/${siteId}/${b.id}.pdf`, new TextEncoder().encode("%PDF-1.4 ødelagt"));
+    const fallback = await etiketter([a.id, b.id, c.id]);
+    expect(fallback.status).toBe(200);
+    expect(fallback.headers.get("content-type")).toMatch(/^text\/html/);
+    expect(fallback.headers.get("cache-control")).toBe("private, no-store");
+    const html = await fallback.text();
+    expect(html).toContain("kunne ikke slås sammen");
+    for (const o of [a, b, c]) expect(html).toContain(`/studio/nettsted/${siteId}/ordre/${o.id}/etikett`);
+
+    // Ingen etiketter blant de valgte: 404. Ugyldige id-er avvises.
+    expect((await etiketter([ikke.id])).status).toBe(404);
+    expect((await etiketter(["../x"])).status).toBe(400);
+    expect((await etiketter([])).status).toBe(400);
+  });
+
+  it("samme tilgang som enkelt-etiketten: ansatte kan, andre og utloggede får ikke noe", async () => {
+    await connect();
+    const o = await paidOrder();
+    await loginAs(editorId);
+    expect(await bulkCreateLabelsAction(siteId, [o.id])).toMatchObject({ booked: 1 });
+
+    await loginAs(strangerId);
+    await expect(bulkCreateLabelsAction(siteId, [o.id])).rejects.toThrow();
+    await expect(bulkPrintLabelsAction(siteId, [o.id])).rejects.toThrow();
+    expect((await etiketter([o.id])).status).toBe(403);
+    jar.clear();
+    await expect(bulkCreateLabelsAction(siteId, [o.id])).rejects.toThrow();
+    expect((await etiketter([o.id])).status).toBe(403);
+    expect(bookingCalls()).toBe(1);
+
+    // Ordre fra en annen butikk kan ikke hentes gjennom en butikk man har tilgang til.
+    const [org2] = await db.insert(organizations).values({ name: "Annen AS" }).returning();
+    await db.insert(memberships).values({ orgId: org2.id, userId: strangerId, role: "owner" });
+    const [other] = await db.insert(sites).values({ orgId: org2.id, name: "Annen", slug: "annen", kind: "nettbutikk", industryPack: "nettbutikk", theme: demoTheme, info: {}, shop: {} }).returning();
+    await loginAs(strangerId);
+    expect(await bulkPrintLabelsAction(other.id, [o.id])).toMatchObject({ ok: false, url: null });
+    expect((await labelsGet(new Request("http://localhost:3000/x?ids=" + o.id), { params: Promise.resolve({ siteId: other.id }) })).status).toBe(404);
+  });
+
+  it("viser «Etikett laget» med sporingsnummer eller «Ikke booket» i ordrelista", async () => {
+    await connect();
+    const booked = await paidOrder();
+    const unbooked = await paidOrder();
+    const pickup = await paidOrder({ shippingCode: "hent", address: undefined });
+    const pending = await order();
+    await loginAs(editorId);
+    await bulkCreateLabelsAction(siteId, [booked.id]);
+    const [b, u, h, p] = await Promise.all([booked, unbooked, pickup, pending].map((o) => orderRow(o.id)));
+    const consignmentNumber = readBringBooking(b.shipping)!.consignmentNumber;
+    expect(labelBadge(b, true)).toEqual({ state: "booked", consignmentNumber });
+    expect(labelBadge(u, true)).toEqual({ state: "none" });
+    expect(labelBadge(u, false)).toBeNull();
+    expect(labelBadge(h, true)).toBeNull();
+    expect(labelBadge(p, true)).toBeNull();
   });
 });
