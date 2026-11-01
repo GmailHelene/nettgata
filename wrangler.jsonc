@@ -34,7 +34,7 @@
     "PLATFORM_CANONICAL_HOST": "nettgata.no",
     // Avsenderadressen for e-post (for eksempel ordre@nettgata.no). BREVO_API_KEY settes som hemmelighet.
     // Uten begge lagres e-postene bare i loggen. Se docs/EPOST.md.
-    "EMAIL_FROM": ""
+    "EMAIL_FROM": "ordre@nettgata.no"
   },
   // Hvert tiende minutt: ventende kundedomener og betalinger. Hver natt: sikkerhetskopi (se custom-worker.ts).
   "triggers": { "crons": ["*/10 * * * *", "30 1 * * *"] }
