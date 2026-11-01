@@ -2,7 +2,16 @@ import type { Db } from "@/db";
 import { emailLog } from "@/db/schema";
 
 export type EmailAddress = { email: string; name?: string };
-export type EmailKind = "ordrebekreftelse" | "ny-ordre" | "sendt" | "ny-henvendelse" | "invitasjon";
+export type EmailKind =
+  | "ordrebekreftelse"
+  | "ny-ordre"
+  | "sendt"
+  | "ny-henvendelse"
+  | "invitasjon"
+  | "bookingbekreftelse"
+  | "ny-booking"
+  | "booking-avbestilt"
+  | "booking-avbestilt-varsel";
 
 export type EmailMessage = {
   to: EmailAddress;
@@ -76,7 +85,7 @@ export function emailPreview(id: string): Preview | null {
 export async function deliver(
   db: Db,
   provider: EmailProvider,
-  entry: { siteId: string; kind: EmailKind; orderId?: string; inquiryId?: string },
+  entry: { siteId: string; kind: EmailKind; orderId?: string; inquiryId?: string; bookingId?: string },
   original: EmailMessage,
 ) {
   // Emnet bygges av navn som kunden har skrevet. Linjeskift i et emne kan gi ekstra e-posthoder (Bcc) med SMTP.
@@ -106,6 +115,7 @@ export async function deliver(
       error,
       orderId: entry.orderId ?? null,
       inquiryId: entry.inquiryId ?? null,
+      bookingId: entry.bookingId ?? null,
     })
     .returning({ id: emailLog.id });
   if (process.env.NODE_ENV !== "production") previews.set(row.id, { subject: message.subject, html: message.html });

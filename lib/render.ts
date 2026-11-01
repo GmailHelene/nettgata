@@ -8,6 +8,7 @@ import { schemaTypeFor } from "@/lib/packs";
 import { readSiteInfo } from "@/lib/site-info";
 import { readSiteLayout } from "@/lib/site-layout";
 import { listCatalog } from "@/lib/shop/catalog";
+import { loadPublicSetup } from "@/lib/egen-booking/store";
 
 type Site = typeof sites.$inferSelect;
 
@@ -72,6 +73,7 @@ export async function buildRenderContext(
     shop,
     layout: readSiteLayout(site.layout),
     products: shop ? (await listCatalog(db, site.id)).slice(0, 60) : [],
+    booking: await loadPublicSetup(db, site.id),
     ...((options.posts ?? preview) && { posts: await loadPosts(db, site.id, preview) }),
   };
 }

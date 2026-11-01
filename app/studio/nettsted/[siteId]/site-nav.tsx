@@ -17,6 +17,7 @@ const tabs = [
   { key: "rapporter", label: "Rapporter", href: "/rapporter", shopOnly: true },
   { key: "betaling", label: "Betaling", href: "/betaling", shopOnly: true },
   { key: "henvendelser", label: "Henvendelser", href: "/henvendelser", shopOnly: false },
+  { key: "booking", label: "Booking", href: "/booking", shopOnly: false },
   { key: "ai-teamet", label: "AI-teamet", href: "/ai-teamet", shopOnly: false },
   { key: "innstillinger", label: "Innstillinger", href: "/innstillinger", shopOnly: false },
   { key: "abonnement", label: "Abonnement", href: "/abonnement", shopOnly: false },

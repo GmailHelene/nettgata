@@ -33,6 +33,20 @@ export function osloMidnight(year: number, month: number, day: number): Date {
   return new Date(utcMidnight - osloOffsetMs(guess));
 }
 
+/**
+ * Et klokkeslett på en dato i norsk tid, som tidspunkt. minute er minutter etter midnatt (570 er 09:30).
+ * Null når klokkeslettet ikke finnes den dagen, som 02:30 natten sommertiden begynner.
+ */
+export function osloDateTime(date: string, minute: number): Date | null {
+  const [y, m, d] = date.split("-").map(Number);
+  const local = Date.UTC(y, m - 1, d, 0, minute);
+  const guess = local - osloOffsetMs(local);
+  const at = local - osloOffsetMs(guess);
+  const p = osloParts(at);
+  const back = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute);
+  return back === local ? new Date(at) : null;
+}
+
 /** Kalenderdatoen i Norge, som «2026-10-31». */
 export function osloDate(at: Date): string {
   const p = osloParts(at.getTime());

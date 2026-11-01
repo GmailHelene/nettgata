@@ -5,13 +5,22 @@ import { mediaSrcPattern, type ImageFocus } from "@/lib/media-types";
  * Feltdefinisjonene er én kilde for både validering og redigeringsskjemaet (lag 1).
  * Et nytt felt i en seksjon gir automatisk et felt i studioet.
  */
-export type Field =
+export type Field = (
   | { key: string; label: string; type: "text"; max?: number; optional?: boolean }
   | { key: string; label: string; type: "textarea"; max?: number; optional?: boolean }
   | { key: string; label: string; type: "link"; optional?: boolean }
   | { key: string; label: string; type: "image"; optional?: boolean }
   | { key: string; label: string; type: "select"; options: { value: string; label: string }[] }
-  | { key: string; label: string; type: "list"; itemLabel: string; fields: Field[]; max?: number };
+  | { key: string; label: string; type: "list"; itemLabel: string; fields: Field[]; max?: number }
+) & {
+  /** Feltet vises og kreves bare i disse variantene av seksjonen. Uten liste gjelder det alle. */
+  variants?: string[];
+};
+
+/** Feltene som hører til en variant. */
+export function fieldsForVariant(fields: Field[], variant: string): Field[] {
+  return fields.filter((f) => !f.variants || f.variants.includes(variant));
+}
 
 /**
  * Sti på samme nettsted. Nettleseren gjør «\» om til «/» og hopper over tabulator og linjeskift i en adresse,
@@ -101,8 +110,11 @@ function fieldToZod(field: Field, mode: ValidationMode): z.ZodType {
   }
 }
 
-export function fieldsToZod(fields: Field[], mode: ValidationMode = "publish") {
-  return z.object(Object.fromEntries(fields.map((f) => [f.key, fieldToZod(f, mode)])));
+/** `variant`: felt som ikke hører til varianten, kan mangle (men aldri være ugyldige). */
+export function fieldsToZod(fields: Field[], mode: ValidationMode = "publish", variant?: string) {
+  return z.object(
+    Object.fromEntries(fields.map((f) => [f.key, fieldToZod(f, variant !== undefined && f.variants && !f.variants.includes(variant) ? "draft" : mode)])),
+  );
 }
 
 export type ImageValue = { src: string; alt: string; decorative?: boolean; focus?: ImageFocus };

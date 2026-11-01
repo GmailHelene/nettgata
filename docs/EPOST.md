@@ -11,6 +11,10 @@ viser «Ikke sendt, e-post er ikke slått på ennå». Lokalt kan hver e-post fo
 | Ny ordre | Butikken | Ved bestilling | Ja |
 | «Pakken er på vei» med sporing | Kunden | Ordren markeres som sendt (ikke for henting) | Ja |
 | Ny henvendelse | Bedriften | Kontaktskjemaet sendes | Ja |
+| Timen er bestilt, med avbestillingslenke | Kunden | Egen booking (se `BOOKING.md`) | Nei |
+| Ny time | Bedriften | Egen booking | Ja, under Booking |
+| Timen er avbestilt | Kunden | Kunden eller bedriften avbestiller | Nei |
+| Time avbestilt | Bedriften | Kunden avbestiller med lenken | Ja, under Booking |
 
 Avsender er alltid plattformens adresse (`EMAIL_FROM`), med butikkens navn som avsendernavn. Svar fra kunden
 går til butikkens kontaktadresse (replyTo), og svar på en henvendelse går rett til den som skrev.

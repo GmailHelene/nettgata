@@ -9,6 +9,11 @@ export const rules = {
   loginPerIp: { limit: 20, windowSeconds: 15 * 60 },
   inquiryPerIp: { limit: 5, windowSeconds: 10 * 60 },
   inquiryPerSite: { limit: 50, windowSeconds: 60 * 60 },
+  /** Timebestilling. En familie kan bestille flere timer på rad, men ikke fylle opp kalenderen. */
+  bookingPerIp: { limit: 6, windowSeconds: 10 * 60 },
+  bookingPerSite: { limit: 100, windowSeconds: 60 * 60 },
+  /** Oppslag av ledige tider. Rause, men stopper skraping av kalenderen. */
+  bookingLookupPerIp: { limit: 120, windowSeconds: 10 * 60 },
   /** Bare koder som ikke finnes teller, så en kunde som skriver feil et par ganger ikke stenges ute. */
   discountFailuresPerIp: { limit: 10, windowSeconds: 10 * 60 },
   /** Koder fra appen har en million muligheter. Fem forsøk per kvarter gjør gjetting nytteløst. */

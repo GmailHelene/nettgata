@@ -7,6 +7,8 @@ import { focusStyle, mediaSrcPattern, mediaSrcSet } from "@/lib/media-types";
 import { formatAddress, formatOrgnr, type SiteInfo } from "@/lib/site-info";
 import { ContactForm } from "./contact-form";
 import { BookingEmbed } from "./booking-embed";
+import { OwnBooking } from "./own-booking";
+import type { PublicBookingSetup } from "@/lib/egen-booking/store";
 import { embeddableHost } from "@/lib/booking";
 import { CartDrawer } from "@/components/shop/cart-drawer";
 import { MobileMenu } from "@/components/site/mobile-menu";
@@ -603,8 +605,32 @@ function Cta({ section, basePath, first }: { section: Section; basePath: string;
  * Timebestilling: en knapp til bookingsystemet, eller bestillingen bygd inn når den besøkende ber om det.
  * Innbygging gjelder bare kjente systemer (lib/booking.ts). Andre lenker blir en knapp, også i varianten «Innebygd».
  */
-function Bestill({ section, basePath, first }: { section: Section; basePath: string; first: boolean }) {
+function Bestill({ section, ctx, first }: { section: Section; ctx: RenderContext; first: boolean }) {
   const p = section.props;
+  const { basePath } = ctx;
+  if (section.variant === "egen") {
+    return (
+      <section id="bestill" className={`scroll-mt-20 ${pad}`}>
+        <Container>
+          <div className="ng-card px-6 py-10 sm:px-8 sm:py-12">
+            <div className="text-center">
+              <Heading first={first}>{str(p, "overskrift")}</Heading>
+              {str(p, "tekst") && <p className="mx-auto mb-8 max-w-2xl text-[var(--c-muted)]">{str(p, "tekst")}</p>}
+            </div>
+            {ctx.booking ? (
+              <OwnBooking siteId={ctx.site.id} setup={ctx.booking} preview={ctx.preview} />
+            ) : (
+              <p className="text-center text-[var(--c-muted)]">
+                {ctx.preview
+                  ? "Legg til minst én tjeneste og én ansatt under Booking i studioet, så vises bestillingen her."
+                  : "Timebestillingen er ikke åpen akkurat nå. Ta gjerne kontakt med oss."}
+              </p>
+            )}
+          </div>
+        </Container>
+      </section>
+    );
+  }
   const link = str(p, "lenke");
   const host = section.variant === "innebygd" && isSafeHref(link) ? embeddableHost(link) : null;
   return (
@@ -639,6 +665,8 @@ export type RenderContext = {
   layout: SiteLayout;
   /** Blogginnleggene (sidene under /blogg), nyeste først. Hentes bare når siden trenger dem. */
   posts?: PostSummary[];
+  /** Egen timebestilling: tjenester og ansatte. Null eller mangler når nettstedet ikke har noen aktiv tjeneste. */
+  booking?: PublicBookingSetup | null;
 };
 
 export type PostSummary = { path: string; title: string; excerpt: string; image: ImageValue | null; date: string };
@@ -949,6 +977,6 @@ function renderSection(section: Section, i: number, ctx: RenderContext) {
     case "blogg":
       return <Blogg key={section.id} section={section} first={i === 0} ctx={ctx} />;
     case "bestill":
-      return <Bestill key={section.id} section={section} first={i === 0} basePath={ctx.basePath} />;
+      return <Bestill key={section.id} section={section} first={i === 0} ctx={ctx} />;
   }
 }

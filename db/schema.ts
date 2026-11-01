@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  date,
   integer,
   jsonb,
   pgEnum,
@@ -19,6 +20,7 @@ import type { ShopSettings } from "@/lib/shop/settings";
 import type { SiteLayout } from "@/lib/site-layout";
 import type { NotificationSettings } from "@/lib/notifications";
 import type { SiteBilling } from "@/lib/billing/state";
+import type { BookingSettings } from "@/lib/egen-booking/settings";
 
 const id = () => uuid("id").primaryKey().default(sql`gen_random_uuid()`);
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -88,6 +90,8 @@ export const sites = pgTable("sites", {
   billing: jsonb("billing").$type<Partial<SiteBilling>>().notNull().default({}),
   /** 301-omdirigeringer når kunden flytter fra en gammel nettside: fra gammel sti til ny sti eller adresse. */
   redirects: jsonb("redirects").$type<{ from: string; to: string }[]>().notNull().default([]),
+  /** Innstillinger for egen timebestilling: varsel, avbestillingsfrist, dager fram i tid. Les via readBookingSettings(). */
+  booking: jsonb("booking").$type<Partial<BookingSettings>>().notNull().default({}),
   createdAt: createdAt(),
 });
 
@@ -445,6 +449,7 @@ export const emailLog = pgTable(
     error: text("error"),
     orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
     inquiryId: uuid("inquiry_id").references(() => inquiries.id, { onDelete: "set null" }),
+    bookingId: uuid("booking_id").references(() => bookings.id, { onDelete: "set null" }),
     createdAt: createdAt(),
   },
   (t) => [index("email_log_site_idx").on(t.siteId, t.createdAt), index("email_log_order_idx").on(t.orderId)],
@@ -507,4 +512,141 @@ export const aiSuggestions = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("ai_suggestions_site_idx").on(t.siteId, t.status, t.createdAt)],
+);
+
+// ---------- Egen timebestilling ----------
+// Portet fra Bestilly og utvidet med ansatte. Alt er avgrenset per nettsted. Klokkeslett lagres som minutter etter
+// midnatt norsk tid, tidspunkter for bookinger i UTC. Ledige tider regnes ut i lib/egen-booking/availability.ts.
+
+/** Det kunden kan bestille. Varighet og buffer i hele fem minutter, så tidene passer i rutenettet til booking_slots. */
+export const bookingServices = pgTable(
+  "booking_services",
+  {
+    id: id(),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    durationMinutes: integer("duration_minutes").notNull(),
+    /** Pris i øre inkludert MVA. Null betyr at prisen ikke vises. */
+    priceOre: integer("price_ore"),
+    /** Pause etter timen før neste kan begynne, for eksempel til rydding. */
+    bufferMinutes: integer("buffer_minutes").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index("booking_services_site_idx").on(t.siteId, t.sortOrder)],
+);
+
+/** Den som utfører timen. En bedrift med én person legger inn seg selv. */
+export const bookingStaff = pgTable(
+  "booking_staff",
+  {
+    id: id(),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    title: text("title").notNull().default(""),
+    active: boolean("active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index("booking_staff_site_idx").on(t.siteId, t.sortOrder)],
+);
+
+/** Hvilke tjenester hver ansatt tar. */
+export const bookingStaffServices = pgTable(
+  "booking_staff_services",
+  {
+    staffId: uuid("staff_id").notNull().references(() => bookingStaff.id, { onDelete: "cascade" }),
+    serviceId: uuid("service_id").notNull().references(() => bookingServices.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.staffId, t.serviceId] }), index("booking_staff_services_service_idx").on(t.serviceId)],
+);
+
+/** Fast ukerytme per ansatt. weekday: 1 er mandag, 7 er søndag (ISO). Minutter etter midnatt norsk tid. */
+export const bookingHours = pgTable(
+  "booking_hours",
+  {
+    id: id(),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    staffId: uuid("staff_id").notNull().references(() => bookingStaff.id, { onDelete: "cascade" }),
+    weekday: integer("weekday").notNull(),
+    startMinute: integer("start_minute").notNull(),
+    endMinute: integer("end_minute").notNull(),
+  },
+  (t) => [index("booking_hours_staff_idx").on(t.staffId, t.weekday)],
+);
+
+export const bookingExceptionKindEnum = pgEnum("booking_exception_kind", ["stengt", "egne_tider", "apen"]);
+
+/**
+ * Avvik fra ukerytmen for en periode: ferie og stengt, egne tider, eller «åpent som vanlig» på en helligdag.
+ * staffId null betyr hele nettstedet. Norske helligdager er stengt uten at de ligger her.
+ */
+export const bookingExceptions = pgTable(
+  "booking_exceptions",
+  {
+    id: id(),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    staffId: uuid("staff_id").references(() => bookingStaff.id, { onDelete: "cascade" }),
+    kind: bookingExceptionKindEnum("kind").notNull(),
+    startDate: date("start_date", { mode: "string" }).notNull(),
+    endDate: date("end_date", { mode: "string" }).notNull(),
+    /** Bare for egne_tider. */
+    startMinute: integer("start_minute"),
+    endMinute: integer("end_minute"),
+    note: text("note").notNull().default(""),
+    createdAt: createdAt(),
+  },
+  (t) => [index("booking_exceptions_site_idx").on(t.siteId, t.endDate)],
+);
+
+export const bookingStatusEnum = pgEnum("booking_status", ["bekreftet", "avbestilt"]);
+
+/**
+ * En bestilt time. Kunden har ingen konto: navn og kontaktinfo ligger på bookingen.
+ * Tjeneste, ansatt og pris lagres også som tekst, så historikken står selv om tjenesten slettes.
+ * Bare en hash av avbestillingsnøkkelen lagres. Slettes tolv måneder etter timen (lib/retention.ts).
+ */
+export const bookings = pgTable(
+  "bookings",
+  {
+    id: id(),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    serviceId: uuid("service_id").references(() => bookingServices.id, { onDelete: "set null" }),
+    staffId: uuid("staff_id").references(() => bookingStaff.id, { onDelete: "set null" }),
+    serviceName: text("service_name").notNull(),
+    staffName: text("staff_name").notNull(),
+    priceOre: integer("price_ore"),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    /** Slutt pluss buffer. Neste time hos samme ansatt kan tidligst begynne her. */
+    blockedUntil: timestamp("blocked_until", { withTimezone: true }).notNull(),
+    customerName: text("customer_name").notNull(),
+    customerEmail: text("customer_email").notNull(),
+    customerPhone: text("customer_phone").notNull().default(""),
+    message: text("message").notNull().default(""),
+    status: bookingStatusEnum("status").notNull().default("bekreftet"),
+    cancelTokenHash: text("cancel_token_hash").notNull().unique(),
+    /** kunde eller bedrift. */
+    cancelledBy: text("cancelled_by"),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("bookings_site_starts_idx").on(t.siteId, t.startsAt), index("bookings_staff_starts_idx").on(t.staffId, t.startsAt)],
+);
+
+/**
+ * Hver bekreftede booking holder av sine fem-minutters ruter hos den ansatte, fra start til slutt pluss buffer.
+ * Den unike indeksen på ansatt og tid gjør dobbeltbooking umulig, også når to bestiller samtidig:
+ * bookingen og rutene lagres i én SQL-setning, så enten lagres begge, eller ingen (lib/egen-booking/store.ts).
+ */
+export const bookingSlots = pgTable(
+  "booking_slots",
+  {
+    bookingId: uuid("booking_id").notNull().references(() => bookings.id, { onDelete: "cascade" }),
+    staffId: uuid("staff_id").notNull().references(() => bookingStaff.id, { onDelete: "cascade" }),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [uniqueIndex("booking_slots_staff_time_idx").on(t.staffId, t.startsAt), index("booking_slots_booking_idx").on(t.bookingId)],
 );

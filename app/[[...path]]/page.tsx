@@ -11,6 +11,9 @@ import { productCategories, sites } from "@/db/schema";
 import { isPlatformHost, resolveHost } from "@/lib/hosts";
 import { getPublishedContents, getPublishedPage, normalizePath } from "@/lib/publishing";
 import { embeddedBookingHosts } from "@/lib/booking";
+import { CANCEL_PATH } from "@/lib/egen-booking/notify";
+import { usesOwnBooking } from "@/lib/egen-booking/store";
+import { BookingCancelPage } from "@/components/site/booking-cancel";
 import { buildRenderContext } from "@/lib/render";
 import { listCatalog } from "@/lib/shop/catalog";
 import { readShopSettings } from "@/lib/shop/settings";
@@ -112,6 +115,9 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
     twitter: { card: image ? "summary_large_image" : "summary" },
   });
 
+  // Avbestillingslenken fra timebestillingen. Nøkkelen står i adressen, så den skal aldri i søkemotorer eller videre i Referer.
+  if (normalizePath(path) === CANCEL_PATH) return { title: `Avbestill time | ${site.name}`, robots: { index: false, follow: false }, referrer: "no-referrer" };
+
   const route = site.kind === "nettbutikk" ? shopRoute(target.segments) : null;
   if (route) {
     const meta = await shopMeta(db, site, route);
@@ -164,6 +170,16 @@ export default async function PublicPage(props: Props) {
   const { db, site, basePath } = loaded;
   const path = "/" + target.segments.join("/");
 
+
+  if (normalizePath(path) === CANCEL_PATH) {
+    const query = await props.searchParams;
+    const ctx = await buildRenderContext(db, site, CANCEL_PATH, false, basePath);
+    return (
+      <SiteChrome theme={site.theme} ctx={ctx}>
+        <BookingCancelPage db={db} siteId={site.id} token={typeof query.t === "string" ? query.t : ""} />
+      </SiteChrome>
+    );
+  }
 
   const route = site.kind === "nettbutikk" ? shopRoute(target.segments) : null;
   if (route) {
@@ -226,9 +242,10 @@ export default async function PublicPage(props: Props) {
     // Er ikke forsiden publisert ennå, får den som har fått adressen en «snart klar»-side, ikke «Fant ikke siden».
     const at = normalizePath(path);
     // Personvernerklæringen nevner bookingsystemene som er bygget inn på de publiserte sidene.
-    const bookingHosts =
-      at === GENERATED_PATHS.personvern ? embeddedBookingHosts(await getPublishedContents(db, site.id)) : [];
-    const generated = generatedLegalPage(site, at, { bookingHosts }) ?? (at === "/" ? comingSoonPage(site.name) : null);
+    const published = at === GENERATED_PATHS.personvern ? await getPublishedContents(db, site.id) : [];
+    const bookingHosts = embeddedBookingHosts(published);
+    const ownBooking = at === GENERATED_PATHS.personvern && (await usesOwnBooking(db, site.id, published));
+    const generated = generatedLegalPage(site, at, { bookingHosts, ownBooking }) ?? (at === "/" ? comingSoonPage(site.name) : null);
     if (!generated) notFound();
     const legalCtx = await buildRenderContext(db, site, at, false, basePath);
     return <PageRenderer content={generated} theme={site.theme} ctx={legalCtx} />;

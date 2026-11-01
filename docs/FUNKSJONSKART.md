@@ -229,7 +229,7 @@ Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske 
 | Funksjon | Lag | Status |
 |---|---|---|
 | Seksjonen «Timebestilling»: knapp til bookingsystemet, eller innebygd bestilling fra Timma, Fresha, Resos, DinnerBooking, Calendly, Spond, TicketCo og Hoopla som lastes først når den besøkende trykker | N | Bygget |
-| Innebygd booking (fra Bestilly): tjenester, ansatte, åpningstider, helligdager | N | MVP |
+| Egen booking (portet fra Bestilly): seksjonen «Timebestilling» med varianten «Egen booking». Tjenester med varighet, pris og buffer, ansatte med tjenester og ukentlige arbeidstider, «første ledige», unntak og ferie per nettsted eller ansatt, norske helligdager stengt automatisk. Ledige tider i norsk tid med sommertid, minimum varsel og maks dager fram i tid. Dobbeltbooking stoppes av unik indeks. Bekreftelse og varsel på e-post, avbestilling med lenke innen frist, oversikt per dag og uke i studioet, sletting etter tolv måneder. Se `BOOKING.md` | N | Bygget |
 | Påminnelse på e-post og SMS | S | Senere |
 | Forskuddsbetaling og depositum med Vipps | N | Senere |
 | Flere lokasjoner og ansatte per lokasjon | A | Senere |

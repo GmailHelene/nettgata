@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import type { Field } from "@/lib/content/fields";
+import { fieldsForVariant, type Field } from "@/lib/content/fields";
 import { sectionRegistry } from "@/lib/content/registry";
 import { sectionBackgrounds, type Section } from "@/lib/content/types";
 import { FieldGroup } from "./fields";
@@ -44,6 +44,8 @@ export type SectionListProps = {
   onDuplicate: (index: number) => void;
   onRemove: (index: number) => void;
   onAdd: (index: number) => void;
+  /** Nettstedet har minst én aktiv tjeneste under Booking, så varianten «Egen booking» kan velges. */
+  ownBooking?: boolean;
 };
 
 export function SectionList({
@@ -57,6 +59,7 @@ export function SectionList({
   onDuplicate,
   onRemove,
   onAdd,
+  ownBooking = false,
 }: SectionListProps) {
   const listRef = useRef<HTMLOListElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -232,7 +235,7 @@ export function SectionList({
                           value={section.variant}
                           onChange={(e) => onChange(i, { ...section, variant: e.target.value }, false)}
                         >
-                          {def.variants.map((v) => (
+                          {def.variants.filter((v) => v.key !== "egen" || ownBooking || section.variant === "egen").map((v) => (
                             <option key={v.key} value={v.key}>
                               {v.label}
                             </option>
@@ -255,7 +258,7 @@ export function SectionList({
                       </select>
                     </label>
                   </div>
-                  <FieldGroup fields={def.fields} value={section.props} onChange={(props) => onChange(i, { ...section, props }, true)} />
+                  <FieldGroup fields={fieldsForVariant(def.fields, section.variant)} value={section.props} onChange={(props) => onChange(i, { ...section, props }, true)} />
                   <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-neutral-200 pt-4 text-sm">
                     <button type="button" onClick={() => onAdd(i + 1)} className="rounded-md border border-[#173b6c] px-3 py-1.5 font-semibold">
                       + Legg til seksjon under

@@ -407,3 +407,144 @@ export function invitationEmail(o: { siteName: string; inviter: string; role: st
     }),
   };
 }
+
+// ---------- Timebestilling ----------
+
+export type BookingMailData = {
+  serviceName: string;
+  staffName: string;
+  /** Ferdig formatert, for eksempel «tirsdag 3. november kl. 09:30». */
+  when: string;
+  durationMinutes: number;
+  priceOre: number | null;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  message: string;
+};
+
+function bookingFacts(b: BookingMailData, withCustomer: boolean): { html: string; text: string } {
+  const rows: [string, string][] = [
+    ["Tjeneste", b.serviceName],
+    ["Hos", b.staffName],
+    ["Tid", b.when],
+    ["Varighet", `${b.durationMinutes} minutter`],
+    ...(b.priceOre !== null ? ([["Pris", formatNok(b.priceOre)]] as [string, string][]) : []),
+    ...(withCustomer
+      ? ([
+          ["Kunde", b.customerName],
+          ["E-post", b.customerEmail],
+          ...(b.customerPhone ? ([["Telefon", b.customerPhone]] as [string, string][]) : []),
+        ] as [string, string][])
+      : []),
+  ];
+  const html = `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 18px;">${rows
+    .map(([k, v]) => `<tr><td style="padding:4px 16px 4px 0;font-size:15px;color:#555555;vertical-align:top;">${esc(k)}</td><td style="padding:4px 0;font-size:15px;">${esc(v)}</td></tr>`)
+    .join("")}</table>`;
+  return { html, text: rows.map(([k, v]) => `${k}: ${v}`).join("\n") };
+}
+
+/** Bekreftelse til kunden, med lenke for å avbestille innen fristen. */
+export function bookingConfirmationEmail(o: { shop: ShopInfo; booking: BookingMailData; cancelUrl: string; cancelDeadline: string }): Rendered {
+  const { shop, booking } = o;
+  const subject = `Timen din hos ${shop.name} er bestilt`;
+  const facts = bookingFacts(booking, false);
+  const contact = contactLine(shop);
+  const cancelText = `Kan du ikke komme? Avbestill senest ${o.cancelDeadline}.`;
+  const body = [
+    paragraph(`Hei ${esc(firstName(booking.customerName))}, takk for bestillingen. Her er timen din:`),
+    facts.html,
+    booking.message ? paragraph(`<strong>Din melding</strong><br>${esc(booking.message).replace(/\n/g, "<br>")}`) : "",
+    paragraph(esc(cancelText)),
+    button(o.cancelUrl, "Avbestill timen"),
+    paragraph("Lenken er personlig. Ta vare på denne e-posten, og ikke del lenken med andre.", "font-size:14px;color:#555555;"),
+    contact.html,
+  ].join("");
+  const text = [
+    `Hei ${firstName(booking.customerName)}, takk for bestillingen. Her er timen din:`,
+    "",
+    facts.text,
+    booking.message ? `\nDin melding: ${booking.message}` : "",
+    "",
+    cancelText,
+    `Avbestill: ${o.cancelUrl}`,
+    contact.text,
+  ]
+    .filter((line, i, all) => line !== "" || all[i - 1] !== "")
+    .join("\n");
+  return {
+    subject,
+    text,
+    html: layout({ subject, preheader: `${booking.serviceName}, ${booking.when}`, brand: shop.name, heading: "Timen er bestilt", body, footer: shopFooter(shop) }),
+  };
+}
+
+/** Varsel til bedriften om en ny time. Svar går rett til kunden. */
+export function newBookingEmail(o: { shop: ShopInfo; booking: BookingMailData; studioUrl: string }): Rendered {
+  const { booking } = o;
+  const subject = `Ny time: ${booking.serviceName}, ${booking.when}`;
+  const facts = bookingFacts(booking, true);
+  const body = [
+    paragraph(`${esc(booking.customerName)} har bestilt time på nettstedet.`),
+    facts.html,
+    booking.message
+      ? `<div style="margin:0 0 18px;padding:14px 16px;background:#f4f4f2;border-radius:6px;font-size:16px;line-height:1.5;">${esc(booking.message).replace(/\n/g, "<br>")}</div>`
+      : "",
+    paragraph(esc(`Svar på denne e-posten, så går svaret rett til ${booking.customerName}.`)),
+    button(o.studioUrl, "Se alle timer"),
+  ].join("");
+  const text = [`${booking.customerName} har bestilt time på nettstedet.`, "", facts.text, booking.message ? `\n${booking.message}` : "", "", `Alle timer: ${o.studioUrl}`]
+    .filter((line, i, all) => line !== "" || all[i - 1] !== "")
+    .join("\n");
+  return {
+    subject,
+    text,
+    html: layout({
+      subject,
+      preheader: `${booking.customerName}, ${booking.when}`,
+      brand: o.shop.name,
+      heading: "Ny time",
+      body,
+      footer: platformFooter("Du får dette fordi varsel om timebestilling er slått på under Booking i studioet."),
+    }),
+  };
+}
+
+/** Til kunden når timen er avbestilt, enten av kunden selv eller av bedriften. */
+export function bookingCancelledEmail(o: { shop: ShopInfo; booking: BookingMailData; byBusiness: boolean; siteUrl: string }): Rendered {
+  const { shop, booking } = o;
+  const subject = `Timen din hos ${shop.name} er avbestilt`;
+  const facts = bookingFacts(booking, false);
+  const contact = contactLine(shop);
+  const lead = o.byBusiness
+    ? `Hei ${firstName(booking.customerName)}, ${shop.name} har dessverre måttet avbestille timen din.`
+    : `Hei ${firstName(booking.customerName)}, timen din er avbestilt.`;
+  const body = [paragraph(esc(lead)), facts.html, button(o.siteUrl, "Bestill en ny time"), contact.html].join("");
+  const text = [lead, "", facts.text, "", `Bestill en ny time: ${o.siteUrl}`, contact.text].filter(Boolean).join("\n");
+  return {
+    subject,
+    text,
+    html: layout({ subject, preheader: `${booking.serviceName}, ${booking.when}`, brand: shop.name, heading: "Timen er avbestilt", body, footer: shopFooter(shop) }),
+  };
+}
+
+/** Til bedriften når kunden har avbestilt med lenken. */
+export function bookingCancelledNoticeEmail(o: { shop: ShopInfo; booking: BookingMailData; studioUrl: string }): Rendered {
+  const { booking } = o;
+  const subject = `Avbestilt: ${booking.serviceName}, ${booking.when}`;
+  const facts = bookingFacts(booking, true);
+  const body = [paragraph(`${esc(booking.customerName)} har avbestilt timen sin. Tiden er ledig igjen.`), facts.html, button(o.studioUrl, "Se alle timer")].join("");
+  const text = [`${booking.customerName} har avbestilt timen sin. Tiden er ledig igjen.`, "", facts.text, "", `Alle timer: ${o.studioUrl}`].join("\n");
+  return {
+    subject,
+    text,
+    html: layout({
+      subject,
+      preheader: `${booking.customerName}, ${booking.when}`,
+      brand: o.shop.name,
+      heading: "Time avbestilt",
+      body,
+      footer: platformFooter("Du får dette fordi varsel om timebestilling er slått på under Booking i studioet."),
+    }),
+  };
+}

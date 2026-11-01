@@ -1,6 +1,6 @@
 import { and, inArray, lt } from "drizzle-orm";
 import type { Db } from "@/db";
-import { aiSuggestions, inquiries, rateLimitEvents } from "@/db/schema";
+import { aiSuggestions, bookings, inquiries, rateLimitEvents } from "@/db/schema";
 
 /**
  * Sletting som personvernerklæringene lover (lib/legal). Kjøres hver natt etter sikkerhetskopien.
@@ -11,6 +11,12 @@ import { aiSuggestions, inquiries, rateLimitEvents } from "@/db/schema";
 export const RATE_LIMIT_KEEP_HOURS = 48;
 /** Henvendelser fra kontaktskjemaene. Erklæringen lover sletting senest tolv måneder etter siste kontakt. */
 export const INQUIRY_KEEP_MONTHS = 12;
+
+/**
+ * Timer fra egen timebestilling. Erklæringen lover sletting tolv måneder etter timen. Bookingene har ingen betaling,
+ * så bokføringsloven krever ikke at de tas vare på lenger. Kommer forskuddsbetaling, må den delen lagres for seg.
+ */
+export const BOOKING_KEEP_MONTHS = 12;
 
 /** Forslag fra AI-teamet som er avvist eller utdatert. Godkjente beholdes som historikk over hva som er endret. */
 export const AI_SUGGESTION_KEEP_DAYS = 90;
@@ -27,5 +33,9 @@ export async function runRetention(db: Db, now = new Date()) {
     .delete(aiSuggestions)
     .where(and(inArray(aiSuggestions.status, ["avvist", "utdatert"]), lt(aiSuggestions.createdAt, aiCutoff)))
     .returning({ id: aiSuggestions.id });
-  return { rateLimits: rateLimits.length, inquiries: oldInquiries.length, aiSuggestions: oldSuggestions.length };
+  const bookingCutoff = new Date(now);
+  bookingCutoff.setMonth(bookingCutoff.getMonth() - BOOKING_KEEP_MONTHS);
+  // Rutene i booking_slots slettes med bookingen (on delete cascade).
+  const oldBookings = await db.delete(bookings).where(lt(bookings.startsAt, bookingCutoff)).returning({ id: bookings.id });
+  return { rateLimits: rateLimits.length, inquiries: oldInquiries.length, aiSuggestions: oldSuggestions.length, bookings: oldBookings.length };
 }

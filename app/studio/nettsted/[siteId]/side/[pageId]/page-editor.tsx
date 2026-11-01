@@ -351,6 +351,7 @@ export function PageEditor({ siteId, preview, pageId, path, initialTitle, initia
                 onDuplicate={duplicate}
                 onRemove={remove}
                 onAdd={setLibrary}
+                ownBooking={Boolean(preview.ctx.booking)}
               />
             )}
             <button

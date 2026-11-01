@@ -67,7 +67,8 @@ export function SectionLibrary({
                 </h3>
                 <p className="mb-3 text-sm text-neutral-700">{def.description}</p>
                 <ul className="flex flex-wrap gap-4">
-                  {def.variants.map((variant) => (
+                  {/* Egen booking vises bare når nettstedet har minst én aktiv tjeneste. */}
+                  {def.variants.filter((v) => type !== "bestill" || v.key !== "egen" || ctx.booking).map((variant) => (
                     <li
                       key={variant.key}
                       className="relative rounded-lg has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-blue-700"

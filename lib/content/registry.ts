@@ -250,17 +250,19 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
   },
   bestill: {
     label: "Timebestilling",
-    description: "Knapp til bookingsystemet ditt, eller bestillingen bygd rett inn på siden.",
-    hint: "Lim inn lenken til bestillingssiden din. Innebygd bestilling virker med Timma, Fresha, Resos, DinnerBooking, Calendly, Spond, TicketCo og Hoopla, og lastes først når den besøkende trykker. Andre lenker vises som knapp.",
+    description: "Knapp til bookingsystemet ditt, bestillingen bygd rett inn på siden, eller egen timebestilling med tjenester og ansatte.",
+    hint: "Egen booking bruker tjenestene, de ansatte og arbeidstidene under Booking i studioet. For et annet bookingsystem limer du inn lenken til bestillingssiden. Innebygd bestilling virker med Timma, Fresha, Resos, DinnerBooking, Calendly, Spond, TicketCo og Hoopla, og lastes først når den besøkende trykker. Andre lenker vises som knapp.",
     variants: [
       { key: "knapp", label: "Knapp til bestillingen" },
       { key: "innebygd", label: "Innebygd bestilling" },
+      // Vises bare når nettstedet har minst én aktiv tjeneste under Booking (RenderContext.booking).
+      { key: "egen", label: "Egen booking" },
     ],
     fields: [
       { key: "overskrift", label: "Overskrift", type: "text" },
       { key: "tekst", label: "Tekst", type: "textarea", max: 400, optional: true },
-      { key: "knappTekst", label: "Knappetekst", type: "text", max: 40 },
-      { key: "lenke", label: "Lenke til bestillingssiden", type: "link" },
+      { key: "knappTekst", label: "Knappetekst", type: "text", max: 40, variants: ["knapp", "innebygd"] },
+      { key: "lenke", label: "Lenke til bestillingssiden", type: "link", variants: ["knapp", "innebygd"] },
     ],
   },
   cta: {
@@ -282,11 +284,11 @@ export type ValidationResult =
 
 // Redigereren sjekker hele siden ved hvert tastetrykk, så skjemaene bygges bare én gang.
 const propsSchemas = new Map<string, ZodType>();
-function propsSchema(type: SectionType, mode: ValidationMode): ZodType {
-  const key = `${type}:${mode}`;
+function propsSchema(type: SectionType, mode: ValidationMode, variant: string): ZodType {
+  const key = `${type}:${mode}:${variant}`;
   let schema = propsSchemas.get(key);
   if (!schema) {
-    schema = fieldsToZod(sectionRegistry[type].fields, mode);
+    schema = fieldsToZod(sectionRegistry[type].fields, mode, variant);
     propsSchemas.set(key, schema);
   }
   return schema;
@@ -294,7 +296,7 @@ function propsSchema(type: SectionType, mode: ValidationMode): ZodType {
 
 /** Det som må rettes i én seksjon, uten seksjonsnavnet foran. Vises på seksjonen i redigereren. */
 export function sectionProblems(section: Section, mode: ValidationMode = "publish"): string[] {
-  const result = propsSchema(section.type, mode).safeParse(section.props);
+  const result = propsSchema(section.type, mode, section.variant).safeParse(section.props);
   return result.success ? [] : result.error.issues.map((i) => i.message);
 }
 
@@ -314,7 +316,7 @@ export function validatePageContent(input: unknown, mode: ValidationMode = "publ
     ids.add(section.id);
     const def = sectionRegistry[section.type];
     const variant = def.variants.some((v) => v.key === section.variant) ? section.variant : def.variants[0].key;
-    const props = propsSchema(section.type, mode).safeParse(section.props);
+    const props = propsSchema(section.type, mode, variant).safeParse(section.props);
     if (!props.success) {
       for (const issue of props.error.issues) {
         errors.push({ sectionId: section.id, message: `${def.label}: ${issue.message}` });

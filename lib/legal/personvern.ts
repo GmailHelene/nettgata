@@ -45,6 +45,8 @@ export type PersonvernInput = {
   kontaktskjema?: boolean;
   /** Bookingsystemene som er bygget inn på de publiserte sidene (embeddedBookingHosts), for eksempel «timma.no». */
   bookingtjenester?: readonly string[];
+  /** Egen timebestilling (lib/egen-booking) er i bruk. Standard er nei. */
+  egenBooking?: boolean;
   /** Nyhetsbrev med dobbel opt-in. Standard er nei, til nyhetsbrevet er bygget. */
   nyhetsbrev?: boolean;
   /** Ukentlig AI-rapport eller AI-team. Standard er ja, fordi AI-rapporten er med i begge abonnementene. */
@@ -113,6 +115,14 @@ export function lagPersonvernerklaering(input: PersonvernInput): PageContent {
         `Timebestillingen på nettstedet kommer fra ${oppramsing(booking)}. Den lastes først når du trykker på knappen for å åpne den. Da får ${enBooking ?? "leverandøren"} IP-adressen din og vet hvilken nettleser du bruker, og kan lagre informasjonskapsler hos deg.`,
         "Det du fyller inn når du bestiller, går rett til bookingsystemet, og vi får bestillingen derfra. Vi bruker den til å gi deg timen eller plassen du har bestilt. Grunnlaget er avtalen med deg (artikkel 6 nr. 1 bokstav b).",
         `Hva ${enBooking ?? "leverandørene"} selv gjør med opplysningene, står i personvernerklæringen ${enBooking ? "deres" : "til hver av dem"}. Vil du heller bestille uten å åpne bookingsystemet, kan du ta kontakt med oss${kontakt ? ` på ${kontakt}` : ""}.`,
+      ]),
+
+    input.egenBooking &&
+      tekstSeksjon("egen-timebestilling", "Når du bestiller time", [
+        "Bestiller du time på nettstedet, lagrer vi navnet ditt, e-postadressen, telefonnummeret og meldingen din hvis du skriver dem, hva du har bestilt, hos hvem og når. Vi lagrer også om timen blir avbestilt, og når.",
+        "Vi bruker opplysningene til å gi deg timen, sende deg en bekreftelse på e-post med lenke for å avbestille, og til å ta kontakt med deg hvis noe endrer seg. Vi får et varsel på e-post når du bestiller eller avbestiller. Grunnlaget er avtalen med deg om timen (personvernforordningen artikkel 6 nr. 1 bokstav b). Navn og e-postadresse må du oppgi, ellers kan vi ikke ta imot bestillingen og sende deg bekreftelsen.",
+        "Lenken for å avbestille er personlig. Vi lagrer ikke selve lenken, bare en kode som gjør at vi kjenner den igjen når du bruker den.",
+        "Bookingen slettes automatisk tolv måneder etter timen. Blir timen en del av et kjøp vi må bokføre, tar vi vare på opplysningene regnskapet trenger så lenge bokføringsloven krever det, som er fem år etter utgangen av regnskapsåret (bokstav c).",
       ]),
 
     butikk &&
