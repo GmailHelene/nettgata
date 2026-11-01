@@ -3,7 +3,7 @@ import { and, count, eq, isNull } from "drizzle-orm";
 import { heading, StreetSign } from "@/components/brand";
 import { ui } from "@/components/studio/ui";
 import { getDb } from "@/db";
-import { inquiries, orders } from "@/db/schema";
+import { aiSuggestions, inquiries, orders } from "@/db/schema";
 
 const tabs = [
   { key: "oversikt", label: "Oversikt", href: "", shopOnly: false },
@@ -17,6 +17,7 @@ const tabs = [
   { key: "rapporter", label: "Rapporter", href: "/rapporter", shopOnly: true },
   { key: "betaling", label: "Betaling", href: "/betaling", shopOnly: true },
   { key: "henvendelser", label: "Henvendelser", href: "/henvendelser", shopOnly: false },
+  { key: "ai-teamet", label: "AI-teamet", href: "/ai-teamet", shopOnly: false },
   { key: "innstillinger", label: "Innstillinger", href: "/innstillinger", shopOnly: false },
   { key: "abonnement", label: "Abonnement", href: "/abonnement", shopOnly: false },
 ] as const;
@@ -40,14 +41,16 @@ export async function SiteNav({
   shop?: boolean;
 }) {
   const db = await getDb();
-  const [[{ unread }], [{ toShip }]] = await Promise.all([
+  const [[{ unread }], [{ toShip }], [{ newIdeas }]] = await Promise.all([
     db.select({ unread: count() }).from(inquiries).where(and(eq(inquiries.siteId, siteId), isNull(inquiries.readAt))),
     shop
       ? db.select({ toShip: count() }).from(orders).where(and(eq(orders.siteId, siteId), eq(orders.status, "paid")))
       : Promise.resolve([{ toShip: 0 }]),
+    db.select({ newIdeas: count() }).from(aiSuggestions).where(and(eq(aiSuggestions.siteId, siteId), eq(aiSuggestions.status, "ny"))),
   ]);
   const badges: Partial<Record<SiteTab, { text: string; className: string }>> = {};
   if (unread > 0) badges.henvendelser = { text: `${unread} ${unread === 1 ? "ny" : "nye"}`, className: "bg-[#a13a2c] text-white" };
+  if (newIdeas > 0) badges["ai-teamet"] = { text: `${newIdeas} forslag`, className: "bg-[#2f5a47] text-white" };
   if (toShip > 0) badges.ordre = { text: `${toShip} å sende`, className: "bg-[#173b6c] text-white" };
 
   return (

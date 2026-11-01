@@ -7,7 +7,7 @@ Grunnlag: markedsanalysen (funksjonskart, funksjonsrevisjon og MVP-liste), produ
 
 **Lag:** N = synlig for nybegynneren. A = avansert lag. U = utviklerlaget. S = skjult automatikk som bare virker.
 
-Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske tekster godkjent, Vipps og Klarna, abonnement med Stripe, sikkerhetskopi, blogg, invitasjoner og omdirigeringer, timebestilling, Bring, Fiken for plattformadmin, funn fra test med kundegrupper).
+Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske tekster godkjent, Vipps og Klarna, abonnement med Stripe, sikkerhetskopi, blogg, invitasjoner og omdirigeringer, timebestilling, Bring, Fiken for plattformadmin, funn fra test med kundegrupper, AI-teamet).
 
 ---
 
@@ -251,10 +251,10 @@ Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske 
 | Funksjon | Lag | Status |
 |---|---|---|
 | Ukentlig rapport med forslag og Godkjenn | N | MVP |
-| Faste roller: SEO, innhold og markedsføring, butikk og drift, sikkerhet | N | MVP |
-| Alt som foreslås kan forhåndsvises og angres | S | MVP |
+| Faste roller: SEO, innhold og markedsføring, butikk og drift, sikkerhet | N | Bygget for tillegget: SEO, innhold og butikk (sikkerhet: Senere) |
+| Alt som foreslås kan forhåndsvises og angres | S | Bygget: før og etter i kortet, Godkjenn skriver bare i kladden, angres med versjonene |
 | Effektmåling i neste rapport | N | Senere |
-| Daglig rapport og sosiale medier (tillegg 249 kr/mnd) | N | Senere |
+| Daglig rapport og sosiale medier (tillegg 249 kr/mnd) | N | Bygget, ikke deployet: daglige forslag med Claude Opus 5.5 (Batch API), kostnadstak 40 kr per nettsted per måned, innlegg til Facebook og Instagram som kopieres, se docs/AI-TEAMET.md |
 
 ## 14. Statistikk og rapporter
 
@@ -296,7 +296,7 @@ Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske 
 | Kundeportal: bytt kort, se fakturaer, si opp ut perioden | N | Bygget (Stripe) |
 | Prisene sjekkes mot vedtatte priser før betaling, feil pris stopper betalingen | S | Bygget |
 | Varsel 30 dager før fornyelse | S | Bygget (e-post fra Stripe, slås på i Stripe) |
-| Tillegget AI-team og sosiale medier 249 kr | S | Skjult til det lanseres |
+| Tillegget AI-team og sosiale medier 249 kr | S | Bygget: i Checkout, og kan legges til eller fjernes på et abonnement som løper. Prisene finnes i Stripe live (01.11.2026) |
 | Publisering sperret til oppstarten er betalt | S | MVP |
 | Vipps Recurring | N | Senere |
 

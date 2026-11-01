@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { sites } from "@/db/schema";
 import { NOT_READY } from "@/lib/billing/checkout";
-import { ADDON, planForKind, quote } from "@/lib/billing/plans";
+import { ADDON, ADDON_AVAILABLE, planForKind, quote } from "@/lib/billing/plans";
 import {
   blocksNewCheckout,
   hasActiveSubscription,
@@ -19,6 +19,7 @@ import { formatOsloDateTime, formatOsloDay } from "@/lib/oslo-time";
 import { requireSiteAccess } from "@/lib/session";
 import { formatNok } from "@/lib/shop/money";
 import { SiteNav } from "../site-nav";
+import { AddonToggle } from "./addon-toggle";
 import { ManualBilling } from "./manual-billing";
 import { PlanForm } from "./plan-form";
 import { PortalButton } from "./portal-button";
@@ -78,6 +79,11 @@ export default async function SubscriptionPage({
   const showPicker = !billing.manual && !blocksNewCheckout(billing);
   // Bare når det har vært et abonnement. En kunde som avbrøt første betaling, har ingen fakturaer å se.
   const showPortal = Boolean(stripe && billing.stripeCustomerId && billing.stripeSubscriptionId && !billing.manual && isOwner);
+  const showAddonToggle =
+    Boolean(stripe && isOwner && billing.stripeSubscriptionId && !billing.manual) &&
+    (billing.status === "active" || billing.status === "trialing") &&
+    !billing.cancelAtPeriodEnd &&
+    (ADDON_AVAILABLE || billing.addon);
   const missing = missingBillingConfig();
   const dashboard = billing.stripeCustomerId
     ? `https://dashboard.stripe.com/${stripe?.mode === "test" ? "test/" : ""}customers/${billing.stripeCustomerId}`
@@ -129,6 +135,7 @@ export default async function SubscriptionPage({
         {showPortal && (
           <PortalButton siteId={site.id} label={hasActiveSubscription(billing) || billing.status === "unpaid" ? "Bytt kort, se fakturaer eller si opp" : "Se fakturaer"} />
         )}
+        {showAddonToggle && <AddonToggle siteId={site.id} active={billing.addon} yearly={billing.interval === "year"} />}
         {!isOwner && (billing.stripeCustomerId || showPicker) && <p className="mt-4 text-sm text-neutral-600">Bare eieren av nettstedet kan endre abonnementet.</p>}
       </section>
 

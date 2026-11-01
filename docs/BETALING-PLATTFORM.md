@@ -120,7 +120,8 @@ Gjør du bare det ene, stopper betalingen med en melding om hvilken pris som ikk
 - Kundeinformasjon: la kunden endre e-post, fakturaadresse og skatte-ID.
 - Oppsigelse: på, «at end of billing period», uten tilbakebetaling. Studioet lover kunden at abonnementet gjelder ut perioden
   som er betalt.
-- Bytte abonnement (subscription update): av. Bytte mellom måned og år, eller legge til tillegget, gjør du foreløpig i Stripe.
+- Bytte abonnement (subscription update): av. Bytte mellom måned og år gjør du foreløpig i Stripe. Tillegget legger kunden til
+  eller fjerner selv under Abonnement i studioet (lib/billing/addon.ts).
 - Lenker til vilkår og personvernerklæring når de er publisert.
 - Standard returadresse: https://nettgata.no/studio. Koden sender uansett med adressen til nettstedets abonnementsside.
 
@@ -244,10 +245,10 @@ regnskapsprogrammet.
 
 ## 12. Valg og grenser du bør vite om
 
-- Tillegget AI-team og sosiale medier står under «Senere» i produktspesifikasjonen. Det er skjult på abonnementssiden og
-  avvises av serveren til `ADDON_AVAILABLE` i `lib/billing/plans.ts` settes til `true`, så ingen kan betale for noe som
-  ikke er levert. Prisene for tillegget i Stripe kan vente til da.
-- Bytte mellom måned og år, legge til tillegget, eller bytte plan når et nettsted blir nettbutikk, gjøres i Stripe-dashbordet.
+- Tillegget AI-team og sosiale medier er bygget (docs/AI-TEAMET.md), og `ADDON_AVAILABLE` i `lib/billing/plans.ts` er `true`.
+  Prisene `nettgata_tillegg_ai_mnd` og `nettgata_tillegg_ai_ar` ble laget i Stripe live 01.11.2026. Settes flagget til
+  `false`, skjules tillegget igjen.
+- Bytte mellom måned og år, eller bytte plan når et nettsted blir nettbutikk, gjøres i Stripe-dashbordet.
 - Slettes et nettsted, må abonnementet sies opp i Stripe. Hendelser om det blir bare kvittert.
 - Oppstarten betales sammen med første betaling. Studioet viser «Oppstart: Betalt» med dato, så du ser hvem som har kjøpt den.
 - Kunder du fakturerer selv: fanen Abonnement, boksen «For plattformadmin», «Fakturert utenom Stripe». Notatet ser bare du.

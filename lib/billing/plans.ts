@@ -32,14 +32,17 @@ export const PLANS: Record<Plan, { label: string; monthOre: number; yearOre: num
  * Tillegget koster 249 kr i måneden. Stripe Checkout kan ikke blande måned og år i samme abonnement,
  * så ved årlig betaling faktureres tillegget for et år om gangen: 12 x 249 kr.
  */
-/** Tillegget er ikke bygget ennå (fase 2 i spesifikasjonen). Til det er klart, kan det verken velges eller betales. */
-export const ADDON_AVAILABLE = false;
+/**
+ * AI-teamet er bygget (lib/ai, docs/AI-TEAMET.md). Prisene nettgata_tillegg_ai_mnd og _ar må finnes i Stripe,
+ * og ANTHROPIC_API_KEY må være lagt inn, før dette deployes. Settes til false for å skjule tillegget igjen.
+ */
+export const ADDON_AVAILABLE = true;
 
 export const ADDON = {
   label: "AI-team og sosiale medier",
   monthOre: 24900,
   yearOre: 249 * 12 * 100,
-  includes: "Daglig rapport med forslag og innlegg til sosiale medier. Ingenting endres før du trykker Godkjenn.",
+  includes: "Daglige forslag til tekst, Google og innlegg til sosiale medier. Ingenting endres før du trykker Godkjenn.",
 };
 
 export type PriceRole = "plan" | "addon" | "setup";

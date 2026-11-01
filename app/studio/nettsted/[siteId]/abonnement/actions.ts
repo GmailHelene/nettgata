@@ -7,6 +7,7 @@ import { redirect, unstable_rethrow } from "next/navigation";
 import { z } from "zod";
 import { getDb } from "@/db";
 import type { ActionState } from "@/app/studio/actions";
+import { addAiAddon, removeAiAddon } from "@/lib/billing/addon";
 import { BillingError, createPortalSession, NOT_READY, startCheckout } from "@/lib/billing/checkout";
 import { readBilling } from "@/lib/billing/state";
 import { getStripe } from "@/lib/billing/stripe";
@@ -78,6 +79,29 @@ export async function openPortalAction(siteId: string): Promise<ActionState> {
     return toState(err, user.isPlatformAdmin);
   }
   redirect(url);
+}
+
+/** Legger til eller fjerner AI-teamet på abonnementet som løper. */
+export async function toggleAddonAction(siteId: string, add: boolean): Promise<ActionState> {
+  const { site, user, role } = await requireSiteAccess(siteId);
+  if (role !== "owner") return { ok: false, message: ONLY_OWNER };
+  const stripe = getStripe();
+  if (!stripe) return { ok: false, message: NOT_READY };
+  try {
+    const db = await getDb();
+    if (!(await hit(db, `tillegg:${site.id}`, { limit: 10, windowSeconds: 3600 }))) {
+      return { ok: false, message: "Mange forsøk på kort tid. Vent litt og prøv igjen." };
+    }
+    if (add) await addAiAddon(db, stripe, site, user.id);
+    else await removeAiAddon(db, stripe, site, user.id);
+  } catch (err) {
+    return toState(err, user.isPlatformAdmin);
+  }
+  revalidatePath(`/studio/nettsted/${site.id}`, "layout");
+  return {
+    ok: true,
+    message: add ? "AI-teamet er lagt til. De første forslagene kommer i løpet av natten, eller du kan be om dem under «AI-teamet»." : "AI-teamet er fjernet fra abonnementet.",
+  };
 }
 
 const manualSchema = z.object({

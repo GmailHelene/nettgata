@@ -449,3 +449,62 @@ export const emailLog = pgTable(
   },
   (t) => [index("email_log_site_idx").on(t.siteId, t.createdAt), index("email_log_order_idx").on(t.orderId)],
 );
+
+/**
+ * Én kjøring av AI-teamet for ett nettsted: om natten (via Batch API) eller når kunden ber om nye forslag.
+ * Kostnaden lagres i øre per kjøring, og summen per måned er det kostnadstaket sjekkes mot (lib/ai/runs.ts).
+ */
+export const aiRuns = pgTable(
+  "ai_runs",
+  {
+    id: id(),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    /** natt eller manuell. */
+    trigger: text("trigger").notNull(),
+    /** venter, ferdig eller feilet. */
+    status: text("status").notNull().default("venter"),
+    /** Batchen hos Anthropic, for nattkjøringene. */
+    batchId: text("batch_id"),
+    model: text("model").notNull(),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    costOre: integer("cost_ore").notNull().default(0),
+    suggestionCount: integer("suggestion_count").notNull().default(0),
+    error: text("error"),
+    createdAt: createdAt(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [index("ai_runs_site_idx").on(t.siteId, t.createdAt), index("ai_runs_batch_idx").on(t.batchId)],
+);
+
+/**
+ * Forslag fra AI-teamet. Ingenting endres på nettstedet før kunden trykker Godkjenn, og da bare i kladden.
+ * before er verdien da forslaget ble laget. Er kladden endret siden, blir forslaget utdatert i stedet for å overskrive.
+ */
+export const aiSuggestions = pgTable(
+  "ai_suggestions",
+  {
+    id: id(),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    runId: uuid("run_id").references(() => aiRuns.id, { onDelete: "set null" }),
+    /** seo, innhold eller butikk. */
+    role: text("role").notNull(),
+    /** seo_tittel, seo_beskrivelse, tekst, blogginnlegg, sosialt_innlegg eller tips. */
+    kind: text("kind").notNull(),
+    pageId: uuid("page_id").references(() => pages.id, { onDelete: "cascade" }),
+    sectionId: text("section_id"),
+    field: text("field"),
+    title: text("title").notNull(),
+    before: text("before"),
+    /** Forslaget: tekst, og for blogginnlegg også ingress, for sosiale medier kanalen. */
+    proposal: jsonb("proposal").$type<{ value: string; ingress?: string; channel?: string }>().notNull(),
+    reason: text("reason").notNull(),
+    effect: text("effect").notNull(),
+    /** ny, godkjent, avvist eller utdatert. */
+    status: text("status").notNull().default("ny"),
+    decidedBy: uuid("decided_by").references(() => users.id, { onDelete: "set null" }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("ai_suggestions_site_idx").on(t.siteId, t.status, t.createdAt)],
+);
