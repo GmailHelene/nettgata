@@ -25,7 +25,8 @@ export default async function ProductPage({ params }: { params: Promise<{ siteId
     vatRate: 25,
     status: "draft",
     categoryId: null,
-    variants: [{ optionValues: [], priceOre: 0, stock: null }],
+    weightGrams: null,
+    variants: [{ optionValues: [], priceOre: 0, stock: null, weightGrams: null }],
   };
   let slug: string | null = null;
 
@@ -35,6 +36,8 @@ export default async function ProductPage({ params }: { params: Promise<{ siteId
     if (!product) notFound();
     const variants = await db.select().from(productVariants).where(eq(productVariants.productId, product.id)).orderBy(asc(productVariants.position));
     slug = product.slug;
+    // Uten valg finnes bare én variant, og vekten vises på varen. En vekt fra import (på varianten) flyttes dit ved lagring.
+    const single = variants.length === 1;
     initial = {
       id: product.id,
       name: product.name,
@@ -45,13 +48,14 @@ export default async function ProductPage({ params }: { params: Promise<{ siteId
       vatRate: product.vatRate,
       status: product.status,
       categoryId: product.categoryId,
+      weightGrams: single ? (variants[0].weightGrams ?? product.weightGrams) : product.weightGrams,
       variants: variants.map((v) => ({
         id: v.id,
         optionValues: v.optionValues,
         sku: v.sku ?? "",
         priceOre: v.priceOre,
         stock: v.stock,
-        weightGrams: v.weightGrams,
+        weightGrams: single ? null : v.weightGrams,
       })),
     };
   }

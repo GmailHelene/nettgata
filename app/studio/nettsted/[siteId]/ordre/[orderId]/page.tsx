@@ -1,16 +1,31 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
-import { emailLog, orderLines, orders } from "@/db/schema";
+import { emailLog, orderLines, orders, productVariants, products } from "@/db/schema";
+import { bringBookingView, readOrderBring, type OrderBring } from "@/lib/bring/booking";
+import { bringSetupView } from "@/lib/bring/config";
+import { bringProductIds, bringProducts } from "@/lib/bring/products";
+import { cartWeight, formatWeight } from "@/lib/bring/weight";
 import { requireSiteAccess } from "@/lib/session";
 import { formatNok } from "@/lib/shop/money";
 import { paymentLabels, type PaymentMethod } from "@/lib/shop/settings";
 import { carrierLabel, trackingUrl } from "@/lib/shop/tracking";
 import { formatOsloDateTime } from "@/lib/oslo-time";
 import { orderStatusLabel } from "../order-status";
+import { BringLabelForm } from "./bring-label";
 import { OrderActions } from "./order-actions";
 import { StaffNoteForm, TrackingForm } from "./order-extras";
+
+/** Hvor fraktprisen i kassen kom fra, sagt så butikkeieren forstår det. */
+function bringPriceNote(b: OrderBring): string {
+  const product = bringProducts[b.product].name;
+  if (b.price === "bring") return `Kunden valgte ${product}. Fraktprisen kom fra Bring.`;
+  if (b.price === "gratis") return `Kunden valgte ${product}, med gratis frakt etter reglene dine.`;
+  return b.reason === "vekt"
+    ? `Kunden valgte ${product}. Reserveprisen ble brukt, fordi minst én vare mangler vekt.`
+    : `Kunden valgte ${product}. Reserveprisen ble brukt, fordi Bring ikke ga pris akkurat da.`;
+}
 
 const emailKindLabel: Record<string, string> = {
   ordrebekreftelse: "Ordrebekreftelse",
@@ -35,6 +50,29 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
     db.select().from(emailLog).where(eq(emailLog.orderId, order.id)).orderBy(asc(emailLog.createdAt)),
   ]);
   const status = orderStatusLabel[order.status];
+
+  // Frakt med Bring: hva kunden valgte i kassen, og etiketten hvis den er laget.
+  const orderBring = readOrderBring(order.shipping);
+  const booking = bringBookingView(order.shipping);
+  const bringSetup = bringSetupView(site.shop);
+  const bringReady = Boolean(bringSetup.account?.ready && bringSetup.shipping);
+  const showBring = site.kind === "nettbutikk" && order.shippingAddress !== null && Boolean(orderBring || booking || bringSetup.account);
+  let estimatedGrams = orderBring?.weightGrams ?? null;
+  if (showBring && !booking && estimatedGrams === null) {
+    // Ordre med et fast fraktvalg har ingen vekt fra kassen. Da brukes vekten varene har nå.
+    const ids = lines.map((l) => l.variantId).filter((id): id is string => Boolean(id));
+    const weights = ids.length
+      ? await db
+          .select({ id: productVariants.id, own: productVariants.weightGrams, product: products.weightGrams })
+          .from(productVariants)
+          .innerJoin(products, eq(productVariants.productId, products.id))
+          .where(and(inArray(productVariants.id, ids), eq(products.siteId, site.id)))
+      : [];
+    const byId = new Map(weights.map((w) => [w.id, w.own ?? w.product]));
+    estimatedGrams = cartWeight(lines.map((l) => ({ quantity: l.quantity, weightGrams: l.variantId ? (byId.get(l.variantId) ?? null) : null })));
+  }
+  const enabledProducts = bringSetup.shipping?.products.map((p) => p.id) ?? [];
+  const labelProducts = [...enabledProducts, ...bringProductIds.filter((id) => !enabledProducts.includes(id))].map((id) => ({ id, name: bringProducts[id].name }));
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-12">
@@ -154,6 +192,58 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
           </div>
         )}
       </section>
+
+      {showBring && (
+        <section className="mt-6 rounded-lg border bg-white p-5">
+          <h2 className="mb-3 font-semibold">Frakt med Bring</h2>
+          {orderBring && <p className="mb-3 text-sm text-neutral-700">{bringPriceNote(orderBring)}</p>}
+          {booking ? (
+            <div className="space-y-3 text-sm">
+              <p>
+                Etiketten ble laget {formatOsloDateTime(new Date(booking.bookedAt))}
+                {booking.test ? " som testbestilling. Bring henter ikke pakken og sender ingen faktura." : "."}
+              </p>
+              <p>
+                {bringProducts[booking.product].name}, {formatWeight(booking.weightGrams)}. Sendingsnummer {booking.consignmentNumber}.
+              </p>
+              {booking.hasLabel ? (
+                <a
+                  href={`/studio/nettsted/${site.id}/ordre/${order.id}/etikett`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-block rounded-md border border-neutral-900 px-4 py-2 font-semibold"
+                >
+                  Last ned etiketten (PDF)
+                </a>
+              ) : (
+                <p>Bring sendte ingen etikett hit. Du finner den i Mybring.</p>
+              )}
+            </div>
+          ) : !bringReady ? (
+            <p className="text-sm text-neutral-700">
+              Koble til Bring under{" "}
+              <Link href={`/studio/nettsted/${site.id}/innstillinger/bring`} className="underline">
+                Frakt med Bring
+              </Link>{" "}
+              for å lage fraktetiketten herfra.
+            </p>
+          ) : order.status === "paid" || order.status === "fulfilled" ? (
+            <BringLabelForm
+              siteId={site.id}
+              orderId={order.id}
+              products={labelProducts}
+              defaultProduct={orderBring?.product ?? labelProducts[0].id}
+              defaultWeightGrams={estimatedGrams}
+              test={bringSetup.account?.environment === "test"}
+            />
+          ) : (
+            <p className="text-sm text-neutral-700">
+              {order.status === "pending_payment" ? "Du kan lage fraktetiketten når ordren er betalt." : "Ordren er kansellert eller refundert, så den skal ikke sendes."}
+            </p>
+          )}
+          <p className="mt-3 text-xs text-neutral-600">Bring fakturerer sendingene til deg etter din egen avtale. Nettgata tar aldri betalt for frakt.</p>
+        </section>
+      )}
 
       {/* Sporing gir bare mening når pakken sendes. «Hent selv» har ingen adresse. */}
       {order.shippingAddress && order.status !== "cancelled" && order.status !== "pending_payment" && (

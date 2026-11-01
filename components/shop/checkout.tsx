@@ -62,6 +62,11 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
   const [online, setOnline] = useState<ReadyProviders>({});
   const [redirecting, setRedirecting] = useState(false);
   const [submitting, startSubmit] = useTransition();
+  // Postnummeret styrer fraktprisen fra Bring. Prisen hentes på nytt bare når det er fire siffer.
+  const [postalCode, setPostalCode] = useState("");
+  const quotePostalCode = /^\d{4}$/.test(postalCode) ? postalCode : "";
+  // Økes etter en bestilling som ble avvist, så kassen viser oppdaterte priser.
+  const [refresh, setRefresh] = useState(0);
 
   // Kommer kunden tilbake med tilbakeknappen fra Vipps eller Klarna, kan nettleseren vise siden fra minnet. Da skal knappen virke igjen.
   useEffect(() => {
@@ -87,7 +92,7 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
 
   useEffect(() => {
     let cancelled = false;
-    getCheckoutData(siteId, items, shippingCode || undefined, appliedCode || undefined).then((result) => {
+    getCheckoutData(siteId, items, shippingCode || undefined, appliedCode || undefined, quotePostalCode || undefined).then((result) => {
       if (cancelled) return;
       setData(result);
       setLoading(false);
@@ -97,7 +102,8 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
         setCodeError(result.discountError);
         setAppliedCode("");
       }
-      setShippingCode((current) => current || result.shippingOptions[0]?.code || "");
+      // Et fraktvalg som ikke lenger finnes (for eksempel for tung pakke for Pakke i postkassen), byttes med det serveren valgte.
+      setShippingCode((current) => (result.shippingOptions.some((o) => o.code === current) ? current : result.shippingCode));
       setPayment((current) => current || result.paymentMethods[0]?.code || "");
       // Varer som ikke lenger finnes, eller antall over det som er på lager, rettes i kurven.
       const valid = new Map(result.lines.map((l) => [l.variantId, l.maxQuantity]));
@@ -109,7 +115,7 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
     return () => {
       cancelled = true;
     };
-  }, [siteId, items, shippingCode, appliedCode]);
+  }, [siteId, items, shippingCode, appliedCode, quotePostalCode, refresh]);
 
   const setQuantity = (variantId: string, quantity: number) =>
     writeCart(siteId, quantity <= 0 ? items.filter((i) => i.variantId !== variantId) : items.map((i) => (i.variantId === variantId ? { ...i, quantity } : i)));
@@ -139,6 +145,12 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
   const submit = (form: FormData) =>
     startSubmit(async () => {
       setError(null);
+      // Fraktprisen fra Bring må være regnet ut før kunden bestiller, så knappen aldri viser feil beløp.
+      if (data.shippingPending || data.shippingCode !== shippingCode) {
+        setError("Fraktprisen regnes ut. Sjekk totalen og trykk Bestill igjen.");
+        setRefresh((n) => n + 1);
+        return;
+      }
       const text = (key: string) => String(form.get(key) ?? "");
       const order = {
         lines: items,
@@ -152,12 +164,15 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
         acceptedTerms: (form.get("terms") === "on") as true,
         note: text("note"),
         discountCode: data.discount?.code ?? "",
+        // Bare til kontroll: serveren regner ut frakten selv og stopper bestillingen hvis den er en annen enn kunden så.
+        seenShippingOre: data.shippingOre,
       };
 
       if (isOnlinePayment(payment)) {
         const result = await placeOrderWithOnlinePayment(siteId, order);
         if (!result.ok) {
           setError(result.message);
+          setRefresh((n) => n + 1);
           return;
         }
         try {
@@ -174,6 +189,7 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
       const result = await placeOrder(siteId, order);
       if (!result.ok) {
         setError(result.message);
+        setRefresh((n) => n + 1);
         return;
       }
       writeCart(siteId, []);
@@ -225,15 +241,23 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
                   name="shipping"
                   value={o.code}
                   checked={shippingCode === o.code}
+                  aria-describedby={o.deliveryDays !== null ? `frakt-${o.code}` : undefined}
                   onChange={() => {
                     setShippingCode(o.code);
                     // Sendes varene, kan de ikke betales ved henting. Velg neste betalingsmåte i stedet.
                     if (o.requiresAddress && payment === "ved-henting") setPayment(data.paymentMethods.find((m) => m.code !== "ved-henting")?.code ?? "");
                   }}
                 />
-                {o.name}
+                <span>
+                  {o.name}
+                  {o.deliveryDays !== null && (
+                    <span id={`frakt-${o.code}`} className="block text-sm text-[var(--c-muted)]">
+                      Bring regner med {o.deliveryDays} {o.deliveryDays === 1 ? "virkedag" : "virkedager"}
+                    </span>
+                  )}
+                </span>
               </span>
-              <span>{o.priceOre === 0 ? "Gratis" : formatNok(o.priceOre)}</span>
+              <span className="text-right">{o.pricePending ? "Pris etter postnummer" : o.priceOre === 0 ? "Gratis" : formatNok(o.priceOre)}</span>
             </label>
           ))}
           {data.freeShippingOverOre !== null && data.subtotalOre < data.freeShippingOverOre && (
@@ -249,12 +273,29 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
             </Field>
             <div className="grid gap-4 sm:grid-cols-[8rem_1fr]">
               <Field label="Postnr.">
-                <input name="postalCode" required inputMode="numeric" maxLength={4} autoComplete="postal-code" className={input} />
+                <input
+                  name="postalCode"
+                  required
+                  inputMode="numeric"
+                  pattern="[0-9]{4}"
+                  title="Fire siffer"
+                  maxLength={4}
+                  autoComplete="postal-code"
+                  value={postalCode}
+                  onChange={(e) => setPostalCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  aria-describedby={shipping.pricePending ? "postnummer-frakt" : undefined}
+                  className={input}
+                />
               </Field>
               <Field label="Poststed">
                 <input name="city" required autoComplete="address-level2" className={input} />
               </Field>
             </div>
+            {shipping.pricePending && (
+              <p id="postnummer-frakt" className="text-sm text-[var(--c-muted)]">
+                Fraktprisen regnes ut når du har skrevet postnummeret.
+              </p>
+            )}
           </section>
         )}
 
@@ -321,7 +362,13 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
           aria-describedby={onlineLabel ? "betaling-videre" : undefined}
           className="w-full rounded-[var(--radius)] bg-[var(--c-primary)] px-6 py-4 text-lg font-semibold text-[var(--c-on-primary)] disabled:opacity-60"
         >
-          {busy ? (onlineLabel ? `Sender deg til ${onlineLabel}...` : "Sender bestillingen...") : `Bestill med plikt til å betale ${formatNok(data.totalOre)}`}
+          {busy
+            ? onlineLabel
+              ? `Sender deg til ${onlineLabel}...`
+              : "Sender bestillingen..."
+            : data.shippingPending
+              ? "Bestill med plikt til å betale"
+              : `Bestill med plikt til å betale ${formatNok(data.totalOre)}`}
         </button>
         {onlineLabel && (
           <p id="betaling-videre" className="text-sm text-[var(--c-muted)]">
@@ -422,10 +469,11 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
           )}
           <div className="flex justify-between">
             <dt>Frakt</dt>
-            <dd>{data.shippingOre === 0 ? "Gratis" : formatNok(data.shippingOre)}</dd>
+            {/* Prisen fra Bring kommer etter at kunden har skrevet postnummeret, og leses opp når den endres. */}
+            <dd aria-live="polite">{data.shippingPending ? "Etter postnummer" : data.shippingOre === 0 ? "Gratis" : formatNok(data.shippingOre)}</dd>
           </div>
           <div className="flex justify-between text-lg font-semibold">
-            <dt>Totalt</dt>
+            <dt>{data.shippingPending ? "Totalt før frakt" : "Totalt"}</dt>
             <dd>{formatNok(data.totalOre)}</dd>
           </div>
           <div className="flex justify-between text-sm text-[var(--c-muted)]">

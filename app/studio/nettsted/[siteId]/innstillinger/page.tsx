@@ -4,6 +4,7 @@ import { getDb } from "@/db";
 import { domains, pages } from "@/db/schema";
 import { displayHost, rootOf } from "@/lib/domains";
 import { presetOf } from "@/lib/themes";
+import { readBringAccount } from "@/lib/bring/state";
 import { readShopSettings } from "@/lib/shop/settings";
 import { requireSiteAccess } from "@/lib/session";
 import { readSiteInfo } from "@/lib/site-info";
@@ -94,6 +95,29 @@ export default async function SettingsPage({ params }: { params: Promise<{ siteI
           Omdirigeringer, varsler{site.kind === "nettbutikk" ? ", frakt og betalingsmåter" : ""} kan bare endres av eieren av nettstedet.
         </p>
       )}
+      {site.kind === "nettbutikk" && <BringLink siteId={site.id} shop={site.shop} />}
     </main>
+  );
+}
+
+/** Frakt med Bring har egen side, med butikkens egen Mybring-konto. */
+function BringLink({ siteId, shop }: { siteId: string; shop: unknown }) {
+  const account = readBringAccount(shop);
+  return (
+    <section className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white p-5">
+      <div>
+        <h2 className="font-semibold">Frakt med Bring</h2>
+        <p className="text-sm text-neutral-600">
+          {account?.testedAt
+            ? `Koblet til${account.environment === "test" ? " i testmodus" : ""}. Kassen viser pris fra Bring.`
+            : account
+              ? "Ikke i bruk før tilkoblingen er testet"
+              : "Pris fra Bring i kassen og fraktetikett fra ordren, med din egen Bring-avtale"}
+        </p>
+      </div>
+      <Link href={`/studio/nettsted/${siteId}/innstillinger/bring`} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+        {account ? "Administrer Bring" : "Sett opp Bring"}
+      </Link>
+    </section>
   );
 }

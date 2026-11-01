@@ -178,6 +178,16 @@ function randomToken(): string {
 }
 
 /**
+ * Bring-valgene pakken kan sendes med (ikke for tung), slik Bring skal spørres om dem. Kassen og ordren spør likt,
+ * så ordren kan bruke svaret kassen fikk, og kunden betaler prisen som ble vist.
+ */
+export function bringQuoteOptions(settings: ShopSettings, weightGrams: number | null) {
+  return checkoutShippingOptions(settings).flatMap((o) =>
+    o.bring && (weightGrams === null || weightGrams <= o.bring.maxWeightGrams) ? [{ code: o.code, product: o.bring.product, fallbackOre: o.priceOre }] : [],
+  );
+}
+
+/**
  * Fraktprisen for et Bring-valg, regnet ut på serveren når ordren lages: handlekurvens vekt og kundens postnummer.
  * Gjelder butikkens regel om gratis frakt, spørres ikke Bring. Svarer ikke Bring, eller mangler vekten, brukes reserveprisen.
  */
@@ -201,9 +211,8 @@ async function bringPriceForOrder(
   if (freeShippingApplies(settings, goodsOre, discount?.kind === "free_shipping")) {
     return { priceOre: 0, bring: { ...base, price: "gratis", reason: null } };
   }
-  const quote = (await quoteBring(db, siteId, [{ code: option.code, product: option.bring.product, fallbackOre: option.priceOre }], weightGrams, address.postalCode))[
-    option.code
-  ];
+  const quotes = await quoteBring(db, siteId, bringQuoteOptions(settings, weightGrams), weightGrams, address.postalCode);
+  const quote = quotes[option.code] ?? { priceOre: option.priceOre, source: "reserve" as const, reason: "bring" as const };
   return { priceOre: quote.priceOre, bring: { ...base, price: quote.source, reason: quote.reason } };
 }
 

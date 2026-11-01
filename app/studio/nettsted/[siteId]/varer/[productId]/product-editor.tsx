@@ -11,8 +11,19 @@ import { parseNok } from "@/lib/shop/money";
 import type { ActionState } from "../../../../actions";
 import { archiveProductAction, saveProductAction } from "../../../../shop-actions";
 
-type VariantRow = { id?: string; optionValues: string[]; sku: string; price: string; stock: string };
+/** weight er variantens egen vekt i gram. Tom betyr samme vekt som varen. */
+type VariantRow = { id?: string; optionValues: string[]; sku: string; price: string; stock: string; weight: string };
 type OptionRow = { name: string; values: string };
+
+const gramsText = (grams: number | null | undefined) => (grams === null || grams === undefined ? "" : String(grams));
+
+/** «» blir null (vekten mangler), «850» blir 850. Alt annet er ugyldig (undefined). */
+function parseGrams(text: string): number | null | undefined {
+  const value = text.replace(/\s/g, "");
+  if (value === "") return null;
+  if (!/^\d+$/.test(value) || Number(value) > 1_000_000) return undefined;
+  return Number(value);
+}
 
 const vatChoices = [
   { rate: 25, label: "25 % (de fleste varer)" },
@@ -50,6 +61,7 @@ export function ProductEditor({
   const [vatRate, setVatRate] = useState(initial.vatRate);
   const [status, setStatus] = useState(initial.status);
   const [options, setOptions] = useState<OptionRow[]>((initial.options ?? []).map((o) => ({ name: o.name, values: o.values.join(", ") })));
+  const [weight, setWeight] = useState(gramsText(initial.weightGrams));
   const [variants, setVariants] = useState<VariantRow[]>(
     initial.variants.map((v) => ({
       id: v.id,
@@ -57,6 +69,7 @@ export function ProductEditor({
       sku: v.sku ?? "",
       price: priceText(v.priceOre),
       stock: v.stock === null || v.stock === undefined ? "" : String(v.stock),
+      weight: gramsText(v.weightGrams),
     })),
   );
   const [bulkPrice, setBulkPrice] = useState("");
@@ -73,7 +86,7 @@ export function ProductEditor({
     setVariants(
       combinations(parsed).map((combo) => {
         const found = existing.get(keyOf(combo));
-        return found ?? { optionValues: combo, sku: "", price: fallback?.price ?? "", stock: fallback?.stock ?? "" };
+        return found ?? { optionValues: combo, sku: "", price: fallback?.price ?? "", stock: fallback?.stock ?? "", weight: "" };
       }),
     );
   };
@@ -82,6 +95,11 @@ export function ProductEditor({
 
   const save = () =>
     startTransition(async () => {
+      const weightGrams = parseGrams(weight);
+      if (weightGrams === undefined) {
+        setState({ ok: false, message: "Skriv vekten i hele gram, for eksempel 850" });
+        return;
+      }
       const builtVariants = [];
       for (const v of variants) {
         const priceOre = parseNok(v.price || "");
@@ -94,7 +112,13 @@ export function ProductEditor({
           setState({ ok: false, message: `Lager må være et helt tall for ${keyOf(v.optionValues) || "varen"}` });
           return;
         }
-        builtVariants.push({ id: v.id, optionValues: v.optionValues, sku: v.sku, priceOre, stock });
+        // Med bare én variant står vekten på varen. Med flere kan hver variant ha sin egen.
+        const variantWeight = variants.length > 1 ? parseGrams(v.weight) : null;
+        if (variantWeight === undefined) {
+          setState({ ok: false, message: `Skriv vekten i hele gram for ${keyOf(v.optionValues)}, eller la feltet stå tomt` });
+          return;
+        }
+        builtVariants.push({ id: v.id, optionValues: v.optionValues, sku: v.sku, priceOre, stock, weightGrams: variantWeight });
       }
       const result = await saveProductAction(siteId, initial.id ?? null, {
         name,
@@ -104,6 +128,7 @@ export function ProductEditor({
         vatRate,
         status,
         categoryId: categoryId || null,
+        weightGrams,
         variants: builtVariants,
       });
       setState(result);
@@ -210,6 +235,25 @@ export function ProductEditor({
               </div>
             )}
           </div>
+          <div>
+            <label className="block max-w-xs">
+              <span className="mb-1 block text-sm font-medium">Vekt (gram)</span>
+              <input
+                value={weight}
+                onChange={(e) => setWeight(e.target.value)}
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="F.eks. 850"
+                aria-describedby="vekt-hjelp"
+                className={inputClass}
+              />
+            </label>
+            <p id="vekt-hjelp" className="mt-1 text-xs text-neutral-600">
+              Vekten pakken får, med emballasje. Den brukes til fraktprisen fra Bring.{" "}
+              {variants.length > 1 && "Veier en variant noe annet, skriver du vekten i tabellen under. "}
+              Uten vekt kan varen fortsatt selges, men kassen bruker da reserveprisen du har satt for Bring.
+            </p>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -217,6 +261,7 @@ export function ProductEditor({
                   {variants.length > 1 && <th className="py-2 pr-3 font-medium">Variant</th>}
                   <th className="py-2 pr-3 font-medium">Pris (kr, inkl. MVA)</th>
                   <th className="py-2 pr-3 font-medium">På lager</th>
+                  {variants.length > 1 && <th className="py-2 pr-3 font-medium">Vekt (gram)</th>}
                   <th className="py-2 font-medium">Varenummer (valgfritt)</th>
                 </tr>
               </thead>
@@ -237,6 +282,19 @@ export function ProductEditor({
                         className={`${inputClass} w-28`}
                       />
                     </td>
+                    {variants.length > 1 && (
+                      <td className="py-2 pr-3">
+                        <input
+                          aria-label={`Vekt i gram for ${keyOf(v.optionValues)}`}
+                          value={v.weight}
+                          onChange={(e) => updateVariant(i, { weight: e.target.value })}
+                          inputMode="numeric"
+                          autoComplete="off"
+                          placeholder="Som varen"
+                          className={`${inputClass} w-28`}
+                        />
+                      </td>
+                    )}
                     <td className="py-2">
                       <input aria-label="Varenummer" value={v.sku} onChange={(e) => updateVariant(i, { sku: e.target.value })} className={`${inputClass} w-40`} />
                     </td>

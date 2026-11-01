@@ -227,7 +227,8 @@ export async function productsCsv(db: Db, siteId: string): Promise<string> {
       csvKroner(variant.priceOre),
       variant.stock ?? "Følges ikke",
       product.vatRate,
-      variant.weightGrams,
+      // Variantens egen vekt, ellers varens (vekt på varen kom med Bring-frakten).
+      variant.weightGrams ?? product.weightGrams,
     ]),
   );
 }

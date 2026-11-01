@@ -115,7 +115,7 @@ export async function removePaymentKeys(db: Db, siteId: string, provider: Online
 }
 
 /**
- * Lagrer butikkinnstillingene (frakt, betalingsmåter, vilkår) uten å røre betalingsnøklene eller Fiken-koblingen.
+ * Lagrer butikkinnstillingene (frakt, betalingsmåter, vilkår) uten å røre betalingsnøklene, Fiken-koblingen eller Bring-oppsettet.
  * Brukes av «Lagre butikkinnstillinger» i studioet, som ellers ville skrevet over hele sites.shop.
  */
 export async function updateShopSettings(db: Db, siteId: string, settings: ShopSettings) {
@@ -125,7 +125,7 @@ export async function updateShopSettings(db: Db, siteId: string, settings: ShopS
   await db
     .update(sites)
     .set({
-      shop: sql`${JSON.stringify(data)}::jsonb || (case when jsonb_typeof(${sites.shop} -> 'paymentProviders') = 'object' then jsonb_build_object('paymentProviders', ${sites.shop} -> 'paymentProviders') else '{}'::jsonb end) || (case when jsonb_typeof(${sites.shop} -> 'fiken') = 'object' then jsonb_build_object('fiken', ${sites.shop} -> 'fiken') else '{}'::jsonb end)`,
+      shop: sql`${JSON.stringify(data)}::jsonb || (case when jsonb_typeof(${sites.shop} -> 'paymentProviders') = 'object' then jsonb_build_object('paymentProviders', ${sites.shop} -> 'paymentProviders') else '{}'::jsonb end) || (case when jsonb_typeof(${sites.shop} -> 'fiken') = 'object' then jsonb_build_object('fiken', ${sites.shop} -> 'fiken') else '{}'::jsonb end) || (case when jsonb_typeof(${sites.shop} -> 'bring') = 'object' then jsonb_build_object('bring', ${sites.shop} -> 'bring') else '{}'::jsonb end)`,
     })
     .where(eq(sites.id, siteId));
 }

@@ -7,7 +7,7 @@ Grunnlag: markedsanalysen (funksjonskart, funksjonsrevisjon og MVP-liste), produ
 
 **Lag:** N = synlig for nybegynneren. A = avansert lag. U = utviklerlaget. S = skjult automatikk som bare virker.
 
-Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske tekster, Vipps og Klarna, abonnement med Stripe, sikkerhetskopi, blogg, invitasjoner og omdirigeringer, funn fra test med kundegrupper).
+Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske tekster godkjent, Vipps og Klarna, abonnement med Stripe, sikkerhetskopi, blogg, invitasjoner og omdirigeringer, timebestilling, Bring, Fiken for plattformadmin, funn fra test med kundegrupper).
 
 ---
 
@@ -198,7 +198,7 @@ Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske 
 | Kassen stengt til kjøpsvilkårene er publisert | S | Ferdig |
 | «Utvalgte varer»-seksjon og nettbutikkpakker (generell, klær, interiør, lokalmat) | N | Bygget |
 | Faste leveringsmåter, hent selv, gratis frakt over en grense | N | Ferdig |
-| Bring med pris fra API og fraktetikett | N | MVP |
+| Bring med pris fra API og fraktetikett: butikkens egen Mybring-konto, pris for vekt og postnummer låst på serveren, reservepris når Bring ikke svarer, etikett og sporing fra ordren, vekt på varer og varianter | N | Bygget (ikke prøvd mot ekte Mybring-konto, se BRING.md) |
 | Ordre med fortløpende nummer, statusregler og kvitteringsside | N | Ferdig |
 | Ordrebekreftelse til kunden, varsel om ny ordre og «pakken er på vei» med sporing (Brevo) | S | Bygget, sendes når Brevo er koblet til |
 | E-postlogg på ordren, så butikken ser om kunden fikk bekreftelsen | S | Ferdig |

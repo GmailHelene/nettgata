@@ -15,7 +15,7 @@ import { quoteBring, type BringPrice } from "@/lib/bring/quote";
 import { cartWeight } from "@/lib/bring/weight";
 import { ShopError } from "@/lib/shop/catalog";
 import { assertUsable, describeDiscount, discountAmount, findDiscount, type Discount } from "@/lib/shop/discounts";
-import { cartTotals, createOrder, freeShippingApplies, priceLines, setOrderStatus, shippingFor, type CheckoutInput } from "@/lib/shop/orders";
+import { bringQuoteOptions, cartTotals, createOrder, freeShippingApplies, priceLines, setOrderStatus, shippingFor, type CheckoutInput } from "@/lib/shop/orders";
 import { availablePaymentMethods, checkoutShippingOptions, paymentLabels, readShopSettings } from "@/lib/shop/settings";
 import { kasseTekster } from "@/lib/legal/angrerett";
 import { readSiteInfo } from "@/lib/site-info";
@@ -62,8 +62,21 @@ export async function getCheckoutData(siteId: string, items: unknown, shippingCo
     }
   }
 
-  const totals = cartTotals(ctx.settings, lines, shippingCode ?? ctx.settings.shippingOptions[0].code, discount);
+  // Fraktvalg av typen Bring: pris for handlekurvens vekt og kundens postnummer. Valg pakken er for tung for, vises ikke.
   const freeShipping = discount?.kind === "free_shipping";
+  const goodsOre = subtotalOre - (discount ? discountAmount(discount, subtotalOre) : 0);
+  const free = freeShippingApplies(ctx.settings, goodsOre, freeShipping);
+  const weightGrams = cartWeight(lines);
+  const options = checkoutShippingOptions(ctx.settings).filter((o) => !o.bring || weightGrams === null || weightGrams <= o.bring.maxWeightGrams);
+  const postal = postalCodeSchema.safeParse(postalCode);
+  const toPostalCode = postal.success ? postal.data : null;
+  const bringOptions = bringQuoteOptions(ctx.settings, weightGrams);
+  const quotes: Record<string, BringPrice> =
+    toPostalCode && !free && bringOptions.length ? await quoteBring(ctx.db, ctx.site.id, bringOptions, weightGrams, toPostalCode) : {};
+  // Uten postnummer har Bring-valgene ingen pris ennå. Da regnes totalen uten frakt, og kassen sier det.
+  const pending = (o: { bring?: unknown }) => Boolean(o.bring) && !toPostalCode && !free;
+  const selected = options.find((o) => o.code === shippingCode) ?? options[0];
+  const totals = cartTotals(ctx.settings, lines, selected.code, discount, pending(selected) ? 0 : quotes[selected.code]?.priceOre);
   return {
     lines: lines.map((l) => ({
       variantId: l.variantId,
@@ -75,10 +88,19 @@ export async function getCheckoutData(siteId: string, items: unknown, shippingCo
       // Kunden får vite hvor mange som er igjen bare når det er færre enn i kurven.
       maxQuantity: l.stock === null ? 99 : Math.min(99, l.stock),
     })),
-    shippingOptions: ctx.settings.shippingOptions.map((o) => ({
-      ...o,
-      priceOre: shippingFor(ctx.settings, o.code, totals.subtotalOre - totals.discountOre, freeShipping)?.priceOre ?? o.priceOre,
+    shippingOptions: options.map((o) => ({
+      code: o.code,
+      name: o.name,
+      requiresAddress: o.requiresAddress,
+      priceOre: shippingFor(ctx.settings, o.code, goodsOre, freeShipping, quotes[o.code]?.priceOre)?.priceOre ?? o.priceOre,
+      /** Bring-prisen kommer når kunden har skrevet postnummeret. */
+      pricePending: pending(o),
+      /** Virkedager Bring regner med, når Bring har svart. */
+      deliveryDays: quotes[o.code]?.deliveryDays ?? null,
     })),
+    /** Fraktvalget totalen er regnet ut for. Er det kundens valg ikke lenger mulig, er det det første valget. */
+    shippingCode: selected.code,
+    shippingPending: pending(selected),
     freeShippingOverOre: ctx.settings.freeShippingOverOre,
     paymentMethods: availablePaymentMethods(ctx.settings).map((m) => ({ code: m, label: paymentLabels[m] })),
     termsPath: ctx.settings.termsPath,
