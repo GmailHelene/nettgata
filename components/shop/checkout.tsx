@@ -4,13 +4,40 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { getCheckoutData, placeOrder } from "@/app/actions/shop";
+import { onlinePaymentInfo, placeOrderWithOnlinePayment } from "@/lib/payments/checkout-action";
+import type { ReadyProviders } from "@/lib/payments/state";
 import { formatNok } from "@/lib/shop/money";
-import type { PaymentMethod } from "@/lib/shop/settings";
+import { isOnlinePayment, type PaymentMethod } from "@/lib/shop/settings";
 import { useCart, writeCart } from "./cart-store";
 
 type Data = NonNullable<Awaited<ReturnType<typeof getCheckoutData>>>;
 
 const input = "w-full rounded-[var(--radius)] border border-[var(--c-muted)] bg-[var(--c-bg)] px-3 py-2";
+
+/** Kort forklaring under betalingsmåten i kassen. */
+const paymentNotes: Partial<Record<PaymentMethod, string>> = {
+  klarna: "Kort, faktura eller delbetaling",
+};
+
+/**
+ * Ordren som venter på Vipps eller Klarna. Handlekurven tømmes først når kvitteringssiden viser at akkurat den
+ * ordren er betalt, så kunden ikke mister kurven hvis betalingen avbrytes.
+ */
+const pendingKey = (siteId: string) => `betaling:${siteId}`;
+
+/** Tømmer handlekurven når betalingen for ordren kunden nettopp sendte til Vipps eller Klarna, er bekreftet. */
+export function ForgetCartAfterPayment({ siteId, orderId }: { siteId: string; orderId: string }) {
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(pendingKey(siteId)) !== orderId) return;
+      localStorage.removeItem(pendingKey(siteId));
+    } catch {
+      return;
+    }
+    writeCart(siteId, []);
+  }, [siteId, orderId]);
+  return null;
+}
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -32,7 +59,31 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
   const [codeInput, setCodeInput] = useState("");
   const [appliedCode, setAppliedCode] = useState("");
   const [codeError, setCodeError] = useState<string | null>(null);
+  const [online, setOnline] = useState<ReadyProviders>({});
+  const [redirecting, setRedirecting] = useState(false);
   const [submitting, startSubmit] = useTransition();
+
+  // Kommer kunden tilbake med tilbakeknappen fra Vipps eller Klarna, kan nettleseren vise siden fra minnet. Da skal knappen virke igjen.
+  useEffect(() => {
+    const reset = (e: PageTransitionEvent) => {
+      if (e.persisted) setRedirecting(false);
+    };
+    window.addEventListener("pageshow", reset);
+    return () => window.removeEventListener("pageshow", reset);
+  }, []);
+
+  // Om Vipps og Klarna står i testmiljøet, så kassen kan si fra om at ingen ekte penger trekkes.
+  useEffect(() => {
+    let cancelled = false;
+    onlinePaymentInfo(siteId)
+      .then((info) => {
+        if (!cancelled) setOnline(info);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [siteId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,11 +134,13 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
     setAppliedCode(codeInput.trim());
   };
 
+  const onlineLabel = isOnlinePayment(payment) ? data.paymentMethods.find((m) => m.code === payment)?.label : undefined;
+
   const submit = (form: FormData) =>
     startSubmit(async () => {
       setError(null);
       const text = (key: string) => String(form.get(key) ?? "");
-      const result = await placeOrder(siteId, {
+      const order = {
         lines: items,
         name: text("name"),
         email: text("email"),
@@ -99,7 +152,26 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
         acceptedTerms: (form.get("terms") === "on") as true,
         note: text("note"),
         discountCode: data.discount?.code ?? "",
-      });
+      };
+
+      if (isOnlinePayment(payment)) {
+        const result = await placeOrderWithOnlinePayment(siteId, order);
+        if (!result.ok) {
+          setError(result.message);
+          return;
+        }
+        try {
+          localStorage.setItem(pendingKey(siteId), result.orderId);
+        } catch {
+          // Privat modus: kurven tømmes ikke av seg selv, men betalingen virker som vanlig.
+        }
+        // Handlekurven står til kvitteringssiden viser at betalingen er bekreftet.
+        setRedirecting(true);
+        window.location.assign(result.redirectUrl);
+        return;
+      }
+
+      const result = await placeOrder(siteId, order);
       if (!result.ok) {
         setError(result.message);
         return;
@@ -108,9 +180,19 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
       router.push(`${basePath}/ordre/${result.orderId}?t=${result.token}`);
     });
 
+  const busy = submitting || redirecting;
+
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_24rem]">
-      <form action={submit} className="space-y-8">
+      {/* onSubmit i stedet for action: React tømmer skjemaet etter en action, også når bestillingen feiler. */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit(new FormData(e.currentTarget));
+        }}
+        className="space-y-8"
+      >
+        <p className="rounded-[var(--radius)] bg-[var(--c-surface)] p-4 text-sm">{data.legal.start}</p>
         <section className="space-y-4">
           <h2 className="text-xl font-semibold">Kontaktinformasjon</h2>
           <Field label="Navn">
@@ -124,6 +206,13 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
               <input name="phone" type="tel" autoComplete="tel" className={input} />
             </Field>
           </div>
+          <p className="text-sm text-[var(--c-muted)]">
+            {data.legal.personvern.replace(/ Les mer i personvernerklæringen\.$/, "")}{" "}
+            <Link href={`${basePath}${data.legal.lenker.personvern}`} target="_blank" className="underline">
+              Les mer i personvernerklæringen
+            </Link>
+            .
+          </p>
         </section>
 
         <fieldset className="space-y-2">
@@ -131,7 +220,17 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
           {data.shippingOptions.map((o) => (
             <label key={o.code} className="flex cursor-pointer items-center justify-between gap-4 rounded-[var(--radius)] border border-[var(--c-muted)]/40 p-4 has-[:checked]:border-[var(--c-primary)]">
               <span className="flex items-center gap-3">
-                <input type="radio" name="shipping" value={o.code} checked={shippingCode === o.code} onChange={() => setShippingCode(o.code)} />
+                <input
+                  type="radio"
+                  name="shipping"
+                  value={o.code}
+                  checked={shippingCode === o.code}
+                  onChange={() => {
+                    setShippingCode(o.code);
+                    // Sendes varene, kan de ikke betales ved henting. Velg neste betalingsmåte i stedet.
+                    if (o.requiresAddress && payment === "ved-henting") setPayment(data.paymentMethods.find((m) => m.code !== "ved-henting")?.code ?? "");
+                  }}
+                />
                 {o.name}
               </span>
               <span>{o.priceOre === 0 ? "Gratis" : formatNok(o.priceOre)}</span>
@@ -161,12 +260,35 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
 
         <fieldset className="space-y-2">
           <legend className="mb-2 text-xl font-semibold">Betaling</legend>
-          {data.paymentMethods.map((m) => (
-            <label key={m.code} className="flex cursor-pointer items-center gap-3 rounded-[var(--radius)] border border-[var(--c-muted)]/40 p-4 has-[:checked]:border-[var(--c-primary)]">
-              <input type="radio" name="payment" value={m.code} checked={payment === m.code} onChange={() => setPayment(m.code)} />
-              {m.label}
-            </label>
-          ))}
+          {data.paymentMethods.length === 0 && (
+            <p role="alert" className="font-medium">
+              Butikken tar ikke imot betaling akkurat nå. Prøv igjen senere.
+            </p>
+          )}
+          {data.paymentMethods.filter((m) => !(shipping?.requiresAddress && m.code === "ved-henting")).map((m) => {
+            const testMode = isOnlinePayment(m.code) && online[m.code]?.environment === "test";
+            const note = [paymentNotes[m.code], testMode && "Testmiljø, ingen ekte penger trekkes"].filter(Boolean).join(". ");
+            return (
+              <label key={m.code} className="flex cursor-pointer items-center gap-3 rounded-[var(--radius)] border border-[var(--c-muted)]/40 p-4 has-[:checked]:border-[var(--c-primary)]">
+                <input
+                  type="radio"
+                  name="payment"
+                  value={m.code}
+                  checked={payment === m.code}
+                  onChange={() => setPayment(m.code)}
+                  aria-describedby={note ? `betaling-${m.code}` : undefined}
+                />
+                <span>
+                  {m.label}
+                  {note && (
+                    <span id={`betaling-${m.code}`} className="block text-sm text-[var(--c-muted)]">
+                      {note}
+                    </span>
+                  )}
+                </span>
+              </label>
+            );
+          })}
         </fieldset>
 
         <Field label="Melding til butikken (valgfritt)">
@@ -179,10 +301,15 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
             Jeg har lest og godtar{" "}
             <Link href={`${basePath}${data.termsPath}`} target="_blank" className="underline">
               kjøpsvilkårene
+            </Link>{" "}
+            og{" "}
+            <Link href={`${basePath}${data.legal.lenker.angrerett}`} target="_blank" className="underline">
+              informasjonen om angrerett
             </Link>
-            , inkludert angreretten.
+            .
           </span>
         </label>
+        <p className="text-sm">{data.legal.forKnappen}</p>
 
         {error && (
           <p role="alert" className="rounded-[var(--radius)] border-2 border-[var(--c-text)] p-4 font-medium">
@@ -190,11 +317,17 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
           </p>
         )}
         <button
-          disabled={submitting || preview}
+          disabled={busy || preview || data.paymentMethods.length === 0}
+          aria-describedby={onlineLabel ? "betaling-videre" : undefined}
           className="w-full rounded-[var(--radius)] bg-[var(--c-primary)] px-6 py-4 text-lg font-semibold text-[var(--c-on-primary)] disabled:opacity-60"
         >
-          {submitting ? "Sender bestillingen..." : `Bestill med plikt til å betale ${formatNok(data.totalOre)}`}
+          {busy ? (onlineLabel ? `Sender deg til ${onlineLabel}...` : "Sender bestillingen...") : `Bestill med plikt til å betale ${formatNok(data.totalOre)}`}
         </button>
+        {onlineLabel && (
+          <p id="betaling-videre" className="text-sm text-[var(--c-muted)]">
+            Du sendes videre til {onlineLabel} for å betale. Bestillingen er ikke betalt før {onlineLabel} har bekreftet betalingen.
+          </p>
+        )}
       </form>
 
       <aside className="h-fit space-y-4 rounded-[var(--radius)] bg-[var(--c-surface)] p-6 lg:sticky lg:top-6">

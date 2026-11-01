@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useId, useRef } from "react";
 import { submitInquiry } from "@/app/actions/inquiry";
 
 const inputClass =
@@ -10,6 +10,16 @@ export function ContactForm({ siteId, path, preview }: { siteId: string; path: s
   const [state, action, pending] = useActionState(submitInquiry.bind(null, siteId), null);
 
   const v = state?.values;
+  const formRef = useRef<HTMLFormElement>(null);
+  const alertRef = useRef<HTMLParagraphElement>(null);
+  const errorId = useId();
+  // Feltet med feil får fokus og blir merket. Uten felt får meldingen fokus.
+  useEffect(() => {
+    if (!state || state.ok) return;
+    const field = state.field ? formRef.current?.querySelector<HTMLElement>(`[name="${state.field}"]`) : null;
+    (field ?? alertRef.current)?.focus();
+  }, [state]);
+  const invalid = (name: string) => (state && !state.ok && state.field === name ? { "aria-invalid": true, "aria-describedby": errorId } : {});
 
   if (state?.ok) {
     return (
@@ -20,7 +30,7 @@ export function ContactForm({ siteId, path, preview }: { siteId: string; path: s
   }
 
   return (
-    <form action={action} className="space-y-4" noValidate>
+    <form ref={formRef} action={action} className="space-y-4" noValidate>
       <input type="hidden" name="path" value={path} />
       {/* Skjult for mennesker, fanger opp roboter. */}
       <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
@@ -31,24 +41,24 @@ export function ContactForm({ siteId, path, preview }: { siteId: string; path: s
       </div>
       <label className="block">
         <span className="mb-1 block font-medium">Navn</span>
-        <input name="name" required autoComplete="name" defaultValue={v?.name} className={inputClass} />
+        <input name="name" required autoComplete="name" defaultValue={v?.name} className={inputClass} {...invalid("name")} />
       </label>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1 block font-medium">E-post</span>
-          <input name="email" type="email" autoComplete="email" defaultValue={v?.email} className={inputClass} />
+          <input name="email" type="email" autoComplete="email" defaultValue={v?.email} className={inputClass} {...invalid("email")} />
         </label>
         <label className="block">
           <span className="mb-1 block font-medium">Telefon</span>
-          <input name="phone" type="tel" autoComplete="tel" defaultValue={v?.phone} className={inputClass} />
+          <input name="phone" type="tel" autoComplete="tel" defaultValue={v?.phone} className={inputClass} {...invalid("phone")} />
         </label>
       </div>
       <label className="block">
         <span className="mb-1 block font-medium">Hva kan vi hjelpe deg med?</span>
-        <textarea name="message" required rows={5} defaultValue={v?.message} className={inputClass} />
+        <textarea name="message" required rows={5} defaultValue={v?.message} className={inputClass} {...invalid("message")} />
       </label>
       {state && !state.ok && (
-        <p role="alert" className="font-medium">
+        <p ref={alertRef} id={errorId} tabIndex={-1} role="alert" className="font-medium outline-none">
           {state.message}
         </p>
       )}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useRef } from "react";
+import type { Theme } from "@/lib/theme";
 import { SectionPreview, type RenderContext } from "@/components/sections";
 import { exampleSection } from "@/lib/content/examples";
 import { sectionRegistry } from "@/lib/content/registry";
@@ -16,13 +17,13 @@ const THUMB_WIDTH = 272;
  */
 export function SectionLibrary({
   ctx,
-  style,
+  theme,
   position,
   onPick,
   onClose,
 }: {
   ctx: RenderContext;
-  style: CSSProperties;
+  theme: Theme;
   /** Hvor seksjonen havner, for eksempel «Under Toppseksjon». */
   position: string;
   onPick: (type: SectionType, variant: string) => void;
@@ -75,7 +76,7 @@ export function SectionLibrary({
                       {/* Bare et bilde: inert gjør at lenker og skjema i eksempelet ikke kan brukes eller nås med tastatur. */}
                       <div inert aria-hidden="true" className="h-40 overflow-hidden rounded-lg border border-neutral-300 bg-white transition-shadow hover:shadow-md">
                         <div style={{ width: SOURCE_WIDTH, zoom: THUMB_WIDTH / SOURCE_WIDTH }}>
-                          <SectionPreview section={exampleSection(type, variant.key)} style={style} ctx={ctx} />
+                          <SectionPreview section={exampleSection(type, variant.key)} theme={theme} ctx={ctx} />
                         </div>
                       </div>
                       <button

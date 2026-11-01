@@ -4,6 +4,7 @@ import { auditLog, domains } from "@/db/schema";
 import { normalizeHost } from "@/lib/hosts";
 import { DomainError, displayHost, parseDomainInput, type DomainKind } from "./parse";
 import { DNS_TYPE, type DnsResolver, type DomainServices, type HostnameState } from "./services";
+import { allowedAuthority } from "./caa";
 
 export { DomainError, displayHost };
 
@@ -96,7 +97,7 @@ export async function addDomain(db: Db, services: DomainServices, siteId: string
   const created: string[] = [];
   try {
     for (const row of inserted) {
-      const state = await services.provider.create(row.hostname);
+      const state = await services.provider.create(row.hostname, (await allowedAuthority(services.resolver, row.hostname)) ?? undefined);
       created.push(state.id);
       await db.update(domains).set({ cfHostnameId: state.id }).where(eq(domains.id, row.id));
     }
@@ -178,8 +179,11 @@ async function checkRoot(db: Db, services: DomainServices, rows: DomainRow[], no
   const ordered = [...rows].sort((a, b) => Number(a.kind === "apex") - Number(b.kind === "apex"));
   for (const row of ordered) {
     let state: HostnameState | null = row.cfHostnameId ? await services.provider.get(row.cfHostnameId) : null;
-    if (!state) state = await services.provider.create(row.hostname);
-    else if (state.status === "moved" || state.status === "deleted") state = await services.provider.refresh(state.id);
+    const ca = (await allowedAuthority(services.resolver, row.hostname)) ?? undefined;
+    if (!state) state = await services.provider.create(row.hostname, ca);
+    else if (state.status === "moved" || state.status === "deleted") state = await services.provider.refresh(state.id, ca);
+    // Sertifikatet står fast med en utsteder kundens CAA-poster ikke tillater: be om nytt hos en som er tillatt.
+    else if (state.sslStatus !== "active" && ca && state.ca && state.ca !== ca) state = await services.provider.refresh(state.id, ca);
 
     const dns = await diagnose(services.resolver, row, expected, targetIps);
     const wwwReady = row.kind !== "apex" || rows.some((r) => r.kind === "www" && r.status === "active");

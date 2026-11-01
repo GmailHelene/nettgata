@@ -11,12 +11,17 @@ import { getEmailProvider } from "@/lib/email/send";
 import { clientKey, hit, isLimited, rules } from "@/lib/rate-limit";
 import { getSecret } from "@/lib/secret";
 import { getPublishedPage } from "@/lib/publishing";
+import { quoteBring, type BringPrice } from "@/lib/bring/quote";
+import { cartWeight } from "@/lib/bring/weight";
 import { ShopError } from "@/lib/shop/catalog";
-import { assertUsable, describeDiscount, findDiscount, type Discount } from "@/lib/shop/discounts";
-import { cartTotals, createOrder, priceLines, setOrderStatus, shippingFor, type CheckoutInput } from "@/lib/shop/orders";
-import { availablePaymentMethods, paymentLabels, readShopSettings } from "@/lib/shop/settings";
+import { assertUsable, describeDiscount, discountAmount, findDiscount, type Discount } from "@/lib/shop/discounts";
+import { cartTotals, createOrder, freeShippingApplies, priceLines, setOrderStatus, shippingFor, type CheckoutInput } from "@/lib/shop/orders";
+import { availablePaymentMethods, checkoutShippingOptions, paymentLabels, readShopSettings } from "@/lib/shop/settings";
+import { kasseTekster } from "@/lib/legal/angrerett";
+import { readSiteInfo } from "@/lib/site-info";
 
 const itemsSchema = z.array(z.object({ variantId: z.string().uuid(), quantity: z.number().int().min(1).max(99) })).max(50);
+const postalCodeSchema = z.string().trim().regex(/^\d{4}$/);
 
 async function shopSite(siteId: string) {
   if (!/^[0-9a-f-]{36}$/.test(siteId)) return null;
@@ -25,8 +30,11 @@ async function shopSite(siteId: string) {
   return site ? { db, site, settings: readShopSettings(site.shop) } : null;
 }
 
-/** Offentlig: gjeldende priser og valg for handlekurven. Viser aldri mer enn det kunden uansett ser i butikken. */
-export async function getCheckoutData(siteId: string, items: unknown, shippingCode?: string, discountCode?: unknown) {
+/**
+ * Offentlig: gjeldende priser og valg for handlekurven. Viser aldri mer enn det kunden uansett ser i butikken.
+ * Med postnummer hentes Bring-prisene for handlekurvens vekt. Prisen som gjelder, regnes ut på nytt når ordren lages.
+ */
+export async function getCheckoutData(siteId: string, items: unknown, shippingCode?: string, discountCode?: unknown, postalCode?: unknown) {
   const parsedItems = itemsSchema.safeParse(items);
   const ctx = await shopSite(siteId);
   if (!ctx || !parsedItems.success) return null;
@@ -74,6 +82,8 @@ export async function getCheckoutData(siteId: string, items: unknown, shippingCo
     freeShippingOverOre: ctx.settings.freeShippingOverOre,
     paymentMethods: availablePaymentMethods(ctx.settings).map((m) => ({ code: m, label: paymentLabels[m] })),
     termsPath: ctx.settings.termsPath,
+    // Opplysningene angrerettloven krever i kassen (§§ 16 og 17), laget fra butikkens egen info.
+    legal: kasseTekster({ butikk: { navn: ctx.site.name, info: readSiteInfo(ctx.site.info) }, betalingsmater: availablePaymentMethods(ctx.settings) }),
     subtotalOre: totals.subtotalOre,
     discount: discount ? { code: discount.code, label: describeDiscount(discount), amountOre: totals.discountOre, freeShipping } : null,
     discountError,

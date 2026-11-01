@@ -2,7 +2,7 @@ import type { Db } from "@/db";
 import { emailLog } from "@/db/schema";
 
 export type EmailAddress = { email: string; name?: string };
-export type EmailKind = "ordrebekreftelse" | "ny-ordre" | "sendt" | "ny-henvendelse";
+export type EmailKind = "ordrebekreftelse" | "ny-ordre" | "sendt" | "ny-henvendelse" | "invitasjon";
 
 export type EmailMessage = {
   to: EmailAddress;
@@ -77,8 +77,10 @@ export async function deliver(
   db: Db,
   provider: EmailProvider,
   entry: { siteId: string; kind: EmailKind; orderId?: string; inquiryId?: string },
-  message: EmailMessage,
+  original: EmailMessage,
 ) {
+  // Emnet bygges av navn som kunden har skrevet. Linjeskift i et emne kan gi ekstra e-posthoder (Bcc) med SMTP.
+  const message = { ...original, subject: original.subject.replace(/\p{Cc}+/gu, " ").trim() };
   let status: "sendt" | "feilet" | "logget" = "logget";
   let providerId: string | null = null;
   let error: string | null = null;

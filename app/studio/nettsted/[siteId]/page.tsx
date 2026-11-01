@@ -8,7 +8,9 @@ import { getPublishedPage } from "@/lib/publishing";
 import { requireSiteAccess } from "@/lib/session";
 import { formatNok } from "@/lib/shop/money";
 import { change, lowStock, orderCounts, salesOverview, topProducts, type Period } from "@/lib/shop/reports";
-import { readShopSettings } from "@/lib/shop/settings";
+import { availablePaymentMethods, readShopSettings } from "@/lib/shop/settings";
+import { getEmailProvider } from "@/lib/email/send";
+import { hasActiveSubscription } from "@/lib/billing/state";
 import { orderStatusLabel } from "./ordre/order-status";
 import { SalesChart } from "./sales-chart";
 import { SiteLinks } from "./site-links";
@@ -83,6 +85,13 @@ export default async function OverviewPage({ params }: { params: Promise<{ siteI
     ]);
     shop = { sales, top, low, recent, lowStockAt: settings.lowStockAt };
     if (!terms) tasks.push({ text: "Kassen er stengt til kjøpsvilkårene er publisert", href: `${base}/sider`, tone: "warning" });
+    // Klar til åpning: uten e-post får kundene ingen ordrebekreftelse, og angreskjemaet skal komme på e-post.
+    if (getEmailProvider().name === "logg") {
+      tasks.push({ text: "E-post er ikke slått på ennå, så kundene får ingen ordrebekreftelse. Ikke åpne butikken før dette er på plass", href: `${base}/innstillinger`, tone: "warning" });
+    }
+    if (!availablePaymentMethods(settings).some((m) => m === "vipps" || m === "klarna")) {
+      tasks.push({ text: "Vipps eller Klarna er ikke koblet til ennå", href: `${base}/betaling` });
+    }
     if (counts.paid) tasks.push({ text: `${counts.paid} ${counts.paid === 1 ? "ordre er betalt og klar" : "ordre er betalt og klare"} til sending`, href: `${base}/ordre?status=klar` });
     if (counts.pending_payment) tasks.push({ text: `${counts.pending_payment} ordre venter på betaling`, href: `${base}/ordre?status=venter` });
     if (low.length) tasks.push({ text: `${low.length}${low.length === 8 ? "+" : ""} varianter har ${settings.lowStockAt} eller færre igjen`, href: `${base}/varer?lager=lite` });
@@ -95,6 +104,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ siteI
   }
   if (unread) tasks.push({ text: `${unread} ${unread === 1 ? "ny henvendelse" : "nye henvendelser"}`, href: `${base}/henvendelser` });
   if (unpublished) tasks.push({ text: `${unpublished} ${unpublished === 1 ? "side er" : "sider er"} ikke publisert`, href: `${base}/sider` });
+  if (!hasActiveSubscription(site.billing)) tasks.push({ text: "Nettstedet har ikke abonnement ennå. Eget domene krever abonnement", href: `${base}/abonnement` });
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-12">

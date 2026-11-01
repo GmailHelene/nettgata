@@ -8,3 +8,9 @@ next-env.d.ts
 .env
 .env*.local
 .dev.vars
+
+# Prospektlister fra scripts/nye-bedrifter.py. Personopplysninger, skal ikke i git.
+/salg/
+
+# Lokale innstillinger for Claude Code (tillatelser), ikke delt.
+.claude/settings.local.json

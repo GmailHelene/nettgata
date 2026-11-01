@@ -1,11 +1,14 @@
 import { and, eq, gte, inArray, isNull, max, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Db } from "@/db";
-import { auditLog, customers, orderLines, orders, productVariants, products, type ShippingAddress } from "@/db/schema";
+import { auditLog, customers, orderLines, orders, productVariants, products, type ShippingAddress, type ShippingChoice } from "@/db/schema";
+import type { OrderBring } from "@/lib/bring/booking";
+import { quoteBring } from "@/lib/bring/quote";
+import { cartWeight } from "@/lib/bring/weight";
 import { ShopError } from "./catalog";
 import { allocateDiscount, assertUsable, claimDiscount, discountAmount, findDiscount, releaseDiscount, type Discount } from "./discounts";
-import { vatOf } from "./money";
-import { availablePaymentMethods, paymentMethods, type ShopSettings } from "./settings";
+import { formatNok, vatOf } from "./money";
+import { availablePaymentMethods, checkoutShippingOptions, isOnlinePayment, paymentMethods, type CheckoutShippingOption, type ShopSettings } from "./settings";
 import { trackingSchema } from "./tracking";
 
 export const MAX_QUANTITY = 99;
@@ -31,6 +34,11 @@ export const checkoutSchema = z.object({
   acceptedTerms: z.literal(true, { error: "Du må godta kjøpsvilkårene" }),
   note: z.string().trim().max(1000).default(""),
   discountCode: z.string().trim().max(40).default(""),
+  /**
+   * Fraktprisen kassen viste kunden. Brukes aldri som pris: serveren regner ut frakten selv. Er den en annen,
+   * stoppes bestillingen, så kunden aldri betaler en annen frakt enn den som sto på knappen.
+   */
+  seenShippingOre: z.number().int().min(0).max(10_000_000).optional(),
 });
 export type CheckoutInput = z.input<typeof checkoutSchema>;
 
@@ -45,6 +53,8 @@ export type PricedLine = {
   vatRate: number;
   totalOre: number;
   stock: number | null;
+  /** Vekt per stykk i gram: variantens egen, ellers varens. Null når vekten mangler. */
+  weightGrams: number | null;
 };
 
 /**
@@ -79,17 +89,25 @@ export async function priceLines(db: Db, siteId: string, lines: { variantId: str
         vatRate: row.product.vatRate,
         totalOre: row.variant.priceOre * quantity,
         stock: row.variant.stock,
+        weightGrams: row.variant.weightGrams ?? row.product.weightGrams ?? null,
       },
     ];
   });
 }
 
-/** Grensen for gratis frakt gjelder varebeløpet etter rabatt, som hos Shopify. */
-export function shippingFor(settings: ShopSettings, code: string, goodsOre: number, freeShipping = false) {
-  const option = settings.shippingOptions.find((o) => o.code === code);
+/** Frakten er gratis med en rabattkode for fri frakt, eller når varebeløpet etter rabatt er over butikkens grense. */
+export function freeShippingApplies(settings: ShopSettings, goodsOre: number, freeShipping = false): boolean {
+  return freeShipping || (settings.freeShippingOverOre !== null && goodsOre >= settings.freeShippingOverOre);
+}
+
+/**
+ * Grensen for gratis frakt gjelder varebeløpet etter rabatt, som hos Shopify, også for Bring.
+ * priceOre er prisen serveren har regnet ut for et Bring-valg. Uten den brukes valgets faste pris (reserveprisen for Bring).
+ */
+export function shippingFor(settings: ShopSettings, code: string, goodsOre: number, freeShipping = false, priceOre?: number) {
+  const option = checkoutShippingOptions(settings).find((o) => o.code === code);
   if (!option) return null;
-  const free = freeShipping || (settings.freeShippingOverOre !== null && goodsOre >= settings.freeShippingOverOre);
-  return { ...option, priceOre: free ? 0 : option.priceOre };
+  return { ...option, priceOre: freeShippingApplies(settings, goodsOre, freeShipping) ? 0 : (priceOre ?? option.priceOre) };
 }
 
 export type VatRow = { rate: number; amountOre: number; vatOre: number };
@@ -117,17 +135,21 @@ export function totalVat(lines: Pick<PricedLine, "totalOre" | "vatRate">[], ship
 
 export type CartTotals = ReturnType<typeof cartTotals>;
 
-/** Én utregning for handlekurv, kasse og ordre, så tallene kunden ser alltid er tallene som lagres. */
+/**
+ * Én utregning for handlekurv, kasse og ordre, så tallene kunden ser alltid er tallene som lagres.
+ * shippingPriceOre er Bring-prisen serveren har hentet for det valgte fraktvalget.
+ */
 export function cartTotals(
   settings: ShopSettings,
   lines: Pick<PricedLine, "totalOre" | "vatRate">[],
   shippingCode: string,
   discount: Pick<Discount, "kind" | "value"> | null = null,
+  shippingPriceOre?: number,
 ) {
   const subtotalOre = lines.reduce((sum, l) => sum + l.totalOre, 0);
   const discountOre = discount ? discountAmount(discount, subtotalOre) : 0;
   const goodsOre = subtotalOre - discountOre;
-  const shipping = shippingFor(settings, shippingCode, goodsOre, discount?.kind === "free_shipping");
+  const shipping = shippingFor(settings, shippingCode, goodsOre, discount?.kind === "free_shipping", shippingPriceOre);
   const shippingOre = shipping?.priceOre ?? 0;
   const shares = allocateDiscount(lines.map((l) => l.totalOre), discountOre);
   const vatOre = totalVat(lines.map((l, i) => ({ totalOre: l.totalOre - shares[i], vatRate: l.vatRate })), shippingOre);
@@ -155,12 +177,47 @@ function randomToken(): string {
   return Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export async function createOrder(db: Db, siteId: string, settings: ShopSettings, input: CheckoutInput) {
+/**
+ * Fraktprisen for et Bring-valg, regnet ut på serveren når ordren lages: handlekurvens vekt og kundens postnummer.
+ * Gjelder butikkens regel om gratis frakt, spørres ikke Bring. Svarer ikke Bring, eller mangler vekten, brukes reserveprisen.
+ */
+async function bringPriceForOrder(
+  db: Db,
+  siteId: string,
+  settings: ShopSettings,
+  option: CheckoutShippingOption,
+  lines: PricedLine[],
+  discount: Discount | null,
+  address: ShippingAddress | null,
+): Promise<{ priceOre: number | undefined; bring: OrderBring | null }> {
+  if (!option.bring || !address) return { priceOre: undefined, bring: null };
+  const weightGrams = cartWeight(lines);
+  if (weightGrams !== null && weightGrams > option.bring.maxWeightGrams) {
+    throw new ShopError(`Pakken er for tung for ${option.name}. Velg en annen leveringsmåte.`);
+  }
+  const subtotalOre = lines.reduce((sum, l) => sum + l.totalOre, 0);
+  const goodsOre = subtotalOre - (discount ? discountAmount(discount, subtotalOre) : 0);
+  const base = { product: option.bring.product, weightGrams, toPostalCode: address.postalCode };
+  if (freeShippingApplies(settings, goodsOre, discount?.kind === "free_shipping")) {
+    return { priceOre: 0, bring: { ...base, price: "gratis", reason: null } };
+  }
+  const quote = (await quoteBring(db, siteId, [{ code: option.code, product: option.bring.product, fallbackOre: option.priceOre }], weightGrams, address.postalCode))[
+    option.code
+  ];
+  return { priceOre: quote.priceOre, bring: { ...base, price: quote.source, reason: quote.reason } };
+}
+
+/**
+ * Lagrer ordren og holder av varene. Ordre med Vipps eller Klarna lages bare av kassen som også starter betalingen
+ * (startsPayment), ellers ville ordren aldri blitt betalt, og kunden ville fått bekreftelse på en ordre som kanselleres.
+ */
+export async function createOrder(db: Db, siteId: string, settings: ShopSettings, input: CheckoutInput, opts: { startsPayment?: boolean } = {}) {
   const parsed = checkoutSchema.safeParse(input);
   if (!parsed.success) throw new ShopError(parsed.error.issues[0].message);
   const data = parsed.data;
 
   if (!availablePaymentMethods(settings).includes(data.paymentMethod)) throw new ShopError("Betalingsmåten er ikke tilgjengelig");
+  if (isOnlinePayment(data.paymentMethod) && !opts.startsPayment) throw new ShopError("Last siden på nytt og prøv igjen.");
   const lines = await priceLines(db, siteId, data.lines);
   if (lines.length !== new Set(data.lines.map((l) => l.variantId)).size) {
     throw new ShopError("En eller flere varer i handlekurven finnes ikke lenger. Oppdater handlekurven.");
@@ -171,16 +228,33 @@ export async function createOrder(db: Db, siteId: string, settings: ShopSettings
     assertUsable(found, lines.reduce((sum, l) => sum + l.totalOre, 0), new Date());
     discount = found;
   }
-  const totals = cartTotals(settings, lines, data.shippingCode, discount);
-  const shipping = totals.shipping;
-  if (!shipping) throw new ShopError("Velg en leveringsmåte");
+  const option = checkoutShippingOptions(settings).find((o) => o.code === data.shippingCode);
+  if (!option) throw new ShopError("Velg en leveringsmåte");
 
   let address: ShippingAddress | null = null;
-  if (shipping.requiresAddress) {
+  if (option.requiresAddress) {
     const a = data.address;
-    if (!a || !a.street || !/^\d{4}$/.test(a.postalCode) || !a.city) throw new ShopError("Fyll inn adresse, postnummer og poststed");
+    if (!a || !a.street || !a.city) throw new ShopError("Fyll inn adresse, postnummer og poststed");
+    if (!/^\d{4}$/.test(a.postalCode)) throw new ShopError("Postnummeret må ha fire siffer");
     address = { name: data.name, street: a.street, postalCode: a.postalCode, city: a.city, country: "NO" };
   }
+
+  // Frakten regnes ut og låses her. En pris fra nettleseren brukes aldri.
+  const bringPrice = await bringPriceForOrder(db, siteId, settings, option, lines, discount, address);
+  const totals = cartTotals(settings, lines, option.code, discount, bringPrice.priceOre);
+  const shipping = totals.shipping;
+  if (!shipping) throw new ShopError("Velg en leveringsmåte");
+  if (data.seenShippingOre !== undefined && data.seenShippingOre !== totals.shippingOre) {
+    throw new ShopError(
+      `${totals.shippingOre === 0 ? "Frakten er nå gratis." : `Fraktprisen er nå ${formatNok(totals.shippingOre)}.`} Sjekk totalen og trykk Bestill på nytt.`,
+    );
+  }
+  const shippingChoice: ShippingChoice & { bring?: OrderBring } = {
+    code: shipping.code,
+    name: shipping.name,
+    priceOre: shipping.priceOre,
+    ...(bringPrice.bring && { bring: bringPrice.bring }),
+  };
 
   // Trekk lager linje for linje. Går én linje tom, legges det som allerede er trukket tilbake.
   const reserved: PricedLine[] = [];
@@ -214,7 +288,7 @@ export async function createOrder(db: Db, siteId: string, settings: ShopSettings
             customerEmail: data.email,
             customerPhone: data.phone || null,
             shippingAddress: address,
-            shipping: { code: shipping.code, name: shipping.name, priceOre: shipping.priceOre },
+            shipping: shippingChoice,
             subtotalOre: totals.subtotalOre,
             discountCode: discount?.code ?? null,
             discountOre: totals.discountOre,
@@ -277,14 +351,28 @@ const transitions: Record<string, string[]> = {
 
 export type OrderStatus = keyof typeof transitions;
 
-/** Endrer status etter faste regler. Kansellering legger varene tilbake på lager. */
+/** Om statusen kan endres fra den ene til den andre etter de faste reglene. */
+export function canTransition(from: string, to: string): boolean {
+  return transitions[from]?.includes(to) ?? false;
+}
+
+async function releaseLines(db: Db, orderId: string) {
+  const lines = await db.select().from(orderLines).where(eq(orderLines.orderId, orderId));
+  for (const l of lines) if (l.variantId) await release(db, l.variantId, l.quantity);
+}
+
+/**
+ * Endrer status etter faste regler. Kansellering legger varene tilbake på lager.
+ * Oppdateringen gjelder bare hvis statusen fortsatt er den vi leste, så to samtidige endringer aldri begge går gjennom
+ * (for eksempel to klikk på «Kanseller», som ellers ville lagt varene tilbake to ganger).
+ */
 export async function setOrderStatus(db: Db, siteId: string, orderId: string, next: OrderStatus, userId: string | null) {
   const [order] = await db.select().from(orders).where(and(eq(orders.id, orderId), eq(orders.siteId, siteId))).limit(1);
   if (!order) throw new ShopError("Fant ikke ordren");
-  if (!transitions[order.status]?.includes(next)) throw new ShopError(`Kan ikke gå fra ${order.status} til ${next}`);
+  if (!canTransition(order.status, next)) throw new ShopError(`Kan ikke gå fra ${order.status} til ${next}`);
 
   const now = new Date();
-  await db
+  const updated = await db
     .update(orders)
     .set({
       status: next as typeof order.status,
@@ -292,12 +380,75 @@ export async function setOrderStatus(db: Db, siteId: string, orderId: string, ne
       ...(next === "fulfilled" && { fulfilledAt: now }),
       ...(next === "cancelled" && { cancelledAt: now }),
     })
-    .where(eq(orders.id, order.id));
-  if (next === "cancelled") {
-    const lines = await db.select().from(orderLines).where(eq(orderLines.orderId, order.id));
-    for (const l of lines) if (l.variantId) await release(db, l.variantId, l.quantity);
-  }
+    .where(and(eq(orders.id, order.id), eq(orders.status, order.status)))
+    .returning({ id: orders.id });
+  if (updated.length === 0) throw new ShopError("Ordren ble endret samtidig av noe annet. Last siden på nytt og prøv igjen.");
+  if (next === "cancelled") await releaseLines(db, order.id);
   await db.insert(auditLog).values({ siteId, userId, action: "order.status", detail: { orderId, from: order.status, to: next } });
+}
+
+/**
+ * Merker en ordre som betalt etter at Vipps eller Klarna har bekreftet betalingen og beløpet stemmer.
+ * Gjelder bare ordre som fortsatt venter på betaling, i én SQL-setning. Kommer kunden tilbake og bakgrunnsjobben
+ * sjekker samtidig, blir ordren bare betalt én gang, og bare den som rakk det, får true (og sender ordrebekreftelsen).
+ */
+export async function markOrderPaid(
+  db: Db,
+  siteId: string,
+  orderId: string,
+  payment: { provider: string; environment: string; reference: string; amountOre: number },
+): Promise<boolean> {
+  const updated = await db
+    .update(orders)
+    .set({ status: "paid", paidAt: new Date() })
+    .where(and(eq(orders.id, orderId), eq(orders.siteId, siteId), eq(orders.status, "pending_payment")))
+    .returning({ id: orders.id });
+  if (updated.length === 0) return false;
+  await db.insert(auditLog).values([
+    { siteId, action: "order.status", detail: { orderId, from: "pending_payment", to: "paid" } },
+    { siteId, action: "payment.paid", detail: { orderId, ...payment } },
+  ]);
+  return true;
+}
+
+/**
+ * Kansellerer en ordre som aldri ble betalt: kunden avbrøt hos Vipps eller Klarna, betalingen gikk ut på tid,
+ * eller butikken avbrøt den. Varene legges tilbake på lager, og rabattkoden kan brukes igjen,
+ * så kunden kan prøve på nytt med samme kode. Gjelder bare ordre som fortsatt venter på betaling.
+ */
+export async function cancelUnpaidOrder(db: Db, siteId: string, orderId: string, detail: Record<string, unknown>, userId: string | null = null): Promise<boolean> {
+  const updated = await db
+    .update(orders)
+    .set({ status: "cancelled", cancelledAt: new Date() })
+    .where(and(eq(orders.id, orderId), eq(orders.siteId, siteId), eq(orders.status, "pending_payment")))
+    .returning({ discountCode: orders.discountCode });
+  if (updated.length === 0) return false;
+  await releaseLines(db, orderId);
+  const code = updated[0].discountCode;
+  if (code) {
+    const discount = await findDiscount(db, siteId, code);
+    if (discount) await releaseDiscount(db, discount.id);
+  }
+  await db.insert(auditLog).values([
+    { siteId, userId, action: "order.status", detail: { orderId, from: "pending_payment", to: "cancelled" } },
+    { siteId, userId, action: "payment.cancelled", detail: { orderId, ...detail } },
+  ]);
+  return true;
+}
+
+/**
+ * Knytter ordren til betalingen hos Vipps eller Klarna. Med expected byttes referansen bare hvis den fortsatt er
+ * den vi leste og ordren venter på betaling, så to prosesser aldri skriver over hverandre.
+ */
+export async function setPaymentRef(db: Db, orderId: string, ref: string, expected?: string): Promise<boolean> {
+  const conditions = [eq(orders.id, orderId), eq(orders.status, "pending_payment")];
+  if (expected !== undefined) conditions.push(eq(orders.paymentRef, expected));
+  const updated = await db
+    .update(orders)
+    .set({ paymentRef: ref })
+    .where(and(...conditions))
+    .returning({ id: orders.id });
+  return updated.length === 1;
 }
 
 /** Lagrer sporingsnummer. Tomt nummer fjerner sporingen. */

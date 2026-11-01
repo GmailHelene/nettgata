@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useEffectEvent, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { RenderContext } from "@/components/sections";
 import type { PageContent } from "@/lib/content/types";
+import type { Theme } from "@/lib/theme";
 import { FRAME_PATH, readMessage, type FrameCommand, type FromFrame, type ToFrame } from "@/app/studio/ramme/protocol";
 
 export type Device = "datamaskin" | "mobil";
@@ -20,22 +21,27 @@ function send(frame: HTMLIFrameElement | null, message: ToFrame) {
  */
 export function PreviewFrame({
   ctx,
-  style,
+  theme,
   content,
   selectedId,
   device,
   scrollTo,
   onSelect,
   onCommand,
+  editable = true,
+  title = "Forhåndsvisning av siden",
 }: {
   ctx: RenderContext;
-  style: CSSProperties;
+  theme: Theme;
   content: PageContent;
   selectedId: string | null;
   device: Device;
   scrollTo: { id: string; seq: number } | null;
   onSelect: (id: string) => void;
   onCommand: (command: FrameCommand) => void;
+  /** Av i temagalleriet: da er siden bare til å se på, uten omriss og valg av seksjoner. */
+  editable?: boolean;
+  title?: string;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -69,12 +75,12 @@ export function PreviewFrame({
   }, []);
 
   useEffect(() => {
-    if (connection) send(frameRef.current, { type: "nettgata:init", ctx, style });
-  }, [connection, ctx, style]);
+    if (connection) send(frameRef.current, { type: "nettgata:init", ctx, theme });
+  }, [connection, ctx, theme]);
 
   useEffect(() => {
-    if (connection) send(frameRef.current, { type: "nettgata:update", content, selectedId, scale });
-  }, [connection, content, selectedId, scale]);
+    if (connection) send(frameRef.current, { type: "nettgata:update", content, selectedId, scale, view: !editable });
+  }, [connection, content, selectedId, scale, editable]);
 
   useEffect(() => {
     if (connection && scrollTo) send(frameRef.current, { type: "nettgata:scrollTo", id: scrollTo.id, seq: scrollTo.seq });
@@ -85,7 +91,7 @@ export function PreviewFrame({
       <iframe
         ref={frameRef}
         src={FRAME_PATH}
-        title="Forhåndsvisning av siden"
+        title={title}
         // Forhåndsvisningen er et bilde av siden. Tastaturbrukere redigerer i skjemaet ved siden av.
         tabIndex={-1}
         className={`absolute top-0 border-0 bg-white ${device === "mobil" ? "shadow-lg ring-1 ring-black/10" : ""}`}

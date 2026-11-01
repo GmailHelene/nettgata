@@ -25,7 +25,7 @@ const emailStatusLabel: Record<string, string> = {
 
 export default async function OrderPage({ params }: { params: Promise<{ siteId: string; orderId: string }> }) {
   const { siteId, orderId } = await params;
-  const { site } = await requireSiteAccess(siteId);
+  const { site, role } = await requireSiteAccess(siteId);
   if (!/^[0-9a-f-]{36}$/.test(orderId)) notFound();
   const db = await getDb();
   const [order] = await db.select().from(orders).where(and(eq(orders.id, orderId), eq(orders.siteId, site.id))).limit(1);
@@ -54,7 +54,13 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
         </a>
       </div>
 
-      <OrderActions siteId={site.id} orderId={order.id} status={order.status} />
+      <OrderActions
+        siteId={site.id}
+        orderId={order.id}
+        status={order.status}
+        online={order.paymentMethod === "vipps" || order.paymentMethod === "klarna"}
+        owner={role === "owner"}
+      />
 
       <section className="mt-8 rounded-lg border bg-white p-5">
         <h2 className="mb-3 font-semibold">Varer</h2>
@@ -136,7 +142,10 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
           ) : (
             <p>{order.shipping.name}</p>
           )}
-          <p className="mt-2 text-sm text-neutral-600">Betaling: {paymentLabels[order.paymentMethod as PaymentMethod] ?? order.paymentMethod}</p>
+          <p className="mt-2 text-sm text-neutral-600">
+            Betaling: {paymentLabels[order.paymentMethod as PaymentMethod] ?? order.paymentMethod}
+            {/^(vipps|klarna):test:/.test(order.paymentRef ?? "") && " (testmiljø, ingen ekte penger)"}
+          </p>
         </div>
         {order.note && (
           <div className="sm:col-span-2">

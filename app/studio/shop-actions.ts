@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { unstable_rethrow } from "next/navigation";
 import { getDb } from "@/db";
-import { auditLog, discountCodes, productCategories, products, sites } from "@/db/schema";
+import { auditLog, discountCodes, orders, productCategories, products } from "@/db/schema";
 import { requireSiteAccess } from "@/lib/session";
 import {
   bulkUpdateProducts,
@@ -20,16 +20,24 @@ import {
 } from "@/lib/shop/catalog";
 import { saveDiscount, type DiscountInput } from "@/lib/shop/discounts";
 import { setCustomerNote } from "@/lib/shop/customers";
-import { notifyOrderShipped } from "@/lib/email/notify";
+import { notifyOrderPlaced, notifyOrderShipped } from "@/lib/email/notify";
 import { getEmailProvider } from "@/lib/email/send";
+import { updateShopSettings } from "@/lib/payments/config";
+import { changeOrderStatus } from "@/lib/payments/service";
+import { readyProviders } from "@/lib/payments/state";
 import { applyImport, planImport, type ImportPlan } from "@/lib/shop/import";
-import { setOrderStatus, setStaffNote, setTracking, type OrderStatus } from "@/lib/shop/orders";
-import { shopSettingsSchema, type ShopSettings } from "@/lib/shop/settings";
+import { setStaffNote, setTracking, type OrderStatus } from "@/lib/shop/orders";
+import { availablePaymentMethods, shopSettingsSchema, type ShopSettings } from "@/lib/shop/settings";
 import type { ActionState } from "./actions";
 
 /** «Pakken er på vei» til kunden, sendt etter at studioet har fått svar. */
 function shippedNotice(db: Awaited<ReturnType<typeof getDb>>, orderId: string) {
   after(() => notifyOrderShipped(db, getEmailProvider(), orderId).catch((err) => console.error("Sendt-varsel feilet", err)));
+}
+
+/** Ordrebekreftelsen for Vipps og Klarna sendes når betalingen er bekreftet, ikke når ordren lages. */
+function placedNotice(db: Awaited<ReturnType<typeof getDb>>, orderId: string) {
+  after(() => notifyOrderPlaced(db, getEmailProvider(), orderId).catch((err) => console.error("Ordrevarsel feilet", err)));
 }
 
 function toState(err: unknown): ActionState {
@@ -104,28 +112,51 @@ export async function deleteCategoryAction(siteId: string, categoryId: string) {
   revalidatePath(`/studio/nettsted/${site.id}/varer`);
 }
 
+/**
+ * Vipps og Klarna: trekk ved «sendt», frigjøring ved kansellering og refusjon ved «refundert» skjer hos Vipps
+ * eller Klarna før statusen endres. «Betalt» hentes fra Vipps eller Klarna i stedet for å settes for hånd.
+ */
 export async function setOrderStatusAction(siteId: string, orderId: string, status: OrderStatus): Promise<ActionState> {
   try {
-    const { site, user } = await requireSiteAccess(siteId);
+    const { site, user, role } = await requireSiteAccess(siteId);
     const db = await getDb();
-    await setOrderStatus(db, site.id, orderId, status, user.id);
+    // Refusjon og kansellering av en betalt ordre gir pengene tilbake, så det kan bare eieren.
+    // Å kansellere en ubetalt ordre og å markere som sendt er vanlig arbeid for alle med tilgang.
+    if (role !== "owner" && (status === "refunded" || status === "cancelled")) {
+      const [order] = await db.select({ status: orders.status }).from(orders).where(and(eq(orders.id, orderId), eq(orders.siteId, site.id))).limit(1);
+      if (status === "refunded" || order?.status !== "pending_payment") {
+        return { ok: false, message: "Bare eieren av butikken kan refundere eller kansellere en betalt ordre." };
+      }
+    }
+    const change = await changeOrderStatus(db, site.id, orderId, status, user.id);
+    if (change.paid) placedNotice(db, orderId);
     if (status === "fulfilled") shippedNotice(db, orderId);
     revalidatePath(`/studio/nettsted/${site.id}/ordre`, "layout");
-    return { ok: true, message: "Status er oppdatert" };
+    return { ok: true, message: change.message };
   } catch (err) {
+    unstable_rethrow(err);
+    // En sjekk hos Vipps eller Klarna kan ha endret ordren selv om handlingen feilet (for eksempel avbrutt betaling).
+    revalidatePath(`/studio/nettsted/${siteId}/ordre`, "layout");
     return toState(err);
   }
 }
 
 export async function saveShopSettingsAction(siteId: string, settings: ShopSettings): Promise<ActionState> {
   try {
-    const { site, user } = await requireSiteAccess(siteId);
+    const { site, user, role } = await requireSiteAccess(siteId);
+    // Betalingsmåter og frakt bestemmer om og hvordan butikken får betalt, så bare eieren kan endre dem.
+    if (role !== "owner") return { ok: false, message: "Bare eieren av butikken kan endre frakt og betalingsmåter." };
     const parsed = shopSettingsSchema.safeParse(settings);
     if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message };
     const codes = parsed.data.shippingOptions.map((o) => o.code);
     if (new Set(codes).size !== codes.length) return { ok: false, message: "To fraktvalg har samme kode" };
+    // Kassen må ha minst én betalingsmåte: en butikken håndterer selv, eller Vipps eller Klarna.
+    if (availablePaymentMethods({ ...parsed.data, online: readyProviders(site.shop) }).length === 0) {
+      return { ok: false, message: "Velg minst én betalingsmåte, eller koble til Vipps eller Klarna under Betaling." };
+    }
     const db = await getDb();
-    await db.update(sites).set({ shop: parsed.data }).where(eq(sites.id, site.id));
+    // Skriver bare butikkinnstillingene. Betalingsnøklene i samme felt blir liggende urørt.
+    await updateShopSettings(db, site.id, parsed.data);
     await db.insert(auditLog).values({ siteId: site.id, userId: user.id, action: "shop.settings_updated" });
     revalidatePath(`/studio/nettsted/${site.id}`, "layout");
     return { ok: true, message: "Butikkinnstillingene er lagret" };
@@ -144,12 +175,22 @@ export async function saveTrackingAction(
     const { site, user } = await requireSiteAccess(siteId);
     const db = await getDb();
     await setTracking(db, site.id, orderId, tracking, user.id);
-    if (markFulfilled) {
-      await setOrderStatus(db, site.id, orderId, "fulfilled", user.id);
-      shippedNotice(db, orderId);
+    if (!markFulfilled) {
+      revalidatePath(`/studio/nettsted/${site.id}`, "layout");
+      return { ok: true, message: "Sporingen er lagret" };
     }
-    revalidatePath(`/studio/nettsted/${site.id}`, "layout");
-    return { ok: true, message: markFulfilled ? "Sporingen er lagret og ordren er markert som sendt" : "Sporingen er lagret" };
+    try {
+      // Med Vipps og Klarna trekkes beløpet her. Feiler trekket, blir ordren ikke markert som sendt.
+      const change = await changeOrderStatus(db, site.id, orderId, "fulfilled", user.id);
+      shippedNotice(db, orderId);
+      revalidatePath(`/studio/nettsted/${site.id}`, "layout");
+      return { ok: true, message: change.online ? `Sporingen er lagret. ${change.message}` : "Sporingen er lagret og ordren er markert som sendt" };
+    } catch (err) {
+      unstable_rethrow(err);
+      revalidatePath(`/studio/nettsted/${site.id}`, "layout");
+      if (err instanceof ShopError) return { ok: false, message: `Sporingen er lagret, men ordren er ikke markert som sendt. ${err.message}` };
+      throw err;
+    }
   } catch (err) {
     return toState(err);
   }
@@ -270,7 +311,8 @@ export async function applyImportAction(siteId: string, text: string): Promise<{
     const { site, user } = await requireSiteAccess(siteId);
     const plan = await applyImport(await getDb(), site.id, text, user.id);
     revalidatePath(`/studio/nettsted/${site.id}`, "layout");
-    return { ok: true, message: `Importert: ${plan.creates.length} nye varer og ${plan.updates.length} varer endret`, plan };
+    const n = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+    return { ok: true, message: `Importert: ${n(plan.creates.length, "ny vare", "nye varer")} og ${n(plan.updates.length, "endret vare", "endrede varer")}`, plan };
   } catch (err) {
     return toState(err) as { ok: boolean; message: string };
   }

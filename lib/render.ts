@@ -1,7 +1,9 @@
-import { and, asc, eq, isNotNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, like } from "drizzle-orm";
 import type { Db } from "@/db";
-import { pages, sites } from "@/db/schema";
-import type { RenderContext } from "@/components/sections";
+import { pageVersions, pages, sites } from "@/db/schema";
+import type { PostSummary, RenderContext } from "@/components/sections";
+import { firstContentImage } from "@/lib/content/seo";
+import type { PageContent } from "@/lib/content/types";
 import { schemaTypeFor } from "@/lib/packs";
 import { readSiteInfo } from "@/lib/site-info";
 import { readSiteLayout } from "@/lib/site-layout";
@@ -9,8 +11,48 @@ import { listCatalog } from "@/lib/shop/catalog";
 
 type Site = typeof sites.$inferSelect;
 
-/** Menyen viser publiserte sider. I forhåndsvisning vises også upubliserte, så kunden ser helheten. */
-export async function buildRenderContext(db: Db, site: Site, path: string, preview: boolean, basePath = ""): Promise<RenderContext> {
+export const BLOG_PREFIX = "/blogg/";
+
+/** Smakebiten i bloggoversikten: ingressen i toppen, ellers starten av den første teksten. */
+function excerptOf(content: PageContent): string {
+  for (const section of content.sections) {
+    const p = section.props as Record<string, unknown>;
+    const text =
+      (section.type === "hero" && typeof p.undertekst === "string" && p.undertekst) ||
+      ((section.type === "tekst" || section.type === "bildetekst") && typeof p.brodtekst === "string" && p.brodtekst) ||
+      "";
+    if (text.trim()) return text.length > 220 ? `${text.slice(0, 217).trimEnd()}...` : text;
+  }
+  return "";
+}
+
+/** Blogginnleggene, nyeste først. Publiserte på nettstedet, også kladder i forhåndsvisningen. */
+async function loadPosts(db: Db, siteId: string, preview: boolean): Promise<PostSummary[]> {
+  const where = and(eq(pages.siteId, siteId), like(pages.path, `${BLOG_PREFIX}%`));
+  const rows = preview
+    ? await db.select({ path: pages.path, title: pages.title, createdAt: pages.createdAt, content: pages.draft }).from(pages).where(where).orderBy(desc(pages.createdAt)).limit(60)
+    : await db
+        .select({ path: pages.path, title: pages.title, createdAt: pages.createdAt, content: pageVersions.content })
+        .from(pages)
+        .innerJoin(pageVersions, eq(pages.publishedVersionId, pageVersions.id))
+        .where(where)
+        .orderBy(desc(pages.createdAt))
+        .limit(60);
+  return rows.map((r) => ({ path: r.path, title: r.title, date: r.createdAt.toISOString(), excerpt: excerptOf(r.content), image: firstContentImage(r.content) }));
+}
+
+/**
+ * Menyen viser publiserte sider. I forhåndsvisning vises også upubliserte, så kunden ser helheten.
+ * `posts`: hent blogginnleggene. Nettstedet ber bare om dem når siden har en bloggseksjon; redigereren alltid.
+ */
+export async function buildRenderContext(
+  db: Db,
+  site: Site,
+  path: string,
+  preview: boolean,
+  basePath = "",
+  options: { posts?: boolean } = {},
+): Promise<RenderContext> {
   const conditions = [eq(pages.siteId, site.id), eq(pages.showInMenu, true)];
   if (!preview) conditions.push(isNotNull(pages.publishedVersionId));
   const shop = site.kind === "nettbutikk";
@@ -30,5 +72,6 @@ export async function buildRenderContext(db: Db, site: Site, path: string, previ
     shop,
     layout: readSiteLayout(site.layout),
     products: shop ? (await listCatalog(db, site.id)).slice(0, 60) : [],
+    ...((options.posts ?? preview) && { posts: await loadPosts(db, site.id, preview) }),
   };
 }

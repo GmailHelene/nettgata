@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "@/db";
 import { createPgliteDb } from "@/db/pglite";
@@ -7,13 +7,13 @@ import { pages, sites, users } from "@/db/schema";
 import { isValidOrgnr, lookupOrgnr, tidyName } from "@/lib/brreg";
 import { validatePageContent } from "@/lib/content/registry";
 import { packs } from "@/lib/packs";
-import { createPage, deletePage, isValidPagePath, movePage, publishAll, updateSiteSettings } from "@/lib/pages";
-import { getPublishedPage, PublishingError } from "@/lib/publishing";
+import { createPage, deletePage, isValidPagePath, movePage, publishAll, updateSiteSettings, updateSiteTheme } from "@/lib/pages";
+import { getPublishedPage, PublishingError, saveDraft } from "@/lib/publishing";
 import { hit, reset } from "@/lib/rate-limit";
 import { buildRenderContext } from "@/lib/render";
 import { readSiteInfo, siteInfoSchema } from "@/lib/site-info";
 import { createSiteFromPack, isValidSlug, slugify } from "@/lib/sites";
-import { themeContrastProblems } from "@/lib/theme";
+import { buildTheme, getThemeDef } from "@/lib/themes";
 
 let db: Db;
 let userId: string;
@@ -25,12 +25,23 @@ beforeEach(async () => {
 });
 
 const newSite = (overrides: Partial<Parameters<typeof createSiteFromPack>[1]> = {}) =>
-  createSiteFromPack(db, { name: "Rørlegger Hansen AS", packKey: "handverker", designKey: "solid", info: demoInfo, ownerId: userId, ...overrides });
+  createSiteFromPack(db, { name: "Rørlegger Hansen AS", packKey: "handverker", themeKey: "verksted", paletteKey: "stal", info: demoInfo, ownerId: userId, ...overrides });
+
+/** Det kunden gjør i redigereren: bytter hver «Skriv ...»-tekst med ekte tekst. */
+const fillIn = (value: unknown): unknown =>
+  typeof value === "string"
+    ? value.replace(/^Skriv (?!til\b|en melding\b)[\s\S]*/, "Ekte tekst fra bedriften.")
+    : Array.isArray(value)
+      ? value.map(fillIn)
+      : value && typeof value === "object"
+        ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fillIn(v)]))
+        : value;
 
 describe("bransjepakker", () => {
-  it("alle designretninger holder WCAG-kontrast", () => {
+  it("anbefaler bare temaer som finnes", () => {
     for (const pack of Object.values(packs)) {
-      for (const design of pack.designs) expect(themeContrastProblems(design.theme), `${pack.key}/${design.key}`).toEqual([]);
+      expect(pack.themes.length, pack.key).toBeGreaterThan(0);
+      for (const key of pack.themes) expect(getThemeDef(key), `${pack.key}/${key}`).not.toBeNull();
     }
   });
 
@@ -43,7 +54,13 @@ describe("bransjepakker", () => {
     for (const pack of Object.values(packs)) {
       const pagesInPack = pack.pages({ name: "Test AS", city: "Åmot" });
       expect(pagesInPack.some((p) => p.path === "/")).toBe(true);
-      for (const p of pagesInPack) expect(validatePageContent(p.content).ok, `${pack.key}${p.path}`).toBe(true);
+      for (const p of pagesInPack) {
+        // Pakkene er kladder. Det eneste som kan stoppe publisering, er eksempelbilder kunden skal bytte.
+        expect(validatePageContent(p.content, "draft").ok, `${pack.key}${p.path}`).toBe(true);
+        const published = validatePageContent(p.content);
+        const blockers = published.ok ? [] : published.errors.filter((e) => !/eksempelbilde/i.test(e.message));
+        expect(blockers, `${pack.key}${p.path}`).toEqual([]);
+      }
     }
   });
 });
@@ -67,7 +84,17 @@ describe("nytt nettsted", () => {
 
   it("publiser alle gjør nettstedet synlig, med meny fra sidene", async () => {
     const site = await newSite();
-    expect(await publishAll(db, site.id, userId)).toBe(3);
+    // Forsiden i håndverkerpakken har «Skriv ...»-tekst kunden skal bytte ut, så den stoppes. De to andre publiseres.
+    const first = await publishAll(db, site.id, userId);
+    expect(first.published).toBe(2);
+    expect(first.failed.map((f) => f.title)).toEqual(["Forside"]);
+    expect(first.failed[0].message).toMatch(/fylles inn/);
+    expect(await getPublishedPage(db, site.id, "/")).toBeNull();
+
+    // Når kunden har skrevet teksten, går alt igjennom.
+    const [front] = await db.select().from(pages).where(and(eq(pages.siteId, site.id), eq(pages.path, "/")));
+    await saveDraft(db, front.id, { title: front.title, content: fillIn(front.draft) }, userId);
+    expect(await publishAll(db, site.id, userId)).toEqual({ published: 3, failed: [] });
     expect(await getPublishedPage(db, site.id, "/kontakt")).not.toBeNull();
     const ctx = await buildRenderContext(db, site, "/", false);
     expect(ctx.nav.map((n) => n.path)).toEqual(["/", "/tjenester", "/kontakt"]);
@@ -77,6 +104,16 @@ describe("nytt nettsted", () => {
 
   it("avviser ugyldig kontaktinfo", async () => {
     await expect(newSite({ info: { ...demoInfo, postalCode: "33" } })).rejects.toThrow(/Postnummer/);
+    await expect(newSite({ info: { ...demoInfo, phone: "ring meg" } })).rejects.toThrow(/åtte siffer/);
+    await expect(newSite({ info: { ...demoInfo, phone: "+47 32 78" } })).rejects.toThrow(/åtte siffer/);
+    expect((await newSite({ info: { ...demoInfo, phone: "+47 (32) 78-00-00" } })).info).toMatchObject({ phone: "+47 (32) 78-00-00" });
+  });
+
+  it("leser gammel kontaktinfo selv om telefonen ikke følger dagens regel", () => {
+    // Ellers ville et gammelt telefonformat visket ut adresse og åpningstider på nettstedet.
+    const info = readSiteInfo({ ...demoInfo, phone: "32780000 (dagtid)" });
+    expect(info.phone).toBe("32780000 (dagtid)");
+    expect(info.city).toBe(demoInfo.city);
   });
 });
 
@@ -85,17 +122,19 @@ describe("sider", () => {
     const site = await newSite();
     const page = await createPage(db, site.id, { title: "Om oss", path: "" }, userId);
     expect(page.path).toBe("/om-oss");
+    // Norske bokstaver i tittelen gir en gyldig adresse, ikke en feilmelding.
+    expect((await createPage(db, site.id, { title: "Våre tjenester på Åmot", path: "" }, userId)).path).toBe("/vare-tjenester-pa-amot");
     await expect(createPage(db, site.id, { title: "Om oss", path: "/om-oss" }, userId)).rejects.toThrow(/allerede/);
     await expect(createPage(db, site.id, { title: "X", path: "/studio" }, userId)).rejects.toBeInstanceOf(PublishingError);
 
     await movePage(db, site.id, page.id, -1);
     const ordered = await db.select().from(pages).where(eq(pages.siteId, site.id)).orderBy(pages.sortOrder);
-    expect(ordered.map((p) => p.path)).toEqual(["/", "/tjenester", "/om-oss", "/kontakt"]);
+    expect(ordered.map((p) => p.path)).toEqual(["/", "/tjenester", "/om-oss", "/kontakt", "/vare-tjenester-pa-amot"]);
 
     const [front] = ordered;
     await expect(deletePage(db, site.id, front.id, userId)).rejects.toThrow(/Forsiden/);
     await deletePage(db, site.id, page.id, userId);
-    expect((await db.select().from(pages).where(eq(pages.siteId, site.id))).length).toBe(3);
+    expect((await db.select().from(pages).where(eq(pages.siteId, site.id))).length).toBe(4);
   });
 
   it("validerer adresser", () => {
@@ -106,14 +145,27 @@ describe("sider", () => {
 });
 
 describe("innstillinger", () => {
-  it("lagrer info og designretning, og avviser feil", async () => {
+  it("lagrer info, og avviser feil", async () => {
     const site = await newSite();
-    await updateSiteSettings(db, site.id, { name: "Hansen Rør", info: { ...demoInfo, phone: "123" }, designKey: "kontrast" }, userId);
+    await updateSiteSettings(db, site.id, { name: "Hansen Rør", info: { ...demoInfo, phone: "32 78 00 00" } }, userId);
     const [updated] = await db.select().from(sites).where(eq(sites.id, site.id));
     expect(updated.name).toBe("Hansen Rør");
-    expect(readSiteInfo(updated.info).phone).toBe("123");
-    expect(updated.theme.background).toBe("#15191d");
-    await expect(updateSiteSettings(db, site.id, { name: "H", info: {}, designKey: "solid" }, userId)).rejects.toThrow(/Navnet/);
+    expect(readSiteInfo(updated.info).phone).toBe("32 78 00 00");
+    await expect(updateSiteSettings(db, site.id, { name: "Hansen Rør", info: { ...demoInfo, phone: "123" } }, userId)).rejects.toThrow(/åtte siffer/);
+    expect(updated.theme.preset).toEqual({ theme: "verksted", palette: "stal" });
+    await expect(updateSiteSettings(db, site.id, { name: "H", info: {} }, userId)).rejects.toThrow(/Navnet/);
+  });
+
+  it("bytter tema uten å røre innholdet, og stopper temaer som bryter kontrastkravet", async () => {
+    const site = await newSite();
+    const before = await db.select({ draft: pages.draft }).from(pages).where(eq(pages.siteId, site.id));
+    const atelier = buildTheme("atelier", "champagne")!;
+    await updateSiteTheme(db, site.id, { ...atelier, header: "farget" }, userId);
+    const [updated] = await db.select().from(sites).where(eq(sites.id, site.id));
+    expect(updated.theme).toMatchObject({ background: "#1b1816", header: "farget", preset: { theme: "atelier", palette: "champagne" } });
+    expect(await db.select({ draft: pages.draft }).from(pages).where(eq(pages.siteId, site.id))).toEqual(before);
+    await expect(updateSiteTheme(db, site.id, { ...atelier, muted: "#3a3330" }, userId)).rejects.toThrow(/Dempet tekst/);
+    await expect(updateSiteTheme(db, site.id, { ...atelier, buttons: "glitter" }, userId)).rejects.toThrow(/Ugyldig tema/);
   });
 
   it("fyller inn standardverdier og normaliserer org.nr.", () => {

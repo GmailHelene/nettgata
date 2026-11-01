@@ -7,6 +7,16 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // Alle sider: nettleseren skal ikke gjette filtype, andre nettsteder får bare domenet i Referer,
+        // og nettstedene skal bare åpnes med https. Uten includeSubDomains, så kundens andre underdomener ikke påvirkes.
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Strict-Transport-Security", value: "max-age=31536000" },
+        ],
+      },
+      {
         // Studioet kan bare vises i en ramme på plattformens egne sider (forhåndsvisningen i redigereren).
         // Ellers kunne et annet nettsted lagt studioet i en usynlig ramme og lurt brukeren til å klikke.
         source: "/studio/:path*",

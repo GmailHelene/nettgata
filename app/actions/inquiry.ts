@@ -13,7 +13,8 @@ import { getSecret } from "@/lib/secret";
 
 type Values = { name: string; email: string; phone: string; message: string };
 /** Ved feil sendes det kunden skrev tilbake, så skjemaet ikke tømmes. */
-export type InquiryState = { ok: boolean; message: string; values?: Values } | null;
+/** `field`: feltet feilen gjelder, så skjemaet kan merke det og flytte fokus dit. */
+export type InquiryState = { ok: boolean; message: string; values?: Values; field?: string } | null;
 
 const inquirySchema = z
   .object({
@@ -28,7 +29,7 @@ const inquirySchema = z
     message: z.string({ error: "Skriv en melding" }).trim().min(5, "Skriv litt mer i meldingen").max(4000, "Meldingen er for lang"),
     path: z.string().max(300).default("/"),
   })
-  .refine((v) => v.email !== "" || v.phone !== "", { message: "Oppgi e-post eller telefon, så vi kan svare deg" });
+  .refine((v) => v.email !== "" || v.phone !== "", { message: "Oppgi e-post eller telefon, så vi kan svare deg", path: ["email"] });
 
 /** Tar imot kontaktskjemaet på kundens nettsted. Offentlig, så alt valideres og begrenses. */
 export async function submitInquiry(siteId: string, _prev: InquiryState, formData: FormData): Promise<InquiryState> {
@@ -42,8 +43,10 @@ export async function submitInquiry(siteId: string, _prev: InquiryState, formDat
     message: String(formData.get("message") ?? "").slice(0, 4000),
   };
   const parsed = inquirySchema.safeParse({ ...values, path: String(formData.get("path") ?? "/") });
-  if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message, values };
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message, values, field: String(parsed.error.issues[0].path[0] ?? "") || undefined };
 
+  // Siden er offentlig, så id-en kan være hva som helst. En ugyldig id skal gi samme svar som en ukjent, ikke en databasefeil.
+  if (!/^[0-9a-f-]{36}$/.test(siteId)) return { ok: false, message: "Skjemaet er ikke tilgjengelig", values };
   const db = await getDb();
   const [site] = await db.select({ id: sites.id }).from(sites).where(eq(sites.id, siteId)).limit(1);
   if (!site) return { ok: false, message: "Skjemaet er ikke tilgjengelig", values };

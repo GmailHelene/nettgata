@@ -42,6 +42,9 @@ export const siteLayoutSchema = z.object({
 });
 export type SiteLayout = z.infer<typeof siteLayoutSchema>;
 
+/** Navnene skrives slik tjenestene selv skriver dem, både i bunnteksten og i studioet. */
+export const socialLabels = { facebook: "Facebook", instagram: "Instagram", tiktok: "TikTok", linkedin: "LinkedIn" } as const;
+
 export function readSiteLayout(raw: unknown): SiteLayout {
   const parsed = siteLayoutSchema.safeParse(raw ?? {});
   return parsed.success ? parsed.data : siteLayoutSchema.parse({});

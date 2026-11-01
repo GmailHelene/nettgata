@@ -20,6 +20,9 @@ async function readText(file: File): Promise<string> {
 
 const SHOW = 30;
 
+/** «1 ny vare», «3 nye varer». */
+const varer = (n: number, en: string, flere: string) => `${n} ${n === 1 ? `${en} vare` : `${flere} varer`}`;
+
 export function ProductImport({ siteId }: { siteId: string }) {
   const [fileName, setFileName] = useState("");
   const [text, setText] = useState("");
@@ -113,9 +116,10 @@ export function ProductImport({ siteId }: { siteId: string }) {
 
           {plan.errors.length === 0 && !nothingToDo && (
             <button type="button" disabled={pending} onClick={apply} className="rounded-md bg-neutral-900 px-5 py-2 font-semibold text-white disabled:opacity-60">
-              Importer {plan.creates.length > 0 && `${plan.creates.length} nye`}
-              {plan.creates.length > 0 && plan.updates.length > 0 && " og "}
-              {plan.updates.length > 0 && `${plan.updates.length} endrede`} varer
+              Importer{" "}
+              {[plan.creates.length > 0 && varer(plan.creates.length, "ny", "nye"), plan.updates.length > 0 && varer(plan.updates.length, "endret", "endrede")]
+                .filter(Boolean)
+                .join(" og ")}
             </button>
           )}
         </div>

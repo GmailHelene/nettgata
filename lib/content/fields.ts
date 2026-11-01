@@ -13,9 +13,17 @@ export type Field =
   | { key: string; label: string; type: "select"; options: { value: string; label: string }[] }
   | { key: string; label: string; type: "list"; itemLabel: string; fields: Field[]; max?: number };
 
-/** Bare trygge lenker: ingen javascript:, data: eller lignende. */
+/**
+ * Sti på samme nettsted. Nettleseren gjør «\» om til «/» og hopper over tabulator og linjeskift i en adresse,
+ * så «/\evil.com» og «/<tab>/evil.com» blir «//evil.com», altså et annet nettsted. Derfor stoppes de her.
+ */
+export function isLocalPath(value: string): boolean {
+  return value.startsWith("/") && !value.startsWith("//") && !/[\\\s\x00-\x1f\x7f]/.test(value);
+}
+
+/** Bare trygge lenker: ingen javascript:, data: eller lignende, og ingen stier som egentlig går til et annet nettsted. */
 export function isSafeHref(value: string): boolean {
-  if (value.startsWith("/") && !value.startsWith("//")) return true;
+  if (value.startsWith("/")) return isLocalPath(value);
   if (value.startsWith("#")) return true;
   try {
     const url = new URL(value);

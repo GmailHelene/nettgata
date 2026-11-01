@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EXAMPLE_IMAGE_SRC } from "@/lib/content/fields";
 import { focusStyle, mediaSrcSet } from "@/lib/media-types";
 import type { CatalogProduct } from "@/lib/shop/catalog";
 import { Price } from "./price";
@@ -33,17 +34,22 @@ export function ProductCard({
   return (
     <Link href={href(basePath, p.slug)} className="group block">
       <div className="relative aspect-[4/5] overflow-hidden rounded-[var(--radius)] bg-[var(--c-surface)]">
-        {image && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={image.src}
-            srcSet={mediaSrcSet(image.src)}
-            sizes={sizes}
-            alt={image.decorative ? "" : image.alt}
-            loading="lazy"
-            style={focusStyle(image.focus)}
-            className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-          />
+        {image?.src === EXAMPLE_IMAGE_SRC ? (
+          // Eksempelvarer i temagalleriet har ikke bilder, men tegnes i temaets farger (ng-art).
+          <div role="img" aria-label="Eksempelbilde" className="ng-art absolute inset-0" />
+        ) : (
+          image && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={image.src}
+              srcSet={mediaSrcSet(image.src)}
+              sizes={sizes}
+              alt={image.decorative ? "" : image.alt}
+              loading="lazy"
+              style={focusStyle(image.focus)}
+              className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+            />
+          )
         )}
         {hover && (
           // Andre bilde vises ved hover, som i de fleste motebutikker.

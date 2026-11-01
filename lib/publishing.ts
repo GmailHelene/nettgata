@@ -1,7 +1,8 @@
 import { and, desc, eq, gt, max, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { auditLog, pageVersions, pages } from "@/db/schema";
-import { validatePageContent } from "@/lib/content/registry";
+import { sectionRegistry, validatePageContent } from "@/lib/content/registry";
+import { hasExampleText } from "@/lib/content/examples";
 import { missingMedia } from "@/lib/media";
 import type { PageContent } from "@/lib/content/types";
 
@@ -91,13 +92,27 @@ async function createVersion(db: Db, pageId: string, title: string, content: Pag
   throw new PublishingError("Kunne ikke lagre versjon");
 }
 
-/** Gjør kladden til live versjon. Valideres på nytt, fordi kladden kan være lagret før en regel ble strengere. */
-export async function publishPage(db: Db, pageId: string, userId: string) {
+/**
+ * Gjør kladden til live versjon. Valideres på nytt, fordi kladden kan være lagret før en regel ble strengere.
+ * Sider med tekst kunden skulle fylt inn («Skriv ...» fra bransjepakkene og eksempeltekst fra seksjonsbiblioteket)
+ * stoppes. `allowPlaceholders` brukes bare til demonettsteder (seed-skriptet og `createSiteFromPack` med `publish`).
+ */
+export async function publishPage(db: Db, pageId: string, userId: string, opts: { allowPlaceholders?: boolean } = {}) {
   const [page] = await db.select().from(pages).where(eq(pages.id, pageId)).limit(1);
   if (!page) throw new PublishingError("Fant ikke siden");
   const result = validatePageContent(page.draft);
   if (!result.ok) throw new PublishingError(result.errors.map((e) => e.message).join("\n"));
   await assertMediaExists(db, page.siteId, result.content);
+  if (!opts.allowPlaceholders) {
+    const unfinished = result.content.sections.filter(hasExampleText).map((s) => sectionRegistry[s.type].label);
+    if (unfinished.length) {
+      throw new PublishingError(`«${page.title}» har tekst som skal fylles inn før publisering: ${[...new Set(unfinished)].join(", ")}`);
+    }
+  }
+  // Malen for kjøpsvilkår sier selv at den ikke skal publiseres før den er byttet ut.
+  if (JSON.stringify(result.content).includes("IKKE PUBLISER")) {
+    throw new PublishingError("Siden har tekst som sier «IKKE PUBLISER». Bytt den ut med det som skal stå der, så kan du publisere.");
+  }
 
   const version = await createVersion(db, pageId, page.title, result.content, userId);
   await db.update(pages).set({ publishedVersionId: version.id }).where(eq(pages.id, pageId));

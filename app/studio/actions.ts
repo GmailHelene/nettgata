@@ -18,6 +18,7 @@ import {
   destroySession,
   readPendingSecondFactor,
   requireSiteAccess,
+  requireUser,
 } from "@/lib/session";
 import { verifySecondFactor } from "@/lib/two-factor";
 
@@ -38,7 +39,8 @@ export async function login(_prev: ActionState, formData: FormData): Promise<Act
   if (!allowed) return { ok: false, message: "For mange forsøk. Vent 15 minutter og prøv igjen." };
 
   const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-  dummyHash ??= bcrypt.hash("ikke-en-bruker", 10);
+  // Samme kost som ekte passord (12). Med lavere kost svarer ukjente e-poster raskere, og det avslører hvem som finnes.
+  dummyHash ??= bcrypt.hash("ikke-en-bruker", 12);
   const valid = await bcrypt.compare(password, user?.passwordHash ?? (await dummyHash));
   if (!user || !valid) return { ok: false, message: "Feil e-post eller passord" };
 
@@ -74,8 +76,12 @@ export async function logout() {
   redirect("/studio/logg-inn");
 }
 
-/** Henter siden og sjekker at brukeren har tilgang til nettstedet den hører til. */
+/**
+ * Henter siden og sjekker at brukeren har tilgang til nettstedet den hører til.
+ * Innloggingen sjekkes først, så den som ikke er logget inn, aldri får vite om en side finnes.
+ */
 async function authorizePage(pageId: string) {
+  await requireUser();
   const db = await getDb();
   const [page] = await db.select({ siteId: pages.siteId }).from(pages).where(eq(pages.id, pageId)).limit(1);
   if (!page) throw new PublishingError("Fant ikke siden");

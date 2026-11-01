@@ -49,7 +49,7 @@ export default async function DiscountsPage({ params }: { params: Promise<{ site
                   {d.usageLimit !== null && ` av ${d.usageLimit}`}
                 </span>
                 <span className={`rounded-full px-3 py-1 text-sm ${status.className}`}>{status.text}</span>
-                <DiscountRowActions siteId={site.id} discountId={d.id} active={d.active} used={d.usedCount > 0} />
+                <DiscountRowActions siteId={site.id} discountId={d.id} code={d.code} active={d.active} used={d.usedCount > 0} />
               </li>
             );
           })}

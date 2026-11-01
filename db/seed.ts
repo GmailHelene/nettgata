@@ -31,7 +31,8 @@ async function main() {
   const site = await createSiteFromPack(db, {
     name: "Demo Rør AS",
     packKey: "handverker",
-    designKey: "solid",
+    themeKey: "fjord",
+    paletteKey: "fjordbla",
     info: demoInfo,
     ownerId: admin.id,
     publish: true,
@@ -44,7 +45,7 @@ async function main() {
     .where(and(eq(pages.siteId, site.id), eq(pages.path, "/")))
     .limit(1);
   await db.update(pages).set({ draft: demoFrontpage }).where(eq(pages.id, front.id));
-  await publishPage(db, front.id, admin.id);
+  await publishPage(db, front.id, admin.id, { allowPlaceholders: true });
 
   console.log("Ferdig. Studio: http://localhost:3000/studio  Nettsted: http://demo.localhost:3000");
 }

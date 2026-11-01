@@ -6,50 +6,7 @@ export const handverker: Pack = {
   label: "Håndverker",
   description: "Elektriker, rørlegger, snekker, maler og andre som tar oppdrag hjemme hos kunden.",
   schemaType: "HomeAndConstructionBusiness",
-  designs: [
-    {
-      key: "solid",
-      label: "Solid",
-      theme: {
-        primary: "#0b4f6c",
-        onPrimary: "#ffffff",
-        background: "#ffffff",
-        surface: "#eef4f7",
-        text: "#14202b",
-        muted: "#4a5a68",
-        fonts: "robust",
-        radius: "myk",
-      },
-    },
-    {
-      key: "lys",
-      label: "Lys og ren",
-      theme: {
-        primary: "#1d5c3a",
-        onPrimary: "#ffffff",
-        background: "#fbfbf8",
-        surface: "#eef2ec",
-        text: "#1a1f1c",
-        muted: "#4d5650",
-        fonts: "moderne",
-        radius: "rund",
-      },
-    },
-    {
-      key: "kontrast",
-      label: "Mørk og tydelig",
-      theme: {
-        primary: "#f2b705",
-        onPrimary: "#15191d",
-        background: "#15191d",
-        surface: "#22282e",
-        text: "#f2f4f5",
-        muted: "#b4bcc3",
-        fonts: "robust",
-        radius: "skarp",
-      },
-    },
-  ],
+  themes: ["verksted", "fjord", "kontor"],
   pages: ({ name, city }) => {
     // Står stedet allerede i firmanavnet, gjentas det ikke («Rør Modum AS i Modum»).
     const area = city && !name.toLowerCase().includes(city.toLowerCase()) ? ` i ${city}` : "";

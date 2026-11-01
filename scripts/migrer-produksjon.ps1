@@ -4,7 +4,7 @@ $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
 try {
-  $secure = Read-Host "Lim inn DATABASE_URL fra Vercel (Ctrl+V, så Enter)" -AsSecureString
+  $secure = Read-Host "Lim inn DATABASE_URL fra Bitwarden (Ctrl+V, så Enter)" -AsSecureString
   $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
   try { $dbUrl = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr).Trim() }
   finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }

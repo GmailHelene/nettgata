@@ -18,6 +18,7 @@ import type { SiteInfo } from "@/lib/site-info";
 import type { ShopSettings } from "@/lib/shop/settings";
 import type { SiteLayout } from "@/lib/site-layout";
 import type { NotificationSettings } from "@/lib/notifications";
+import type { SiteBilling } from "@/lib/billing/state";
 
 const id = () => uuid("id").primaryKey().default(sql`gen_random_uuid()`);
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -83,8 +84,30 @@ export const sites = pgTable("sites", {
   layout: jsonb("layout").$type<Partial<SiteLayout>>().notNull().default({}),
   /** Hvem som får varsel på e-post om nye ordre og henvendelser. Les via readNotificationSettings(). */
   notifications: jsonb("notifications").$type<Partial<NotificationSettings>>().notNull().default({}),
+  /** Abonnementet hos Stripe, eller «fakturert utenom Stripe». Les via readBilling(), skriv bare som sammenslåing. */
+  billing: jsonb("billing").$type<Partial<SiteBilling>>().notNull().default({}),
+  /** 301-omdirigeringer når kunden flytter fra en gammel nettside: fra gammel sti til ny sti eller adresse. */
+  redirects: jsonb("redirects").$type<{ from: string; to: string }[]>().notNull().default([]),
   createdAt: createdAt(),
 });
+
+/** Invitasjon til et nettsted. Lenken sendes på e-post, og bare en hash av nøkkelen lagres, aldri selve nøkkelen. */
+export const invitations = pgTable(
+  "invitations",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    role: roleEnum("role").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    invitedBy: uuid("invited_by").references(() => users.id, { onDelete: "set null" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("invitations_site_idx").on(t.siteId)],
+);
 
 export const domains = pgTable(
   "domains",
@@ -247,6 +270,11 @@ export const products = pgTable(
     options: jsonb("options").$type<ProductOption[]>().notNull().default([]),
     /** MVA-sats i prosent: 25 (standard), 15 (mat), 12, 0. */
     vatRate: integer("vat_rate").notNull().default(25),
+    /**
+     * Vekt i gram for hele varen, brukt til fraktpris fra Bring. En variant med egen vekt (product_variants.weight_grams)
+     * bruker sin egen. Null betyr at vekten mangler: varen kan fortsatt selges, og kassen bruker reserveprisen for Bring.
+     */
+    weightGrams: integer("weight_grams"),
     status: productStatusEnum("status").notNull().default("draft"),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: createdAt(),
@@ -266,6 +294,7 @@ export const productVariants = pgTable(
     priceOre: integer("price_ore").notNull(),
     /** Null betyr at lager ikke følges (tjenester, digitale varer, laget på bestilling). */
     stock: integer("stock"),
+    /** Variantens egen vekt i gram. Null betyr at varianten veier det samme som varen (products.weight_grams). */
     weightGrams: integer("weight_grams"),
     position: integer("position").notNull().default(0),
     createdAt: createdAt(),

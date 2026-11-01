@@ -4,12 +4,13 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { getDb } from "@/db";
-import { auditLog, inquiries, sites } from "@/db/schema";
+import { auditLog, inquiries, pages, sites } from "@/db/schema";
 import { siteLayoutSchema, type SiteLayout } from "@/lib/site-layout";
 import { notificationSettingsSchema, type NotificationSettings } from "@/lib/notifications";
-import { themeSchema, type Theme } from "@/lib/theme";
+import type { Theme } from "@/lib/theme";
 import { lookupOrgnr, type BrregCompany } from "@/lib/brreg";
-import { createPage, deletePage, movePage, publishAll, setPageInMenu, updateSiteSettings } from "@/lib/pages";
+import { parseRedirectList } from "@/lib/redirects";
+import { createPage, createPost, deletePage, movePage, publishAll, setPageInMenu, updateSiteSettings, updateSiteTheme } from "@/lib/pages";
 import { PublishingError } from "@/lib/publishing";
 import { requireSiteAccess, requireUser } from "@/lib/session";
 import { createSiteFromPack, SiteError } from "@/lib/sites";
@@ -57,7 +58,8 @@ export async function createSiteAction(_prev: ActionState, formData: FormData): 
     const site = await createSiteFromPack(db, {
       name: text(formData, "name"),
       packKey: text(formData, "pack"),
-      designKey: text(formData, "design"),
+      themeKey: text(formData, "theme"),
+      paletteKey: text(formData, "palette"),
       slug: text(formData, "slug") || undefined,
       info: infoFromForm(formData),
       ownerId: user.id,
@@ -73,7 +75,7 @@ export async function updateSettingsAction(siteId: string, _prev: ActionState, f
   try {
     const { user, site } = await requireSiteAccess(siteId);
     const db = await getDb();
-    await updateSiteSettings(db, site.id, { name: text(formData, "name"), info: infoFromForm(formData), designKey: text(formData, "design") }, user.id);
+    await updateSiteSettings(db, site.id, { name: text(formData, "name"), info: infoFromForm(formData) }, user.id);
     revalidatePath(`/studio/nettsted/${site.id}`, "layout");
     return { ok: true, message: "Lagret. Endringene vises på nettstedet med en gang." };
   } catch (err) {
@@ -87,6 +89,18 @@ export async function createPageAction(siteId: string, _prev: ActionState, formD
     const { user, site } = await requireSiteAccess(siteId);
     const db = await getDb();
     const page = await createPage(db, site.id, { title: text(formData, "title"), path: text(formData, "path") }, user.id);
+    target = `/studio/nettsted/${site.id}/side/${page.id}`;
+  } catch (err) {
+    return toState(err);
+  }
+  redirect(target);
+}
+
+export async function createPostAction(siteId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
+  let target: string;
+  try {
+    const { user, site } = await requireSiteAccess(siteId);
+    const page = await createPost(await getDb(), site.id, { title: text(formData, "title") }, user.id);
     target = `/studio/nettsted/${site.id}/side/${page.id}`;
   } catch (err) {
     return toState(err);
@@ -120,9 +134,11 @@ export async function movePageAction(siteId: string, pageId: string, direction: 
 export async function publishAllAction(siteId: string): Promise<ActionState> {
   try {
     const { user, site } = await requireSiteAccess(siteId);
-    const count = await publishAll(await getDb(), site.id, user.id);
+    const { published, failed } = await publishAll(await getDb(), site.id, user.id);
     revalidatePath(`/studio/nettsted/${site.id}`, "layout");
-    return { ok: true, message: `${count} sider er publisert` };
+    const done = `${published} ${published === 1 ? "side er" : "sider er"} publisert.`;
+    if (!failed.length) return { ok: true, message: done };
+    return { ok: false, message: [done, "Disse er ikke publisert ennå:", ...failed.map((f) => `${f.title}: ${f.message}`)].join("\n") };
   } catch (err) {
     return toState(err);
   }
@@ -148,18 +164,13 @@ export async function deleteInquiryAction(siteId: string, inquiryId: string) {
 }
 
 /** Logo, toppstripe, bunntekst, fonter og hjørner. Gjelder med en gang på alle sider. */
-export async function saveAppearanceAction(
-  siteId: string,
-  input: { layout: SiteLayout; fonts: Theme["fonts"]; radius: Theme["radius"] },
-): Promise<ActionState> {
+export async function saveAppearanceAction(siteId: string, input: { layout: SiteLayout }): Promise<ActionState> {
   try {
     const { site, user } = await requireSiteAccess(siteId);
     const layout = siteLayoutSchema.safeParse(input.layout);
     if (!layout.success) return { ok: false, message: layout.error.issues[0].message };
-    const theme = themeSchema.safeParse({ ...site.theme, fonts: input.fonts, radius: input.radius });
-    if (!theme.success) return { ok: false, message: "Ugyldig font eller hjørnevalg" };
     const db = await getDb();
-    await db.update(sites).set({ layout: layout.data, theme: theme.data }).where(eq(sites.id, site.id));
+    await db.update(sites).set({ layout: layout.data }).where(eq(sites.id, site.id));
     await db.insert(auditLog).values({ siteId: site.id, userId: user.id, action: "site.appearance_updated" });
     revalidatePath(`/studio/nettsted/${site.id}`, "layout");
     return { ok: true, message: "Utseendet er lagret og vises på nettstedet med en gang." };
@@ -168,9 +179,50 @@ export async function saveAppearanceAction(
   }
 }
 
-export async function saveNotificationsAction(siteId: string, input: NotificationSettings): Promise<ActionState> {
+/** Bytter tema eller lagrer tilpasningene fra Design. Gjelder hele nettstedet med en gang, uten publisering. */
+export async function saveThemeAction(siteId: string, theme: Theme): Promise<ActionState> {
   try {
     const { site, user } = await requireSiteAccess(siteId);
+    await updateSiteTheme(await getDb(), site.id, theme, user.id);
+    revalidatePath(`/studio/nettsted/${site.id}`, "layout");
+    return { ok: true, message: "Designet er lagret og vises på nettstedet med en gang." };
+  } catch (err) {
+    return toState(err);
+  }
+}
+
+/** Gamle adresser fra en tidligere nettside, én per linje. Gjelder med en gang. */
+export async function saveRedirectsAction(siteId: string, text: string): Promise<ActionState> {
+  try {
+    const { site, user, role } = await requireSiteAccess(siteId);
+    // En omdirigering kan sende alle besøkende på en adresse et annet sted, så bare eieren kan endre dem.
+    if (role !== "owner") return { ok: false, message: "Bare eieren av nettstedet kan endre omdirigeringer." };
+    const { redirects, errors } = parseRedirectList(text);
+    if (errors.length) return { ok: false, message: errors.slice(0, 5).join("\n") };
+    const db = await getDb();
+    await db.update(sites).set({ redirects }).where(eq(sites.id, site.id));
+    await db.insert(auditLog).values({ siteId: site.id, userId: user.id, action: "site.redirects_updated", detail: { count: redirects.length } });
+    revalidatePath(`/studio/nettsted/${site.id}/innstillinger`);
+    if (!redirects.length) return { ok: true, message: "Ingen omdirigeringer lagret." };
+    // Sider som finnes, vinner over omdirigeringer (se findRedirect). Kunden må få vite at disse ikke sendes videre.
+    const paths = new Set((await db.select({ path: pages.path }).from(pages).where(eq(pages.siteId, site.id))).map((p) => p.path));
+    const shadowed = redirects.filter((r) => paths.has(r.from));
+    const saved = `Lagret ${redirects.length} ${redirects.length === 1 ? "omdirigering" : "omdirigeringer"}. De virker med en gang.`;
+    if (!shadowed.length) return { ok: true, message: saved };
+    return {
+      ok: true,
+      message: [saved, `Disse adressene er sider her nå, så de viser siden i stedet for å sende videre: ${shadowed.map((r) => r.from).join(", ")}`].join("\n"),
+    };
+  } catch (err) {
+    return toState(err);
+  }
+}
+
+export async function saveNotificationsAction(siteId: string, input: NotificationSettings): Promise<ActionState> {
+  try {
+    const { site, user, role } = await requireSiteAccess(siteId);
+    // Varslene inneholder henvendelser og ordre med personopplysninger. Mottakeren bestemmer eieren.
+    if (role !== "owner") return { ok: false, message: "Bare eieren av nettstedet kan endre hvem som får varsler." };
     const parsed = notificationSettingsSchema.safeParse(input);
     if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message };
     const db = await getDb();

@@ -1,10 +1,9 @@
-import Link from "next/link";
 import type { Metadata } from "next";
 import { asc, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { notFound, permanentRedirect } from "next/navigation";
 import { cache } from "react";
-import { PageRenderer, SiteChrome } from "@/components/sections";
+import { PageRenderer, SiteChrome, siteHref } from "@/components/sections";
 import { ProductPage, ProductsPage, OrderPage, CartPage, shopMeta, type ShopRoute } from "@/components/shop/pages";
 import { effectiveTitle, firstContentImage, shareImageSrc } from "@/lib/content/seo";
 import { getDb } from "@/db";
@@ -15,7 +14,11 @@ import { buildRenderContext } from "@/lib/render";
 import { listCatalog } from "@/lib/shop/catalog";
 import { readShopSettings } from "@/lib/shop/settings";
 import { parseBrowseQuery } from "@/lib/shop/browse";
-import { themeToCssVars } from "@/lib/theme";
+import { findRedirect } from "@/lib/redirects";
+import { generatedLegalPage } from "@/lib/legal/kundesider";
+import type { PageContent } from "@/lib/content/types";
+import { renderPlatformPage } from "@/components/platform/pages";
+import { platformMetadata, platformRoute } from "@/lib/platform-routes";
 
 type Props = { params: Promise<{ path?: string[] }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
@@ -75,14 +78,15 @@ async function currentRequest({ params }: Props) {
       ? { kind: "slug", slug: segments[1], segments: segments.slice(2) }
       : null;
   // Vertsnavnet er allerede slått opp mot kjente domener, så det er trygt å bruke i kanoniske lenker.
-  return { target, isPlatformRoot: target === null && segments.length === 0, origin: `${proto}://${host}` };
+  // På plattformens egen adresse er stien en av salgssidene (lib/platform-routes.ts).
+  return { target, platform: target === null ? platformRoute(segments) : null, origin: `${proto}://${host}` };
 }
 
 const keyOf = (t: Target) => (t.kind === "host" ? t.host : t.slug);
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
-  const { target, origin } = await currentRequest(props);
-  if (!target) return { title: "Nettgata", description: "Nettsider og nettbutikker for norske bedrifter." };
+  const { target, platform, origin } = await currentRequest(props);
+  if (!target) return platform ? platformMetadata(platform, origin) : { title: "Nettgata" };
   const loaded = await loadSite(target.kind, keyOf(target));
   if (!loaded) return {};
   if (loaded.redirectHost) await redirectToPrimary(loaded.redirectHost, props);
@@ -119,7 +123,9 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   }
 
   const page = await getPublishedPage(db, site.id, path);
-  if (!page) return {};
+  const generated = page ? null : generatedLegalPage(site, normalizePath(path));
+  if (generated) return { title: generated.seo.title, description: generated.seo.description, ...indexing };
+  if (!page) return normalizePath(path) === "/" ? { title: site.name, robots: { index: false, follow: false } } : {};
   const seo = page.content.seo ?? {};
   return {
     ...sharing(
@@ -131,22 +137,24 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   };
 }
 
+/** Vises på forsiden til den er publisert. Metadata over setter noindex, så Google ikke tar vare på den. */
+function comingSoonPage(name: string): PageContent {
+  return {
+    seo: { title: name },
+    sections: [
+      { id: "snart", type: "tekst", variant: "standard", props: { overskrift: name, brodtekst: "Nettstedet er snart klart. Kom gjerne tilbake om litt." } },
+    ],
+  };
+}
+
 export default async function PublicPage(props: Props) {
-  const { target, isPlatformRoot, origin } = await currentRequest(props);
+  const { target, platform, origin } = await currentRequest(props);
 
   if (!target) {
-    if (!isPlatformRoot) notFound();
-    return (
-      <main className="mx-auto max-w-2xl px-5 py-24">
-        <h1 className="text-4xl font-bold">Nettgata</h1>
-        <p className="mt-4 text-lg text-neutral-700">Nettsider og nettbutikker for norske bedrifter. Åpner snart.</p>
-        <p className="mt-8 text-sm">
-          <Link href="/studio" className="underline">
-            Logg inn
-          </Link>
-        </p>
-      </main>
-    );
+    const env = { tagId: process.env.GOOGLE_ADS_TAG_ID?.trim() ?? "", sendTo: process.env.GOOGLE_ADS_LEAD_SEND_TO?.trim() ?? "" };
+    const page = platform ? renderPlatformPage(platform, env) : null;
+    if (!page) notFound();
+    return page;
   }
 
   const loaded = await loadSite(target.kind, keyOf(target));
@@ -154,7 +162,7 @@ export default async function PublicPage(props: Props) {
   if (loaded.redirectHost) await redirectToPrimary(loaded.redirectHost, props);
   const { db, site, basePath } = loaded;
   const path = "/" + target.segments.join("/");
-  const style = themeToCssVars(site.theme);
+
 
   const route = site.kind === "nettbutikk" ? shopRoute(target.segments) : null;
   if (route) {
@@ -196,14 +204,33 @@ export default async function PublicPage(props: Props) {
       }
     }
     return (
-      <SiteChrome style={style} ctx={ctx}>
+      <SiteChrome theme={site.theme} ctx={ctx}>
         {body}
       </SiteChrome>
     );
   }
 
   const page = await getPublishedPage(db, site.id, path);
-  if (!page) notFound();
-  const ctx = await buildRenderContext(db, site, normalizePath(path), false, basePath);
-  return <PageRenderer content={page.content} style={style} ctx={ctx} canonicalUrl={`${origin}/`} />;
+  // Gamle adresser fra en tidligere nettside (Innstillinger, Flytting). Sider som finnes, vinner,
+  // bortsett fra gamle adresser med spørring som WordPress sine «/?page_id=12».
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(await props.searchParams)) {
+    for (const v of Array.isArray(value) ? value : value === undefined ? [] : [value]) query.append(key, v);
+  }
+  const search = query.size ? `?${query}` : "";
+  const moved = !page || search ? findRedirect(site.redirects, path, search, Boolean(page)) : null;
+  if (moved) permanentRedirect(moved.startsWith("/") ? siteHref(basePath, moved) : moved);
+  if (!page) {
+    // Personvernerklæring og angrerett lages automatisk når kunden ikke har laget en egen side der.
+    // Er ikke forsiden publisert ennå, får den som har fått adressen en «snart klar»-side, ikke «Fant ikke siden».
+    const at = normalizePath(path);
+    const generated = generatedLegalPage(site, at) ?? (at === "/" ? comingSoonPage(site.name) : null);
+    if (!generated) notFound();
+    const legalCtx = await buildRenderContext(db, site, at, false, basePath);
+    return <PageRenderer content={generated} theme={site.theme} ctx={legalCtx} />;
+  }
+  const ctx = await buildRenderContext(db, site, normalizePath(path), false, basePath, {
+    posts: page.content.sections.some((s) => s.type === "blogg"),
+  });
+  return <PageRenderer content={page.content} theme={site.theme} ctx={ctx} canonicalUrl={`${origin}/`} />;
 }

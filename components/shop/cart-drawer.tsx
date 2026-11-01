@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useModal } from "@/components/site/use-modal";
 import { getCheckoutData } from "@/app/actions/shop";
 import { formatNok } from "@/lib/shop/money";
 import { useCart, writeCart } from "./cart-store";
@@ -20,6 +21,8 @@ export function CartDrawer({ siteId, basePath }: { siteId: string; basePath: str
   const [data, setData] = useState<Data | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModal(open, dialogRef, buttonRef);
   // Temaets CSS-variabler må følge med ut av siden når skuffen flyttes til <body>.
   const [styleVars, setStyleVars] = useState<React.CSSProperties>();
   useEffect(() => {
@@ -101,6 +104,7 @@ export function CartDrawer({ siteId, basePath }: { siteId: string; basePath: str
         // Portal til <body>: toppmenyen har backdrop-filter, som ellers låser «fixed» til menyens høyde.
         createPortal(
           <div
+            ref={dialogRef}
             style={styleVars}
             className="fixed inset-0 z-50 font-[family-name:var(--f-body)] text-[var(--c-text)]"
             role="dialog"
@@ -176,7 +180,7 @@ export function CartDrawer({ siteId, basePath }: { siteId: string; basePath: str
                           >
                             +
                           </button>
-                          <button type="button" onClick={() => setQuantity(l.variantId, 0)} className="ml-auto underline">
+                          <button type="button" aria-label={`Fjern ${l.name}`} onClick={() => setQuantity(l.variantId, 0)} className="ml-auto underline">
                             Fjern
                           </button>
                         </div>

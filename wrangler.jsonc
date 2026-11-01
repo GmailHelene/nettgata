@@ -36,7 +36,7 @@
     // Uten begge lagres e-postene bare i loggen. Se docs/EPOST.md.
     "EMAIL_FROM": ""
   },
-  // Sjekker ventende kundedomener hvert tiende minutt (custom-worker.ts -> /api/cron/domener).
-  "triggers": { "crons": ["*/10 * * * *"] }
+  // Hvert tiende minutt: ventende kundedomener og betalinger. Hver natt: sikkerhetskopi (se custom-worker.ts).
+  "triggers": { "crons": ["*/10 * * * *", "30 1 * * *"] }
   // Hemmeligheter (DATABASE_URL, SESSION_SECRET) settes med scripts/oppsett-produksjon.ps1, aldri her.
 }

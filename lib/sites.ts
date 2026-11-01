@@ -2,8 +2,9 @@ import { eq } from "drizzle-orm";
 import type { Db } from "@/db";
 import { auditLog, memberships, organizations, pages, sites } from "@/db/schema";
 import { getPack } from "@/lib/packs";
-import { siteInfoSchema, type SiteInfo } from "@/lib/site-info";
+import { siteInfoInputSchema, type SiteInfo } from "@/lib/site-info";
 import { themeContrastProblems } from "@/lib/theme";
+import { buildTheme } from "@/lib/themes";
 import { publishPage } from "@/lib/publishing";
 
 export class SiteError extends Error {}
@@ -16,20 +17,27 @@ const RESERVED_SLUGS = new Set([
   ...["www", "app", "api", "studio", "admin", "status", "hjelp", "support", "kundeservice", "demo", "blogg", "docs", "info", "kontakt"],
   ...["kunder", "fallback", "cdn", "media", "static", "dev", "test", "staging"],
   ...["mail", "post", "smtp", "imap", "pop", "webmail", "autodiscover", "autoconfig", "ftp", "ns1", "ns2"],
-  ...["konto", "minside", "faktura", "betaling"],
+  ...["konto", "minside", "faktura", "betaling", "plattform", "nettgata"],
 ]);
 
-/** Lager en gyldig underdomene-slug av et firmanavn: «Rørlegger Hansen AS» blir «rorlegger-hansen». */
-export function slugify(name: string): string {
-  return name
+/** Små bokstaver, tall og bindestrek. Æ, ø og å blir ae, o og a. Brukes til adresser på sider og innlegg. */
+export function toSlug(text: string): string {
+  return text
     .toLowerCase()
     .replace(/æ/g, "ae")
     .replace(/ø/g, "o")
     .replace(/å/g, "a")
     .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/\b(as|asa|enk|da|ans|sa|nuf)\b/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/** Lager en gyldig underdomene-slug av et firmanavn: «Rørlegger Hansen AS» blir «rorlegger-hansen». */
+export function slugify(name: string): string {
+  return toSlug(name)
+    .replace(/\b(as|asa|enk|da|ans|sa|nuf)\b/g, "")
+    .replace(/-+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 40)
     .replace(/-+$/g, "");
@@ -54,7 +62,9 @@ export async function availableSlug(db: Db, wanted: string): Promise<string> {
 export type CreateSiteInput = {
   name: string;
   packKey: string;
-  designKey: string;
+  /** Temaet og fargevarianten. Uten tema brukes det første temaet bransjen anbefaler. */
+  themeKey?: string;
+  paletteKey?: string;
   info: Partial<SiteInfo>;
   /** Brukeren som blir eier. */
   ownerId: string;
@@ -68,9 +78,10 @@ export async function createSiteFromPack(db: Db, input: CreateSiteInput) {
   if (name.length < 2 || name.length > 80) throw new SiteError("Navnet må være mellom 2 og 80 tegn");
   const pack = getPack(input.packKey);
   if (!pack) throw new SiteError("Ukjent bransjepakke");
-  const design = pack.designs.find((d) => d.key === input.designKey) ?? pack.designs[0];
-  if (themeContrastProblems(design.theme).length) throw new SiteError("Designretningen holder ikke kontrastkravet");
-  const info = siteInfoSchema.safeParse(input.info);
+  const theme = buildTheme(input.themeKey || pack.themes[0], input.paletteKey);
+  if (!theme) throw new SiteError("Ukjent tema");
+  if (themeContrastProblems(theme).length) throw new SiteError("Temaet holder ikke kontrastkravet");
+  const info = siteInfoInputSchema.safeParse(input.info);
   if (!info.success) throw new SiteError(info.error.issues[0].message);
 
   const slug = await availableSlug(db, input.slug ? slugify(input.slug) : slugify(name));
@@ -84,7 +95,7 @@ export async function createSiteFromPack(db: Db, input: CreateSiteInput) {
       slug,
       kind: pack.kind ?? "nettside",
       industryPack: pack.key,
-      theme: design.theme,
+      theme,
       info: info.data,
       layout: pack.layout ?? {},
     })
@@ -106,8 +117,8 @@ export async function createSiteFromPack(db: Db, input: CreateSiteInput) {
     .returning({ id: pages.id });
 
   if (input.publish) {
-    for (const page of created) await publishPage(db, page.id, input.ownerId);
+    for (const page of created) await publishPage(db, page.id, input.ownerId, { allowPlaceholders: true });
   }
-  await db.insert(auditLog).values({ siteId: site.id, userId: input.ownerId, action: "site.created", detail: { pack: pack.key } });
+  await db.insert(auditLog).values({ siteId: site.id, userId: input.ownerId, action: "site.created", detail: { pack: pack.key, theme: theme.preset } });
   return site;
 }

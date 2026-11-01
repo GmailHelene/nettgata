@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { Theme } from "@/lib/theme";
 import type { RenderContext } from "@/components/sections";
 import type { PageContent } from "@/lib/content/types";
 
@@ -12,8 +12,9 @@ export type FrameCommand = "undo" | "redo" | "save";
 
 /** Fra redigereren til rammen. */
 export type ToFrame =
-  | { type: "nettgata:init"; ctx: RenderContext; style: CSSProperties }
-  | { type: "nettgata:update"; content: PageContent; selectedId: string | null; scale: number }
+  | { type: "nettgata:init"; ctx: RenderContext; theme: Theme }
+  /** `view`: bare visning (temagalleriet), uten omriss og valg av seksjoner. */
+  | { type: "nettgata:update"; content: PageContent; selectedId: string | null; scale: number; view?: boolean }
   | { type: "nettgata:scrollTo"; id: string; seq: number };
 
 /** Fra rammen til redigereren. */

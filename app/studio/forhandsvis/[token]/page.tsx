@@ -7,7 +7,6 @@ import { pages, sites } from "@/db/schema";
 import { validatePageContent } from "@/lib/content/registry";
 import { verifyPreviewToken } from "@/lib/preview";
 import { buildRenderContext } from "@/lib/render";
-import { themeToCssVars } from "@/lib/theme";
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
@@ -36,7 +35,7 @@ export default async function PreviewPage({ params }: { params: Promise<{ token:
       </p>
       <PageRenderer
         content={result.content}
-        style={themeToCssVars(row.site.theme)}
+        theme={row.site.theme}
         ctx={await buildRenderContext(db, row.site, row.page.path, true)}
       />
     </>

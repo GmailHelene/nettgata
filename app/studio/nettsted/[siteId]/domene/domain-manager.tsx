@@ -116,7 +116,20 @@ function Guides({ target }: { target: string }) {
   );
 }
 
-export function DomainManager({ siteId, views, canAdd, simulated }: { siteId: string; views: DomainView[]; canAdd: boolean; simulated: boolean }) {
+/** `canManage`: bare eieren kan legge til, endre og fjerne. Andre med tilgang ser status og kan sjekke på nytt. */
+export function DomainManager({
+  siteId,
+  views,
+  canAdd,
+  canManage,
+  simulated,
+}: {
+  siteId: string;
+  views: DomainView[];
+  canAdd: boolean;
+  canManage: boolean;
+  simulated: boolean;
+}) {
   const router = useRouter();
   const [input, setInput] = useState("");
   const [state, setState] = useState<ActionState>(null);
@@ -225,12 +238,12 @@ export function DomainManager({ siteId, views, canAdd, simulated }: { siteId: st
                     {h.active ? (h.primary ? "Hovedadresse" : h.kind === "apex" ? "Sender videre til hovedadressen" : "Aktiv") : (h.message ?? "Venter på første sjekk")}
                     {h.active && h.message && <span className="block text-red-800">{h.message}</span>}
                   </span>
-                  {h.active && !h.primary && h.kind !== "apex" && (
+                  {canManage && h.active && !h.primary && h.kind !== "apex" && (
                     <button type="button" disabled={pending} onClick={() => run(() => setPrimaryDomainAction(siteId, h.id))} className="underline">
                       Gjør til hovedadresse
                     </button>
                   )}
-                  {!h.active && h.kind === "apex" && (
+                  {canManage && !h.active && h.kind === "apex" && (
                     <button type="button" disabled={pending} onClick={() => run(() => dropApexAction(siteId, h.id))} className="underline">
                       Jeg bruker videresending
                     </button>
@@ -270,17 +283,19 @@ export function DomainManager({ siteId, views, canAdd, simulated }: { siteId: st
                 Sjekk nå
               </button>
               {lastCheck && <span className="text-neutral-600">Sist sjekket kl. {lastCheck}</span>}
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => {
-                  if (!confirm(`Fjerne ${view.rootLabel} fra nettstedet? Siden blir liggende på gratisadressen.`)) return;
-                  run(() => removeDomainAction(siteId, view.hosts[0].id));
-                }}
-                className="ml-auto underline"
-              >
-                Fjern domenet
-              </button>
+              {canManage && (
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => {
+                    if (!confirm(`Fjerne ${view.rootLabel} fra nettstedet? Siden blir liggende på gratisadressen.`)) return;
+                    run(() => removeDomainAction(siteId, view.hosts[0].id));
+                  }}
+                  className="ml-auto underline"
+                >
+                  Fjern domenet
+                </button>
+              )}
             </div>
           </section>
         );

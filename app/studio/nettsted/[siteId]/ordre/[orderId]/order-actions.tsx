@@ -6,30 +6,57 @@ import type { OrderStatus } from "@/lib/shop/orders";
 import type { ActionState } from "../../../../actions";
 import { setOrderStatusAction } from "../../../../shop-actions";
 
-/** Knappene følger de samme statusreglene som serveren, så bare lovlige steg vises. */
-const actions: Record<string, { to: OrderStatus; label: string; confirm?: string; primary?: boolean }[]> = {
-  pending_payment: [
-    { to: "paid", label: "Marker som betalt", primary: true },
-    { to: "cancelled", label: "Kanseller", confirm: "Kansellere ordren? Varene legges tilbake på lager." },
-  ],
-  paid: [
-    { to: "fulfilled", label: "Marker som sendt eller hentet", primary: true },
-    { to: "cancelled", label: "Kanseller", confirm: "Kansellere en betalt ordre? Husk å betale tilbake til kunden." },
-    { to: "refunded", label: "Marker som refundert", confirm: "Har du betalt tilbake hele beløpet til kunden?" },
-  ],
-  fulfilled: [{ to: "refunded", label: "Marker som refundert (retur)", confirm: "Har du fått varene tilbake og betalt tilbake til kunden?" }],
-  cancelled: [],
-  refunded: [],
-};
+/**
+ * Knappene følger de samme statusreglene som serveren, så bare lovlige steg vises.
+ * Med Vipps og Klarna flytter statusen ekte penger: sendt trekker beløpet, kansellert frigjør reservasjonen,
+ * refundert betaler tilbake. Uten dem må butikken ordne pengene selv.
+ */
+function actionsFor(status: string, online: boolean): { to: OrderStatus; label: string; confirm?: string; primary?: boolean }[] {
+  switch (status) {
+    case "pending_payment":
+      return [
+        { to: "paid", label: online ? "Sjekk betalingen" : "Marker som betalt", primary: true },
+        { to: "cancelled", label: "Kanseller", confirm: "Kansellere ordren? Varene legges tilbake på lager." },
+      ];
+    case "paid":
+      return [
+        { to: "fulfilled", label: online ? "Marker som sendt (beløpet trekkes)" : "Marker som sendt eller hentet", primary: true },
+        {
+          to: "cancelled",
+          label: "Kanseller",
+          confirm: online ? "Kansellere ordren? Reservasjonen hos kunden frigjøres automatisk." : "Kansellere en betalt ordre? Husk å betale tilbake til kunden.",
+        },
+        {
+          to: "refunded",
+          label: online ? "Refunder" : "Marker som refundert",
+          confirm: online ? "Betale tilbake hele beløpet til kunden nå?" : "Har du betalt tilbake hele beløpet til kunden?",
+        },
+      ];
+    case "fulfilled":
+      return [
+        {
+          to: "refunded",
+          label: online ? "Refunder (retur)" : "Marker som refundert (retur)",
+          confirm: online ? "Har du fått varene tilbake? Hele beløpet betales tilbake til kunden nå." : "Har du fått varene tilbake og betalt tilbake til kunden?",
+        },
+      ];
+    default:
+      return [];
+  }
+}
 
-export function OrderActions({ siteId, orderId, status }: { siteId: string; orderId: string; status: string }) {
+export function OrderActions({ siteId, orderId, status, online, owner }: { siteId: string; orderId: string; status: string; online: boolean; owner: boolean }) {
   const [state, setState] = useState<ActionState>(null);
   const [pending, startTransition] = useTransition();
-  const available = actions[status] ?? [];
-  if (available.length === 0) return null;
+  // Samme regel som setOrderStatusAction: refusjon og kansellering av betalte ordre er eierens.
+  const all = actionsFor(status, online);
+  const available = owner ? all : all.filter((a) => a.to !== "refunded" && !(a.to === "cancelled" && status !== "pending_payment"));
+  const hidden = all.length > available.length;
+  if (available.length === 0 && !hidden) return null;
 
   return (
     <div className="space-y-3">
+      {hidden && <p className="text-sm text-neutral-700">Refusjon og kansellering av betalte ordre gjøres av eieren av butikken.</p>}
       <div className="flex flex-wrap gap-3">
         {available.map((a) => (
           <button

@@ -5,7 +5,7 @@ import { useActionState, useState, useTransition } from "react";
 import { FormStatus } from "@/components/studio/form-status";
 import { inputClass } from "@/components/studio/info-fields";
 import type { ActionState } from "../../actions";
-import { createPageAction, deletePageAction, movePageAction, publishAllAction, setMenuAction } from "../../site-actions";
+import { createPageAction, createPostAction, deletePageAction, movePageAction, publishAllAction, setMenuAction } from "../../site-actions";
 
 type PageRow = { id: string; title: string; path: string; showInMenu: boolean; published: boolean };
 
@@ -13,6 +13,7 @@ export function PageList({ siteId, pages }: { siteId: string; pages: PageRow[] }
   const [status, setStatus] = useState<ActionState>(null);
   const [pending, startTransition] = useTransition();
   const [createState, createAction, creating] = useActionState(createPageAction.bind(null, siteId), null);
+  const [postState, postAction, posting] = useActionState(createPostAction.bind(null, siteId), null);
   const unpublished = pages.filter((p) => !p.published).length;
 
   return (
@@ -75,6 +76,7 @@ export function PageList({ siteId, pages }: { siteId: string; pages: PageRow[] }
                     if (!confirm(`Slette «${page.title}»? Siden og alle versjonene forsvinner.`)) return;
                     startTransition(async () => setStatus(await deletePageAction(siteId, page.id)));
                   }}
+                  aria-label={`Slett ${page.title}`}
                   className="text-sm text-red-800 underline"
                 >
                   Slett
@@ -102,6 +104,25 @@ export function PageList({ siteId, pages }: { siteId: string; pages: PageRow[] }
         </form>
         <div className="mt-3">
           <FormStatus state={createState} />
+        </div>
+      </section>
+
+      <section className="rounded-lg border bg-white p-5">
+        <h2 className="font-semibold">Nytt blogginnlegg</h2>
+        <p className="mb-3 text-sm text-neutral-600">
+          Innleggene havner under /blogg. Første gang lages også bloggsiden med oversikten, og den legges i menyen.
+        </p>
+        <form action={postAction} className="grid items-end gap-3 sm:grid-cols-[1fr_auto]">
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium">Tittel på innlegget</span>
+            <input name="title" required maxLength={120} className={inputClass} />
+          </label>
+          <button disabled={posting} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+            Lag innlegg
+          </button>
+        </form>
+        <div className="mt-3">
+          <FormStatus state={postState} />
         </div>
       </section>
     </div>

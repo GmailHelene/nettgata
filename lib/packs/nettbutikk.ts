@@ -10,50 +10,7 @@ export const nettbutikk: Pack = {
   description: "Butikk med fysiske varer, varianter, lager, frakt og henting.",
   schemaType: "OnlineStore",
   kind: "nettbutikk",
-  designs: [
-    {
-      key: "ren",
-      label: "Ren og enkel",
-      theme: {
-        primary: "#111111",
-        onPrimary: "#ffffff",
-        background: "#ffffff",
-        surface: "#f4f4f2",
-        text: "#111111",
-        muted: "#555555",
-        fonts: "moderne",
-        radius: "skarp",
-      },
-    },
-    {
-      key: "varm",
-      label: "Varm",
-      theme: {
-        primary: "#8a3b12",
-        onPrimary: "#ffffff",
-        background: "#fbf7f2",
-        surface: "#f1e8dc",
-        text: "#2b1d14",
-        muted: "#5e4a3c",
-        fonts: "klassisk",
-        radius: "myk",
-      },
-    },
-    {
-      key: "frisk",
-      label: "Frisk",
-      theme: {
-        primary: "#0f5c4a",
-        onPrimary: "#ffffff",
-        background: "#ffffff",
-        surface: "#e8f3ef",
-        text: "#10221d",
-        muted: "#4a5d57",
-        fonts: "moderne",
-        radius: "rund",
-      },
-    },
-  ],
+  themes: ["boutique", "fjord", "atelier", "nordlys"],
   layout: {
     footerText: "Skriv én setning om butikken og hva du selger.",
     footerColumns: [
@@ -182,3 +139,50 @@ export const nettbutikk: Pack = {
     },
   ],
 };
+
+type ShopVariant = Pick<Pack, "key" | "label" | "description" | "themes"> & { hero: { overskrift: string; undertekst: string } };
+
+/** Samme butikk med egen tekst i toppen, så forhåndsvisningen og utkastet passer bransjen fra start. */
+function shopPack(variant: ShopVariant): Pack {
+  const { hero, ...rest } = variant;
+  return {
+    ...nettbutikk,
+    ...rest,
+    pages: (input) =>
+      nettbutikk.pages(input).map((page) =>
+        page.path !== "/"
+          ? page
+          : {
+              ...page,
+              content: {
+                ...page.content,
+                sections: page.content.sections.map((s) => (s.id === "hero" ? { ...s, props: { ...s.props, ...hero } } : s)),
+              },
+            },
+      ),
+  };
+}
+
+export const shopVariants = [
+  shopPack({
+    key: "klaer",
+    label: "Klær og mote",
+    description: "Klær, sko og tilbehør.",
+    themes: ["boutique", "atelier", "nordlys", "galleri"],
+    hero: { overskrift: "Klær du får lyst til å bruke hver dag", undertekst: "Skriv én setning om stilen, kvaliteten eller hvor klærne kommer fra." },
+  }),
+  shopPack({
+    key: "interior",
+    label: "Interiør og gaver",
+    description: "Interiør, gaver, keramikk og brukskunst.",
+    themes: ["atelier", "boutique", "hytte", "galleri"],
+    hero: { overskrift: "Ting som gjør hjemmet litt finere", undertekst: "Skriv én setning om utvalget og hva som gjør det spesielt." },
+  }),
+  shopPack({
+    key: "lokalmat",
+    label: "Gårdsbutikk og lokalmat",
+    description: "Mat, drikke og produkter fra egen gård eller lokale produsenter.",
+    themes: ["hytte", "bistro", "boutique"],
+    hero: { overskrift: "Lokal mat, rett fra gården", undertekst: "Skriv hva du lager, hvor det kommer fra og hvordan kundene får det." },
+  }),
+];

@@ -7,9 +7,10 @@ import { mediaSrcPattern } from "@/lib/media-types";
 import type { CatalogProduct } from "@/lib/shop/catalog";
 import { formatNok } from "@/lib/shop/money";
 import { carrierLabel, trackingUrl } from "@/lib/shop/tracking";
-import { paymentInstructions, paymentLabels, type PaymentMethod, type ShopSettings } from "@/lib/shop/settings";
+import { isOnlinePayment, paymentInstructions, paymentLabels, type PaymentMethod, type ShopSettings } from "@/lib/shop/settings";
+import { parsePaymentRef } from "@/lib/payments/common";
 import { AddToCart } from "./add-to-cart";
-import { Checkout } from "./checkout";
+import { Checkout, ForgetCartAfterPayment } from "./checkout";
 import { Gallery } from "./gallery";
 import { BrowseControls } from "./browse-controls";
 import { availableFilters, browse, type BrowseQuery } from "@/lib/shop/browse";
@@ -101,7 +102,12 @@ export function ProductsPage({
           {all.length > 0 && (
             <BrowseControls action={`${basePath}/produkter`} category={activeSlug} query={query} filters={availableFilters(all)} count={items.length} />
           )}
-          {items.length === 0 ? <p className="text-[var(--c-muted)]">{all.length ? "Ingen varer passer filtrene." : "Ingen varer her ennå."}</p> : <ProductGrid products={items} basePath={basePath} />}
+          {items.length === 0 ? <p className="text-[var(--c-muted)]">{all.length ? "Ingen varer passer filtrene." : "Ingen varer her ennå."}</p> : (
+            <>
+              <h2 className="sr-only">Varer</h2>
+              <ProductGrid products={items} basePath={basePath} />
+            </>
+          )}
         </div>
       </Container>
     </section>
@@ -201,7 +207,7 @@ export function ProductPage({
               </Accordion>
               <Accordion title="Angrerett og retur">
                 <p>
-                  Du har 14 dagers angrerett fra du mottar varen.{" "}
+                  Du har 14 dagers angrerett, regnet fra dagen etter at du får varen.{" "}
                   <Link href={`${basePath}${settings.termsPath}`} className="underline">
                     Les kjøpsvilkårene
                   </Link>
@@ -244,17 +250,77 @@ export async function OrderPage({ db, siteId, orderId, token, basePath }: { db: 
   if (!order || order.accessToken !== token) return null;
   const lines = await db.select().from(orderLines).where(eq(orderLines.orderId, order.id));
 
+  const label = paymentLabels[order.paymentMethod as PaymentMethod] ?? order.paymentMethod;
+  const online = isOnlinePayment(order.paymentMethod);
+  // Vipps og Klarna i testmiljøet: ingen ekte penger. Det skal kunden (og butikken som tester) se.
+  const testMode = online && parsePaymentRef(order.paymentRef)?.environment === "test";
+  const waiting = online && order.status === "pending_payment";
+  const cancelled = order.status === "cancelled";
+  const paidOnline = online && (order.status === "paid" || order.status === "fulfilled");
+
+  let paymentText = `${label}. ${paymentInstructions[order.paymentMethod as PaymentMethod] ?? ""}`;
+  if (online) {
+    const after =
+      order.status === "paid"
+        ? order.paymentMethod === "vipps"
+          ? " Beløpet er reservert og trekkes når varene sendes eller hentes."
+          : " Klarna sender deg informasjon om betalingen når varene er sendt."
+        : order.status === "refunded"
+          ? " Pengene er betalt tilbake til deg."
+          : "";
+    paymentText = `Betalt med ${label}.${after}`;
+  }
+  if (testMode) paymentText += " Dette var en betaling i testmiljøet, og ingen ekte penger er trukket.";
+
   return (
     <section className="py-12">
       <Container className="max-w-3xl">
-        <Heading level={1}>Takk for bestillingen!</Heading>
+        {paidOnline && <ForgetCartAfterPayment siteId={siteId} orderId={order.id} />}
+        <Heading level={1}>{waiting ? "Betalingen er ikke fullført ennå" : cancelled ? "Bestillingen er kansellert" : "Takk for bestillingen!"}</Heading>
         <p className="text-lg">
           Ordrenummer <strong>{order.number}</strong> · {statusText[order.status]}
         </p>
-        <p className="mt-2 text-[var(--c-muted)]">
-          {paymentLabels[order.paymentMethod as PaymentMethod] ?? order.paymentMethod}. {paymentInstructions[order.paymentMethod as PaymentMethod] ?? ""} Ta vare på
-          denne siden, lenken viser bestillingen din.
-        </p>
+        {waiting ? (
+          <div className="mt-4 space-y-4 rounded-[var(--radius)] border-2 border-[var(--c-text)] p-5">
+            <p>
+              Vi har ikke fått bekreftet betalingen fra {label}. Har du nettopp betalt, kan det ta et lite øyeblikk.
+              {testMode && " Dette er en betaling i testmiljøet, og ingen ekte penger trekkes."}
+            </p>
+            <div className="flex flex-wrap items-center gap-4">
+              <a
+                href={`/api/betaling/retur?ordre=${order.id}&t=${order.accessToken}`}
+                className="rounded-[var(--radius)] bg-[var(--c-primary)] px-5 py-3 font-semibold text-[var(--c-on-primary)]"
+              >
+                Sjekk betalingen på nytt
+              </a>
+              <form method="post" action="/api/betaling/avbryt">
+                <input type="hidden" name="ordre" value={order.id} />
+                <input type="hidden" name="t" value={order.accessToken} />
+                <button className="font-semibold underline">Avbryt og velg en annen betalingsmåte</button>
+              </form>
+            </div>
+            <p className="text-sm text-[var(--c-muted)]">
+              Varene holdes av en stund. Blir ikke betalingen fullført, kanselleres bestillingen av seg selv, og ingen penger trekkes.
+            </p>
+          </div>
+        ) : cancelled ? (
+          <p className="mt-2">
+            {order.paidAt
+              ? online
+                ? `Du får pengene tilbake fra ${label}.`
+                : "Har du betalt, får du pengene tilbake fra butikken."
+              : online
+                ? "Betalingen ble ikke fullført, så ingen penger er trukket. Varene ligger fortsatt i handlekurven hvis du vil prøve igjen."
+                : "Ingen penger er trukket."}{" "}
+            {online && !order.paidAt && (
+              <Link href={`${basePath}/handlekurv`} className="font-semibold underline">
+                Gå til handlekurven
+              </Link>
+            )}
+          </p>
+        ) : (
+          <p className="mt-2 text-[var(--c-muted)]">{paymentText.trim()} Ta vare på denne siden, lenken viser bestillingen din.</p>
+        )}
 
         <div className="mt-8 rounded-[var(--radius)] bg-[var(--c-surface)] p-6">
           <ul className="divide-y divide-[var(--c-muted)]/30">

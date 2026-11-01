@@ -9,6 +9,8 @@ describe("lenker", () => {
   it("tillater vanlige lenker og stopper farlige", () => {
     for (const ok of ["/kontakt", "#kontakt", "https://vipps.no", "mailto:a@b.no", "tel:90000000"]) expect(isSafeHref(ok)).toBe(true);
     for (const bad of ["javascript:alert(1)", "data:text/html,x", "//evil.com", "vbscript:x"]) expect(isSafeHref(bad)).toBe(false);
+    // Stier som nettleseren gjør om til «//evil.com».
+    for (const sneaky of ["/\\evil.com", "/\t/evil.com", "/\r\n/evil.com", "/ /evil.com"]) expect(isSafeHref(sneaky), JSON.stringify(sneaky)).toBe(false);
   });
 });
 

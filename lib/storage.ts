@@ -6,6 +6,8 @@ export interface MediaStore {
   put(key: string, data: Uint8Array, contentType: string): Promise<void>;
   get(key: string): Promise<StoredObject | null>;
   delete(key: string): Promise<void>;
+  /** Nøklene som starter med prefix, sortert. Brukes til å rydde gamle sikkerhetskopier. */
+  list(prefix: string): Promise<string[]>;
 }
 
 /** Det vi bruker av R2-bindingen. Holdt minimalt for å slippe hele workers-types. */
@@ -13,6 +15,7 @@ type R2BucketLike = {
   put(key: string, value: Uint8Array, options: { httpMetadata: { contentType: string } }): Promise<unknown>;
   get(key: string): Promise<{ body: ReadableStream; size: number; httpMetadata?: { contentType?: string } } | null>;
   delete(key: string): Promise<void>;
+  list(options: { prefix: string; cursor?: string }): Promise<{ objects: { key: string }[]; truncated: boolean; cursor?: string }>;
 };
 
 export class StorageNotConfiguredError extends Error {}
@@ -29,6 +32,16 @@ function r2Store(bucket: R2BucketLike): MediaStore {
     },
     async delete(key) {
       await bucket.delete(key);
+    },
+    async list(prefix) {
+      const keys: string[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await bucket.list({ prefix, cursor });
+        keys.push(...page.objects.map((o) => o.key));
+        cursor = page.truncated ? page.cursor : undefined;
+      } while (cursor);
+      return keys.sort();
     },
   };
 }
@@ -56,6 +69,16 @@ async function localStore(): Promise<MediaStore> {
     async delete(key) {
       await fs.rm(file(key), { force: true });
       await fs.rm(`${file(key)}.type`, { force: true });
+    },
+    async list(prefix) {
+      const dir = path.dirname(file(`${prefix}x`));
+      const names = await fs.readdir(dir).catch(() => [] as string[]);
+      const base = path.relative(root, dir).split(path.sep).filter(Boolean).join("/");
+      return names
+        .filter((n) => !n.endsWith(".type"))
+        .map((n) => (base ? `${base}/${n}` : n))
+        .filter((k) => k.startsWith(prefix))
+        .sort();
     },
   };
 }

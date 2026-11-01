@@ -29,8 +29,6 @@ const codeFrom = (name: string, taken: string[]) => {
 const selectable: { method: PaymentMethod; note?: string; disabled?: boolean }[] = [
   { method: "ved-henting" },
   { method: "faktura", note: "Du sender faktura selv etter bestillingen" },
-  { method: "vipps", note: "Kommer: krever Vipps-avtale for butikken", disabled: true },
-  { method: "kort", note: "Kommer: krever kortavtale for butikken", disabled: true },
   { method: "test", note: "Vises bare under utvikling, aldri i produksjon" },
 ];
 
@@ -108,6 +106,7 @@ export function ShopSettingsForm({ siteId, initial, pages }: { siteId: string; i
 
       <fieldset>
         <legend className="mb-2 text-sm font-medium">Betalingsmåter</legend>
+        <p className="mb-2 text-xs text-neutral-600">Vipps og Klarna kobler du til under fanen Betaling, med butikkens egne avtaler.</p>
         <div className="space-y-2">
           {selectable.map(({ method, note, disabled }) => (
             <label key={method} className={`flex items-start gap-2 ${disabled ? "opacity-60" : ""}`}>

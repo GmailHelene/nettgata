@@ -34,6 +34,22 @@ export const siteInfoSchema = z.object({
 });
 export type SiteInfo = z.infer<typeof siteInfoSchema>;
 
+/**
+ * Strengere variant som brukes når kunden lagrer: telefonen må ha minst åtte siffer, så «Ring»-lenken virker.
+ * Lagret info leses med den milde varianten over. Ellers kunne et gammelt telefonformat visket ut adresse og åpningstider.
+ */
+export const siteInfoInputSchema = siteInfoSchema.extend({
+  phone: z
+    .string()
+    .trim()
+    .max(30, "Telefon er for lang")
+    .refine(
+      (v) => v === "" || (/^\+?[\d\s()-]+$/.test(v) && v.replace(/\D/g, "").length >= 8),
+      "Telefonnummeret må ha minst åtte siffer, for eksempel 32 78 00 00",
+    )
+    .default(""),
+});
+
 /** Leser lagret info og fyller inn standardverdier for felt som mangler. */
 export function readSiteInfo(raw: unknown): SiteInfo {
   const parsed = siteInfoSchema.safeParse(raw ?? {});

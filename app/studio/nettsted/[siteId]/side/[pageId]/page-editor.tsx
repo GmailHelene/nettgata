@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useEffectEvent, useMemo, useReducer, useState, useTransition, type CSSProperties } from "react";
+import { useEffect, useEffectEvent, useMemo, useReducer, useState, useTransition } from "react";
 import type { RenderContext } from "@/components/sections";
 import { SiteIdContext } from "@/components/studio/image-input";
 import { hasExampleText, newSection } from "@/lib/content/examples";
@@ -10,15 +10,16 @@ import { previewLinkAction, publishAction, restoreAction, type ActionState } fro
 import type { FrameCommand } from "@/app/studio/ramme/protocol";
 import { historyReducer, initHistory, type Doc } from "./editor-history";
 import { inputClass } from "./fields";
-import { PreviewFrame, type Device } from "./preview-frame";
+import { PreviewFrame, type Device } from "@/components/studio/preview-frame";
 import { SeoPanel } from "./seo-panel";
 import { SectionLibrary } from "./section-library";
 import { SectionList } from "./section-list";
 import { useAutosave } from "./use-autosave";
+import type { Theme } from "@/lib/theme";
 
 type Props = {
   siteId: string;
-  preview: { ctx: RenderContext; style: CSSProperties };
+  preview: { ctx: RenderContext; theme: Theme };
   pageId: string;
   path: string;
   initialTitle: string;
@@ -433,7 +434,7 @@ export function PageEditor({ siteId, preview, pageId, path, initialTitle, initia
               <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-neutral-300 bg-neutral-200/70">
                 <PreviewFrame
                   ctx={preview.ctx}
-                  style={preview.style}
+                  theme={preview.theme}
                   content={content}
                   selectedId={selectedId}
                   device={device}
@@ -447,7 +448,7 @@ export function PageEditor({ siteId, preview, pageId, path, initialTitle, initia
         </div>
 
         {library !== null && (
-          <SectionLibrary ctx={preview.ctx} style={preview.style} position={libraryPosition} onPick={insert} onClose={() => setLibrary(null)} />
+          <SectionLibrary ctx={preview.ctx} theme={preview.theme} position={libraryPosition} onPick={insert} onClose={() => setLibrary(null)} />
         )}
       </div>
     </SiteIdContext.Provider>

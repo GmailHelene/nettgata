@@ -2,13 +2,23 @@ import { and, asc, eq, isNotNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { pageVersions, pages, products } from "@/db/schema";
 import { isPlatformHost, resolveHost } from "@/lib/hosts";
+import { platformOrigin, platformPaths } from "@/lib/platform-routes";
 
 const escapeXml = (s: string) => s.replace(/[<>&'"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /** Sitemap per nettsted, bygget fra publiserte sider og aktive varer på domenet som spør. */
 export async function GET(request: Request) {
   const host = request.headers.get("host") ?? "";
-  if (isPlatformHost(host)) return new Response("Not found", { status: 404 });
+  if (isPlatformHost(host)) {
+    const proto = request.headers.get("x-forwarded-proto") ?? new URL(request.url).protocol.replace(":", "");
+    const origin = platformOrigin(`${proto}://${host}`);
+    const urls = platformPaths()
+      .map((path) => `<url><loc>${escapeXml(`${origin}${path}`)}</loc></url>`)
+      .join("");
+    return new Response(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`, {
+      headers: { "content-type": "application/xml; charset=utf-8" },
+    });
+  }
   const db = await getDb();
   const match = await resolveHost(db, host);
   if (!match) return new Response("Not found", { status: 404 });

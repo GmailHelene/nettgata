@@ -14,6 +14,8 @@ export const sectionTypes = [
   "faq",
   "kontakt",
   "cta",
+  "blogg",
+  "bestill",
 ] as const;
 
 /** Bakgrunn per seksjon. «Flate» og «Fargerik» gir rytme på siden uten nye farger. */

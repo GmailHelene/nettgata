@@ -3,7 +3,7 @@ import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { domains, pages } from "@/db/schema";
 import { displayHost, rootOf } from "@/lib/domains";
-import { getPack } from "@/lib/packs";
+import { presetOf } from "@/lib/themes";
 import { readShopSettings } from "@/lib/shop/settings";
 import { requireSiteAccess } from "@/lib/session";
 import { readSiteInfo } from "@/lib/site-info";
@@ -15,14 +15,15 @@ import { NotificationsForm } from "./notifications-form";
 import { readNotificationSettings } from "@/lib/notifications";
 import { getEmailProvider } from "@/lib/email/send";
 import { readSiteLayout } from "@/lib/site-layout";
+import { listAccess } from "@/lib/invitations";
+import { AccessForm } from "./access-form";
+import { RedirectsForm } from "./redirects-form";
 
 export default async function SettingsPage({ params }: { params: Promise<{ siteId: string }> }) {
   const { siteId } = await params;
-  const { site } = await requireSiteAccess(siteId);
-  const designs = getPack(site.industryPack)?.designs ?? [];
-  // Sammenlign bare fargene, siden fonter og hjørner kan være endret under Utseende.
-  const colors = (t: typeof site.theme) => JSON.stringify([t.primary, t.onPrimary, t.background, t.surface, t.text, t.muted]);
-  const current = designs.find((d) => colors(d.theme) === colors(site.theme))?.key;
+  const { site, user, role } = await requireSiteAccess(siteId);
+  const preset = presetOf(site.theme);
+  const access = await listAccess(await getDb(), site.id);
   const domainRows = await (await getDb()).select().from(domains).where(eq(domains.siteId, site.id));
   const primary = domainRows.find((d) => d.isPrimary && d.status === "active");
   const waiting = domainRows.find((d) => d.status === "pending" && d.kind !== "apex");
@@ -45,25 +46,53 @@ export default async function SettingsPage({ params }: { params: Promise<{ siteI
           {primary || waiting ? "Administrer domene" : "Koble til domene"}
         </Link>
       </section>
-      <SettingsForm siteId={site.id} name={site.name} info={readSiteInfo(site.info)} designs={designs} currentDesign={current} />
-      <AppearanceForm siteId={site.id} initial={readSiteLayout(site.layout)} fonts={site.theme.fonts} radius={site.theme.radius} />
-      <NotificationsForm
+      <section className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white p-5">
+        <div>
+          <h2 className="font-semibold">Design</h2>
+          <p className="text-sm text-neutral-600">
+            {preset ? `Temaet ${preset.def.label}, fargene ${preset.palette.label}` : "Eget oppsett fra før temaene kom"}
+          </p>
+        </div>
+        <Link href={`/studio/nettsted/${site.id}/design`} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+          Bytt tema eller tilpass
+        </Link>
+      </section>
+      <SettingsForm siteId={site.id} name={site.name} info={readSiteInfo(site.info)} />
+      <AppearanceForm siteId={site.id} initial={readSiteLayout(site.layout)} />
+      <AccessForm
         siteId={site.id}
-        initial={readNotificationSettings(site.notifications)}
-        contactEmail={readSiteInfo(site.info).email}
-        shop={site.kind === "nettbutikk"}
-        emailEnabled={getEmailProvider().name !== "logg"}
+        canManage={role === "owner"}
+        currentUserId={user.id}
+        members={access.members}
+        pending={access.pending.map((p) => ({ ...p, expiresAt: p.expiresAt.toISOString() }))}
       />
-      {site.kind === "nettbutikk" && (
-        <ShopSettingsForm
-          siteId={site.id}
-          initial={readShopSettings(site.shop)}
-          pages={(await (await getDb()).select().from(pages).where(eq(pages.siteId, site.id)).orderBy(asc(pages.sortOrder))).map((p) => ({
-            path: p.path,
-            title: p.title,
-            published: p.publishedVersionId !== null,
-          }))}
-        />
+      {/* Omdirigeringer, varsler og butikkoppsett styrer trafikk, personopplysninger og penger. Serveren sjekker det samme. */}
+      {role === "owner" ? (
+        <>
+          <RedirectsForm siteId={site.id} initial={site.redirects ?? []} />
+          <NotificationsForm
+            siteId={site.id}
+            initial={readNotificationSettings(site.notifications)}
+            contactEmail={readSiteInfo(site.info).email}
+            shop={site.kind === "nettbutikk"}
+            emailEnabled={getEmailProvider().name !== "logg"}
+          />
+          {site.kind === "nettbutikk" && (
+            <ShopSettingsForm
+              siteId={site.id}
+              initial={readShopSettings(site.shop)}
+              pages={(await (await getDb()).select().from(pages).where(eq(pages.siteId, site.id)).orderBy(asc(pages.sortOrder))).map((p) => ({
+                path: p.path,
+                title: p.title,
+                published: p.publishedVersionId !== null,
+              }))}
+            />
+          )}
+        </>
+      ) : (
+        <p className="mb-8 rounded-lg border bg-white p-5 text-sm text-neutral-700">
+          Omdirigeringer, varsler{site.kind === "nettbutikk" ? ", frakt og betalingsmåter" : ""} kan bare endres av eieren av nettstedet.
+        </p>
       )}
     </main>
   );

@@ -152,7 +152,18 @@ function contactLine(shop: ShopInfo): { html: string; text: string } {
 
 // ---------- Til kunden ----------
 
-export function orderConfirmationEmail(o: { shop: ShopInfo; order: OrderData; lines: LineData[]; orderUrl: string; termsUrl: string }): Rendered {
+/**
+ * Ordrebekreftelsen. `angrerett` er opplysningene og angreskjemaet fra lib/legal/angrerett.ts. Angrerettloven § 18
+ * krever dem på varig medium, og en lenke er ikke nok, så de står i selve e-posten.
+ */
+export function orderConfirmationEmail(o: {
+  shop: ShopInfo;
+  order: OrderData;
+  lines: LineData[];
+  orderUrl: string;
+  termsUrl: string;
+  angrerett?: { overskrift: string; avsnitt: string[]; angreskjemaOverskrift: string; angreskjema: string[]; tekst: string };
+}): Rendered {
   const { shop, order, lines } = o;
   const subject = `Takk for bestillingen (ordre ${order.number})`;
   const contact = contactLine(shop);
@@ -169,6 +180,16 @@ export function orderConfirmationEmail(o: { shop: ShopInfo; order: OrderData; li
     paragraph("Lenken viser bestillingen din, så det er lurt å ta vare på denne e-posten.", "font-size:14px;color:#555555;"),
     paragraph(`<a href="${safeUrl(o.termsUrl)}" style="color:#111111;">Les kjøpsvilkårene og angreretten</a>`, "font-size:14px;"),
     contact.html,
+    o.angrerett
+      ? [
+          `<h2 style="margin:28px 0 10px;font-size:18px;">${esc(o.angrerett.overskrift)}</h2>`,
+          ...o.angrerett.avsnitt.map((a) => paragraph(esc(a), "font-size:14px;")),
+          `<div style="margin:16px 0;padding:14px 16px;border:1px solid #cccccc;border-radius:6px;font-size:14px;line-height:1.6;">`,
+          `<strong>${esc(o.angrerett.angreskjemaOverskrift)}</strong><br>`,
+          o.angrerett.angreskjema.map((line) => esc(line)).join("<br>"),
+          `</div>`,
+        ].join("")
+      : "",
   ].join("");
 
   const text = [
@@ -186,6 +207,8 @@ export function orderConfirmationEmail(o: { shop: ShopInfo; order: OrderData; li
     `Se bestillingen: ${o.orderUrl}`,
     `Kjøpsvilkår og angrerett: ${o.termsUrl}`,
     contact.text,
+    o.angrerett ? "" : "",
+    o.angrerett?.tekst ?? "",
   ]
     .filter((line, i, all) => line !== "" || all[i - 1] !== "")
     .join("\n");
@@ -352,6 +375,35 @@ export function newInquiryEmail(o: {
       heading: subject,
       body,
       footer: platformFooter("Du får dette fordi varsel om nye henvendelser er slått på under Innstillinger."),
+    }),
+  };
+}
+
+/** Invitasjon til et nettsted i studioet. Lenken virker i sju dager og kan bare brukes én gang. */
+export function invitationEmail(o: { siteName: string; inviter: string; role: string; link: string }): Rendered {
+  const subject = `Du er invitert til ${o.siteName}`;
+  const body = [
+    paragraph(`${esc(o.inviter)} har gitt deg tilgang til nettstedet ${esc(o.siteName)} som ${esc(o.role.toLowerCase())}.`),
+    paragraph("Trykk på knappen for å lage passord og komme i gang. Lenken virker i sju dager."),
+    button(o.link, "Godta invitasjonen"),
+    paragraph(`Virker ikke knappen? Lim inn denne adressen i nettleseren: ${esc(o.link)}`, "font-size:14px;color:#555555;"),
+  ].join("");
+  const text = [
+    `${o.inviter} har gitt deg tilgang til nettstedet ${o.siteName} som ${o.role.toLowerCase()}.`,
+    "Åpne lenken for å lage passord og komme i gang. Den virker i sju dager.",
+    "",
+    o.link,
+  ].join("\n");
+  return {
+    subject,
+    text,
+    html: layout({
+      subject,
+      preheader: `Tilgang til ${o.siteName}`,
+      brand: o.siteName,
+      heading: subject,
+      body,
+      footer: platformFooter("Du får dette fordi noen har invitert deg. Har du ikke ventet det, kan du se bort fra e-posten."),
     }),
   };
 }

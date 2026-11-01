@@ -1,5 +1,5 @@
 // Inngangen Cloudflare kjører: OpenNext sin Worker for alle sidene, videresending fra plattformens
-// ekstra adresser, og bakgrunnsjobben (cron) som sjekker kundedomener hvert tiende minutt.
+// ekstra adresser, og bakgrunnsjobbene (cron): domener og betalinger hvert tiende minutt, sikkerhetskopi hver natt.
 // Se https://opennext.js.org/cloudflare/howtos/custom-worker
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore .open-next/worker.js lages av «opennextjs-cloudflare build»
@@ -17,6 +17,9 @@ type Env = {
 };
 type Context = { waitUntil(promise: Promise<unknown>): void };
 
+/** Samme uttrykk som i wrangler.jsonc. Klokken er UTC, så kopien tas mellom 03 og 04 norsk tid. */
+const NIGHTLY = "30 1 * * *";
+
 const worker = {
   fetch(request: Request, env: Env, ctx: Context) {
     // Ekstra adresser går rett til https://nettgata.no i ett hopp. Alt annet over http går til https.
@@ -28,16 +31,19 @@ const worker = {
     return handler.fetch(request, env, ctx);
   },
 
-  // Jobben kaller appen selv, så sjekken kjører med samme database og innstillinger som resten.
-  async scheduled(_controller: unknown, env: Env, ctx: Context) {
+  // Jobbene kaller appen selv, så de kjører med samme database og innstillinger som resten.
+  async scheduled(controller: { cron?: string }, env: Env, ctx: Context) {
     const secret = env.SESSION_SECRET?.trim();
     if (!secret) return;
     const key = await cronKey(secret);
-    ctx.waitUntil(
-      env.WORKER_SELF_REFERENCE.fetch("https://intern/api/cron/domener", { method: "POST", headers: { "x-cron-key": key } }).then(async (res) => {
-        if (!res.ok) console.error("Domenesjekken feilet", res.status, await res.text());
-      }),
-    );
+    const jobs = controller.cron === NIGHTLY ? ["sikkerhetskopi"] : ["domener", "betaling"];
+    for (const job of jobs) {
+      ctx.waitUntil(
+        env.WORKER_SELF_REFERENCE.fetch(`https://intern/api/cron/${job}`, { method: "POST", headers: { "x-cron-key": key } }).then(async (res) => {
+          if (!res.ok) console.error(`Bakgrunnsjobben ${job} feilet`, res.status, await res.text());
+        }),
+      );
+    }
   },
 };
 

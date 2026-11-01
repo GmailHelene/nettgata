@@ -6,14 +6,17 @@ import { inquiries, orders } from "@/db/schema";
 const tabs = [
   { key: "oversikt", label: "Oversikt", href: "", shopOnly: false },
   { key: "sider", label: "Sider", href: "/sider", shopOnly: false },
+  { key: "design", label: "Design", href: "/design", shopOnly: false },
   { key: "bilder", label: "Bilder", href: "/bilder", shopOnly: false },
   { key: "varer", label: "Varer", href: "/varer", shopOnly: true },
   { key: "ordre", label: "Ordre", href: "/ordre", shopOnly: true },
   { key: "kunder", label: "Kunder", href: "/kunder", shopOnly: true },
   { key: "rabatter", label: "Rabatter", href: "/rabatter", shopOnly: true },
   { key: "rapporter", label: "Rapporter", href: "/rapporter", shopOnly: true },
+  { key: "betaling", label: "Betaling", href: "/betaling", shopOnly: true },
   { key: "henvendelser", label: "Henvendelser", href: "/henvendelser", shopOnly: false },
   { key: "innstillinger", label: "Innstillinger", href: "/innstillinger", shopOnly: false },
+  { key: "abonnement", label: "Abonnement", href: "/abonnement", shopOnly: false },
 ] as const;
 
 export type SiteTab = (typeof tabs)[number]["key"];
@@ -42,7 +45,7 @@ export async function SiteNav({
       : Promise.resolve([{ toShip: 0 }]),
   ]);
   const badges: Partial<Record<SiteTab, { text: string; className: string }>> = {};
-  if (unread > 0) badges.henvendelser = { text: `${unread} nye`, className: "bg-red-700 text-white" };
+  if (unread > 0) badges.henvendelser = { text: `${unread} ${unread === 1 ? "ny" : "nye"}`, className: "bg-red-700 text-white" };
   if (toShip > 0) badges.ordre = { text: `${toShip} å sende`, className: "bg-blue-700 text-white" };
 
   return (

@@ -71,6 +71,20 @@
       "when": 1793479703264,
       "tag": "0009_tofaktor",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793493974780,
+      "tag": "0010_abonnement",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793508192633,
+      "tag": "0011_bring",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { asc, count, eq } from "drizzle-orm";
+import { and, asc, count, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { productCategories, products } from "@/db/schema";
+import { domains, productCategories, products } from "@/db/schema";
 import { requireSiteAccess } from "@/lib/session";
 import { listProductsAdmin, parseProductQuery, productStatusFilters, type ProductStatusFilter } from "@/lib/shop/admin";
 import { readShopSettings } from "@/lib/shop/settings";
@@ -21,11 +21,18 @@ export default async function ProductsPage({
   const query = parseProductQuery(await searchParams);
   const settings = readShopSettings(site.shop);
   const db = await getDb();
-  const [rows, categories, [{ total }]] = await Promise.all([
+  const [rows, categories, [{ total }], [primary]] = await Promise.all([
     listProductsAdmin(db, site.id, query, settings.lowStockAt),
     db.select().from(productCategories).where(eq(productCategories.siteId, site.id)).orderBy(asc(productCategories.sortOrder), asc(productCategories.name)),
     db.select({ total: count() }).from(products).where(eq(products.siteId, site.id)),
+    db
+      .select({ hostname: domains.hostname })
+      .from(domains)
+      .where(and(eq(domains.siteId, site.id), eq(domains.isPrimary, true), eq(domains.status, "active")))
+      .limit(1),
   ]);
+  // Feeden ligger på butikkens egen adresse, så Google og Meta ser samme domene som i lenkene til varene.
+  const feedUrl = `https://${primary?.hostname ?? `${site.slug}.${process.env.SITES_ROOT_DOMAIN ?? "localhost"}`}/produktfeed.xml`;
   const base = `/studio/nettsted/${site.id}/varer`;
   const href = (changes: Record<string, string>) => {
     const merged = { status: query.status, q: query.search, kategori: query.categoryId, lager: query.lowStock ? "lite" : "", ...changes };
@@ -41,6 +48,12 @@ export default async function ProductsPage({
     <main className="mx-auto max-w-5xl px-5 py-12">
       <SiteNav siteId={site.id} name={site.name} shop active="varer" />
 
+      <p className="mb-6 rounded-md border bg-white px-4 py-3 text-sm text-neutral-700">
+        Produktfeed til Google Merchant Center og Meta (Facebook og Instagram):{" "}
+        <a href={feedUrl} className="break-all font-medium text-neutral-900 underline" target="_blank" rel="noreferrer">
+          {feedUrl}
+        </a>
+      </p>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Varer</h2>
         <div className="flex flex-wrap gap-2">

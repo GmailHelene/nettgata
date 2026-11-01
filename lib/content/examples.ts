@@ -69,6 +69,7 @@ const examples: Record<SectionType, Record<string, unknown>> = {
     ],
   },
   produkter: { overskrift: "Utvalgte varer", utvalg: "utvalgte", knappTekst: "Se alle varene" },
+  blogg: { overskrift: "Siste fra bloggen", antall: "3" },
   galleri: { overskrift: "Bilder", bilder: Array.from({ length: 6 }, () => ({ bilde, tekst: "" })) },
   omtaler: {
     overskrift: "Hva kundene sier",
@@ -90,6 +91,12 @@ const examples: Record<SectionType, Record<string, unknown>> = {
     ],
   },
   kontakt: { overskrift: "Kontakt oss", tekst: "Send en melding her, eller ring oss om det haster." },
+  bestill: {
+    overskrift: "Bestill time",
+    tekst: ex("Skriv hva kunden kan bestille her, og om de får bekreftelse på e-post eller SMS."),
+    knappTekst: "Bestill time",
+    lenke: "",
+  },
   cta: {
     overskrift: "Lurer du på noe?",
     tekst: ex("Skriv hva kunden får hvis de tar kontakt nå, for eksempel et uforpliktende tilbud."),
@@ -135,7 +142,8 @@ export function newSection(type: SectionType, variant: string, id: string, paths
 /** Om seksjonen fortsatt har eksempeltekst som bør byttes ut før publisering. */
 export function hasExampleText(section: Section): boolean {
   const walk = (value: unknown): boolean => {
-    if (typeof value === "string") return exampleTexts.has(value.trim());
+    // Bransjepakkene ber kunden fylle inn med «Skriv ...» og «Skriv pris». «Skriv til oss» er vanlig tekst og teller ikke.
+    if (typeof value === "string") return exampleTexts.has(value.trim()) || /^Skriv (?!til\b|en melding\b)/.test(value.trim());
     if (Array.isArray(value)) return value.some(walk);
     return value !== null && typeof value === "object" && Object.values(value).some(walk);
   };

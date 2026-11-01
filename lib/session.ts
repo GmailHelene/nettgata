@@ -10,8 +10,20 @@ const COOKIE = "sesjon";
 const AUDIENCE = "studio";
 const MAX_AGE = 60 * 60 * 24 * 14;
 
+/**
+ * Kort avtrykk av passordhashen, lagt i økten. Når passordet byttes (db/reset-password.ts eller ny invitasjon),
+ * slutter alle gamle økter å virke, også en som er stjålet. Selve hashen havner aldri i informasjonskapselen.
+ */
+async function passwordStamp(passwordHash: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`nettgata-okt:${passwordHash}`));
+  return Array.from(new Uint8Array(digest).slice(0, 8), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export async function createSession(userId: string) {
-  const token = await new SignJWT({ sub: userId })
+  const db = await getDb();
+  const [user] = await db.select({ passwordHash: users.passwordHash }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) throw new Error("Fant ikke brukeren");
+  const token = await new SignJWT({ sub: userId, pw: await passwordStamp(user.passwordHash) })
     .setProtectedHeader({ alg: "HS256" })
     .setAudience(AUDIENCE)
     .setIssuedAt()
@@ -77,12 +89,13 @@ export async function getCurrentUser() {
     const { payload } = await jwtVerify(token, getSecret(), { audience: AUDIENCE, algorithms: ["HS256"] });
     if (!payload.sub) return null;
     const db = await getDb();
-    const [user] = await db
-      .select({ id: users.id, email: users.email, name: users.name, isPlatformAdmin: users.isPlatformAdmin })
+    const [row] = await db
+      .select({ id: users.id, email: users.email, name: users.name, isPlatformAdmin: users.isPlatformAdmin, passwordHash: users.passwordHash })
       .from(users)
       .where(eq(users.id, payload.sub))
       .limit(1);
-    return user ?? null;
+    if (!row || payload.pw !== (await passwordStamp(row.passwordHash))) return null;
+    return { id: row.id, email: row.email, name: row.name, isPlatformAdmin: row.isPlatformAdmin };
   } catch {
     return null;
   }

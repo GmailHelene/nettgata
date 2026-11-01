@@ -6,13 +6,18 @@ import { sectionRegistry } from "@/lib/content/registry";
 import { focusStyle, mediaSrcPattern, mediaSrcSet } from "@/lib/media-types";
 import { formatAddress, formatOrgnr, type SiteInfo } from "@/lib/site-info";
 import { ContactForm } from "./contact-form";
+import { BookingEmbed } from "./booking-embed";
+import { embeddableHost } from "@/lib/booking";
 import { CartDrawer } from "@/components/shop/cart-drawer";
 import { MobileMenu } from "@/components/site/mobile-menu";
-import type { SiteLayout } from "@/lib/site-layout";
+import { socialLabels, type SiteLayout } from "@/lib/site-layout";
 import { ProductCarousel, ProductGrid } from "@/components/shop/product-grid";
 import type { CatalogProduct } from "@/lib/shop/catalog";
+import { themeRootProps, type Theme } from "@/lib/theme";
 
 type Props = Record<string, unknown>;
+/** Luft over og under en seksjon. Temaets «luft» skalerer den (--space). */
+const pad = "py-[calc(3.5rem*var(--space,1))]";
 const str = (p: Props, key: string) => (typeof p[key] === "string" ? (p[key] as string) : "");
 const list = (p: Props, key: string) => (Array.isArray(p[key]) ? (p[key] as Props[]) : []);
 const image = (p: Props, key: string): ImageValue | null => {
@@ -45,14 +50,20 @@ function Img({
   sizes?: (typeof imageSizes)[keyof typeof imageSizes];
 }) {
   if (value.src === EXAMPLE_IMAGE_SRC) {
-    // Eksempelbilde fra seksjonsbiblioteket. Finnes bare i kladder, fordi publisering stopper det.
+    // Eksempelbilde fra seksjonsbiblioteket og bransjepakkene. Finnes bare i kladder, fordi publisering stopper det.
+    // Tegnes som et landskap i temaets farger (ng-art i globals.css), med et lite bildeikon som viser at det skal byttes.
     return (
-      <div
-        role="img"
-        aria-label="Eksempelbilde"
-        className={`${className} flex items-center justify-center bg-[color-mix(in_srgb,var(--c-muted)_22%,var(--c-surface))] text-[var(--c-muted)]`}
-      >
-        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+      <div role="img" aria-label="Eksempelbilde" className={`${className} ng-art relative`}>
+        <svg
+          className="absolute bottom-3 left-3 text-[var(--c-text)] opacity-35"
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          aria-hidden="true"
+        >
           <rect x="3" y="4" width="18" height="16" rx="2" />
           <circle cx="9" cy="10" r="2" />
           <path d="M3 17l5-5 4 4 3-3 6 6" />
@@ -100,10 +111,8 @@ export function siteHref(basePath: string, href: string): string {
 function Button({ href, basePath, children }: { href: string; basePath: string; children: ReactNode }) {
   if (!href || !isSafeHref(href)) return null;
   return (
-    <a
-      href={siteHref(basePath, href)}
-      className="inline-block rounded-[var(--radius)] bg-[var(--c-primary)] px-6 py-3 font-semibold text-[var(--c-on-primary)] outline-offset-4 hover:opacity-90 focus-visible:outline-2 focus-visible:outline-[var(--c-text)]"
-    >
+    // Utseendet styres av temaet (ng-btn og data-knapper i globals.css).
+    <a href={siteHref(basePath, href)} className="ng-btn">
       {children}
     </a>
   );
@@ -119,13 +128,8 @@ export function Container({ children, className = "" }: { children: ReactNode; c
  */
 export function Heading({ children, level = 2, first = false }: { children: ReactNode; level?: 1 | 2; first?: boolean }) {
   const Tag = level === 1 || first ? "h1" : "h2";
-  return (
-    <Tag
-      className={`font-[family-name:var(--f-heading)] font-bold tracking-tight ${level === 1 ? "text-4xl md:text-5xl" : "mb-6 text-3xl"}`}
-    >
-      {children}
-    </Tag>
-  );
+  // Font, vekt, store bokstaver og størrelse kommer fra temaet (ng-h i globals.css).
+  return <Tag className={`ng-h ${level === 1 ? "ng-h1" : "ng-h2 mb-6"}`}>{children}</Tag>;
 }
 
 function Hero({ section, isFirst, basePath }: { section: Section; isFirst: boolean; basePath: string }) {
@@ -152,7 +156,7 @@ function Hero({ section, isFirst, basePath }: { section: Section; isFirst: boole
   if (variant === "bakgrunn" && bilde) {
     // Mørk hinne over bildet sikrer lesbar hvit tekst uansett hva bildet viser.
     return (
-      <section className="relative isolate overflow-hidden py-28 text-center text-white md:py-40">
+      <section className="ng-hero-dark relative isolate overflow-hidden py-[calc(7rem*var(--space,1))] text-center text-white md:py-[calc(10rem*var(--space,1))]">
         <Img value={bilde} eager={isFirst} sizes={imageSizes.full} className="absolute inset-0 -z-20 h-full w-full object-cover" />
         <div className="absolute inset-0 -z-10 bg-black/60" />
         <Container>{text}</Container>
@@ -161,16 +165,16 @@ function Hero({ section, isFirst, basePath }: { section: Section; isFirst: boole
   }
   if (variant === "bilde" && bilde) {
     return (
-      <section className="py-16 md:py-24">
+      <section className="py-[calc(4rem*var(--space,1))] md:py-[calc(6rem*var(--space,1))]">
         <Container className="grid items-center gap-10 md:grid-cols-2">
           {text}
-          <Img value={bilde} eager={isFirst} sizes={imageSizes.half} className="aspect-[4/3] w-full rounded-[var(--radius)] object-cover" />
+          <Img value={bilde} eager={isFirst} sizes={imageSizes.half} className="ng-feature aspect-[4/3] w-full object-cover" />
         </Container>
       </section>
     );
   }
   return (
-    <section className="py-20 md:py-28">
+    <section className="py-[calc(5rem*var(--space,1))] md:py-[calc(7rem*var(--space,1))]">
       <Container className={centered ? "text-center" : ""}>{text}</Container>
     </section>
   );
@@ -181,14 +185,10 @@ function BildeTekst({ section, basePath, first }: { section: Section; basePath: 
   const bilde = image(p, "bilde");
   const imageFirst = section.variant !== "bilde-hoyre";
   return (
-    <section className="py-14">
+    <section className={pad}>
       <Container className="grid items-center gap-10 md:grid-cols-2">
         {bilde && (
-          <Img
-            value={bilde}
-            sizes={imageSizes.half}
-            className={`aspect-[4/3] w-full rounded-[var(--radius)] object-cover ${imageFirst ? "" : "md:order-2"}`}
-          />
+          <Img value={bilde} sizes={imageSizes.half} className={`ng-feature aspect-[4/3] w-full object-cover ${imageFirst ? "" : "md:order-2"}`} />
         )}
         <div>
           {str(p, "overskrift") && <Heading first={first}>{str(p, "overskrift")}</Heading>}
@@ -213,7 +213,7 @@ function Galleri({ section, first }: { section: Section; first: boolean }) {
     .filter((i): i is { bilde: ImageValue; tekst: string } => i.bilde !== null);
   const large = section.variant === "store";
   return (
-    <section className="py-14">
+    <section className={pad}>
       <Container>
         {str(p, "overskrift") && <Heading first={first}>{str(p, "overskrift")}</Heading>}
         <ul className={`grid gap-4 ${large ? "md:grid-cols-2" : "grid-cols-2 md:grid-cols-3"}`}>
@@ -238,13 +238,13 @@ function Galleri({ section, first }: { section: Section; first: boolean }) {
 function Omtaler({ section, first }: { section: Section; first: boolean }) {
   const p = section.props;
   return (
-    <section className="py-14">
+    <section className={pad}>
       <Container>
         <Heading first={first}>{str(p, "overskrift")}</Heading>
         <ul className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {list(p, "omtaler").map((o, i) => (
             <li key={i}>
-              <figure className="h-full rounded-[var(--radius)] bg-[var(--c-surface)] p-6">
+              <figure className="ng-card h-full p-6">
                 <blockquote className="leading-relaxed">«{str(o, "sitat")}»</blockquote>
                 <figcaption className="mt-4 text-sm">
                   <span className="font-semibold">{str(o, "navn")}</span>
@@ -262,7 +262,7 @@ function Omtaler({ section, first }: { section: Section; first: boolean }) {
 function Faq({ section, first }: { section: Section; first: boolean }) {
   const p = section.props;
   return (
-    <section className="py-14">
+    <section className={pad}>
       <Container>
         <div className="max-w-3xl">
           <Heading first={first}>{str(p, "overskrift")}</Heading>
@@ -290,7 +290,7 @@ function Faq({ section, first }: { section: Section; first: boolean }) {
 function Tekst({ section, first }: { section: Section; first: boolean }) {
   const p = section.props;
   return (
-    <section className="py-14">
+    <section className={pad}>
       <Container>
         <div className="max-w-3xl">
           {str(p, "overskrift") && <Heading first={first}>{str(p, "overskrift")}</Heading>}
@@ -305,7 +305,7 @@ function Tjenester({ section, first }: { section: Section; first: boolean }) {
   const p = section.props;
   const items = list(p, "tjenester");
   return (
-    <section className="py-14">
+    <section className={pad}>
       <Container>
         <Heading first={first}>{str(p, "overskrift")}</Heading>
         {section.variant === "liste" ? (
@@ -321,8 +321,8 @@ function Tjenester({ section, first }: { section: Section; first: boolean }) {
         ) : (
           <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {items.map((item, i) => (
-              <li key={i} className="rounded-[var(--radius)] bg-[var(--c-surface)] p-6">
-                <h3 className="text-lg font-semibold">{str(item, "navn")}</h3>
+              <li key={i} className="ng-card p-6">
+                <h3 className="ng-h3 text-lg">{str(item, "navn")}</h3>
                 {str(item, "beskrivelse") && <p className="mt-2 text-[var(--c-muted)]">{str(item, "beskrivelse")}</p>}
                 {str(item, "pris") && <p className="mt-4 font-semibold">{str(item, "pris")}</p>}
               </li>
@@ -349,7 +349,7 @@ function Produkter({ section, ctx, first }: { section: Section; ctx: RenderConte
           : all
   ).slice(0, section.variant === "karusell" ? 12 : 8);
   return (
-    <section className="py-14">
+    <section className={pad}>
       <Container>
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <Heading first={first}>{str(p, "overskrift")}</Heading>
@@ -376,14 +376,14 @@ function Fordeler({ section, first }: { section: Section; first: boolean }) {
   const items = list(p, "punkter");
   const cards = section.variant === "kort";
   return (
-    <section className={cards ? "py-14" : "py-8"}>
+    <section className={cards ? pad : "py-[calc(2rem*var(--space,1))]"}>
       <Container>
         {str(p, "overskrift") && <Heading first={first}>{str(p, "overskrift")}</Heading>}
         <ul className={`grid gap-6 ${items.length >= 4 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
           {items.map((item, i) => (
-            <li key={i} className={`flex gap-3 ${cards ? "rounded-[var(--radius)] bg-[var(--c-surface)] p-6" : "items-start"}`}>
+            <li key={i} className={`flex gap-3 ${cards ? "ng-card p-6" : "items-start"}`}>
               <svg
-                className="mt-0.5 shrink-0 text-[var(--c-primary)]"
+                className="mt-0.5 shrink-0 text-[var(--c-accent)]"
                 width="22"
                 height="22"
                 viewBox="0 0 24 24"
@@ -418,7 +418,7 @@ function Kategorikort({ section, basePath, first }: { section: Section; basePath
   }));
   const large = section.variant === "store";
   return (
-    <section className="py-14">
+    <section className={pad}>
       <Container>
         {str(p, "overskrift") && <Heading first={first}>{str(p, "overskrift")}</Heading>}
         <ul className={`grid gap-5 ${large ? "md:grid-cols-2" : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}`}>
@@ -439,13 +439,63 @@ function Kategorikort({ section, basePath, first }: { section: Section; basePath
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-5 text-white">
-                  <p className="font-[family-name:var(--f-heading)] text-xl font-bold">{k.tittel}</p>
+                  <p className="ng-h3 text-xl">{k.tittel}</p>
                   {k.tekst && <p className="mt-1 text-sm text-white/90">{k.tekst}</p>}
                 </div>
               </a>
             </li>
           ))}
         </ul>
+      </Container>
+    </section>
+  );
+}
+
+const postDate = new Intl.DateTimeFormat("nb-NO", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Oslo" });
+
+function Blogg({ section, ctx, first }: { section: Section; ctx: RenderContext; first: boolean }) {
+  const p = section.props;
+  const antall = str(p, "antall") || "3";
+  const posts = (ctx.posts ?? []).slice(0, antall === "alle" ? undefined : Number(antall) || 3);
+  const date = (post: PostSummary) => (
+    <time dateTime={post.date} className="text-sm text-[var(--c-muted)]">
+      {postDate.format(new Date(post.date))}
+    </time>
+  );
+  return (
+    <section className={pad}>
+      <Container>
+        {str(p, "overskrift") && <Heading first={first}>{str(p, "overskrift")}</Heading>}
+        {posts.length === 0 ? (
+          <p className="text-[var(--c-muted)]">Ingen innlegg ennå.</p>
+        ) : section.variant === "liste" ? (
+          <ul className="divide-y divide-[var(--c-muted)]/30 border-y border-[var(--c-muted)]/30">
+            {posts.map((post) => (
+              <li key={post.path} className="py-5">
+                <a href={siteHref(ctx.basePath, post.path)} className="group block">
+                  {date(post)}
+                  <h3 className="ng-h3 mt-1 text-xl group-hover:underline">{post.title}</h3>
+                  {post.excerpt && <p className="mt-2 max-w-3xl text-[var(--c-muted)]">{post.excerpt}</p>}
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {posts.map((post) => (
+              <li key={post.path}>
+                <a href={siteHref(ctx.basePath, post.path)} className="ng-card group block h-full overflow-hidden">
+                  {post.image && <Img value={{ ...post.image, decorative: true }} sizes={imageSizes.third} className="aspect-[16/10] w-full object-cover" />}
+                  <div className="p-5">
+                    {date(post)}
+                    <h3 className="ng-h3 mt-1 text-lg group-hover:underline">{post.title}</h3>
+                    {post.excerpt && <p className="mt-2 text-sm text-[var(--c-muted)]">{post.excerpt}</p>}
+                  </div>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
       </Container>
     </section>
   );
@@ -472,6 +522,7 @@ function SectionBackground({ background, children }: { background?: string; chil
             "--c-surface": "color-mix(in srgb, var(--c-on-primary-fixed) 12%, var(--c-primary-fixed))",
             "--c-primary": "var(--c-on-primary-fixed)",
             "--c-on-primary": "var(--c-primary-fixed)",
+            "--c-accent": "var(--c-on-primary-fixed)",
           } as CSSProperties
         }
       >
@@ -487,7 +538,7 @@ function Kontakt({ section, ctx, first }: { section: Section; ctx: RenderContext
   const { info } = ctx.site;
   const address = formatAddress(info);
   return (
-    <section id="kontakt" className="scroll-mt-20 py-14">
+    <section id="kontakt" className={`scroll-mt-20 ${pad}`}>
       <Container className="grid gap-10 md:grid-cols-2">
         <div>
           <Heading first={first}>{str(p, "overskrift")}</Heading>
@@ -513,7 +564,7 @@ function Kontakt({ section, ctx, first }: { section: Section; ctx: RenderContext
           </address>
           {info.openingHours.length > 0 && (
             <div className="mt-8">
-              <h3 className="mb-3 text-xl font-semibold">Åpningstider</h3>
+              {first ? <h2 className="ng-h3 mb-3 text-xl">Åpningstider</h2> : <h3 className="ng-h3 mb-3 text-xl">Åpningstider</h3>}
               <dl className="max-w-sm space-y-1">
                 {info.openingHours.map((h, i) => (
                   <div key={i} className="flex justify-between gap-4">
@@ -534,14 +585,41 @@ function Kontakt({ section, ctx, first }: { section: Section; ctx: RenderContext
 function Cta({ section, basePath, first }: { section: Section; basePath: string; first: boolean }) {
   const p = section.props;
   return (
-    <section className="py-14">
+    <section className={pad}>
       <Container>
-        <div className="rounded-[var(--radius)] bg-[var(--c-surface)] px-8 py-12 text-center">
+        <div className="ng-card px-8 py-12 text-center">
           <Heading first={first}>{str(p, "overskrift")}</Heading>
           {str(p, "tekst") && <p className="mx-auto mb-8 max-w-2xl text-[var(--c-muted)]">{str(p, "tekst")}</p>}
           <Button href={str(p, "knappLenke")} basePath={basePath}>
             {str(p, "knappTekst")}
           </Button>
+        </div>
+      </Container>
+    </section>
+  );
+}
+
+/**
+ * Timebestilling: en knapp til bookingsystemet, eller bestillingen bygd inn når den besøkende ber om det.
+ * Innbygging gjelder bare kjente systemer (lib/booking.ts). Andre lenker blir en knapp, også i varianten «Innebygd».
+ */
+function Bestill({ section, basePath, first }: { section: Section; basePath: string; first: boolean }) {
+  const p = section.props;
+  const link = str(p, "lenke");
+  const host = section.variant === "innebygd" && isSafeHref(link) ? embeddableHost(link) : null;
+  return (
+    <section className={pad}>
+      <Container>
+        <div className="ng-card px-6 py-10 text-center sm:px-8 sm:py-12">
+          <Heading first={first}>{str(p, "overskrift")}</Heading>
+          {str(p, "tekst") && <p className="mx-auto mb-8 max-w-2xl text-[var(--c-muted)]">{str(p, "tekst")}</p>}
+          {host ? (
+            <BookingEmbed url={link} host={host} label={str(p, "knappTekst")} />
+          ) : (
+            <Button href={link} basePath={basePath}>
+              {str(p, "knappTekst")}
+            </Button>
+          )}
         </div>
       </Container>
     </section>
@@ -559,7 +637,11 @@ export type RenderContext = {
   shop: boolean;
   products: CatalogProduct[];
   layout: SiteLayout;
+  /** Blogginnleggene (sidene under /blogg), nyeste først. Hentes bare når siden trenger dem. */
+  posts?: PostSummary[];
 };
+
+export type PostSummary = { path: string; title: string; excerpt: string; image: ImageValue | null; date: string };
 
 function SiteHeader({ ctx }: { ctx: RenderContext }) {
   const { layout, site } = ctx;
@@ -567,7 +649,7 @@ function SiteHeader({ ctx }: { ctx: RenderContext }) {
   return (
     <header className="sticky top-0 z-40 bg-[var(--c-bg)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--c-bg)]/85">
       {(layout.announcement.text || layout.topLinks.length > 0) && (
-        <div className="bg-[var(--c-primary)] text-sm text-[var(--c-on-primary)]">
+        <div className="ng-announce bg-[var(--c-primary)] text-sm text-[var(--c-on-primary)]">
           <Container className="flex min-h-9 items-center justify-between gap-4 py-1.5">
             <p className="flex-1 text-center md:text-left">
               {layout.announcement.href && isSafeHref(layout.announcement.href) ? (
@@ -592,12 +674,12 @@ function SiteHeader({ ctx }: { ctx: RenderContext }) {
           </Container>
         </div>
       )}
-      <div className="border-b border-[var(--c-muted)]/15">
-        <Container className="flex h-16 items-center gap-6 md:h-20">
+      <div className="ng-header-bar border-b border-[var(--c-muted)]/15">
+        <Container className="ng-header-row flex h-16 items-center gap-6 md:h-20">
           <MobileMenu items={nav} currentPath={ctx.path} siteName={site.name} />
           <Link
             href={siteHref(ctx.basePath, "/")}
-            className="mr-auto flex shrink-0 items-center font-[family-name:var(--f-heading)] text-xl font-bold md:mr-0"
+            className="ng-logo mr-auto flex shrink-0 items-center text-xl md:mr-0"
           >
             {layout.logo ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -607,7 +689,7 @@ function SiteHeader({ ctx }: { ctx: RenderContext }) {
             )}
           </Link>
           {nav.length > 1 && (
-            <nav aria-label="Hovedmeny" className="hidden flex-1 justify-center md:flex">
+            <nav aria-label="Hovedmeny" className="ng-header-nav hidden flex-1 justify-center md:flex">
               <ul className="flex flex-wrap gap-x-8">
                 {nav.map((item) => (
                   <li key={item.path}>
@@ -623,13 +705,14 @@ function SiteHeader({ ctx }: { ctx: RenderContext }) {
               </ul>
             </nav>
           )}
-          <div className="ml-auto flex items-center gap-4 md:ml-0">
+          <div className="ng-header-actions ml-auto flex items-center gap-4 md:ml-0">
             {ctx.shop ? (
               <CartDrawer siteId={site.id} basePath={ctx.basePath} />
             ) : (
               site.info.phone && (
-                <a href={`tel:${site.info.phone.replace(/\s/g, "")}`} className="hidden font-semibold sm:inline">
-                  Ring {site.info.phone}
+                // På mobil står bare «Ring», så knappen får plass ved siden av menyen. Der trenger folk den mest.
+                <a href={`tel:${site.info.phone.replace(/\s/g, "")}`} aria-label={`Ring ${site.info.phone}`} className="py-2 font-semibold">
+                  Ring<span className="hidden sm:inline"> {site.info.phone}</span>
                 </a>
               )
             )}
@@ -640,8 +723,6 @@ function SiteHeader({ ctx }: { ctx: RenderContext }) {
   );
 }
 
-const socialLabels = { facebook: "Facebook", instagram: "Instagram", tiktok: "TikTok", linkedin: "LinkedIn" } as const;
-
 function SiteFooter({ ctx }: { ctx: RenderContext }) {
   const { info, name } = ctx.site;
   const { layout } = ctx;
@@ -651,7 +732,7 @@ function SiteFooter({ ctx }: { ctx: RenderContext }) {
     <footer className="mt-16 bg-[var(--c-surface)] text-sm">
       <Container className="grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-4">
         <div className="space-y-3">
-          <p className="font-[family-name:var(--f-heading)] text-lg font-bold">{name}</p>
+          <p className="ng-logo text-lg">{name}</p>
           {layout.footerText && <p className="max-w-xs text-[var(--c-muted)]">{layout.footerText}</p>}
         </div>
         {layout.footerColumns.map((col) => (
@@ -706,7 +787,20 @@ function SiteFooter({ ctx }: { ctx: RenderContext }) {
             © {new Date().getFullYear()} {name}
             {info.orgnr && ` · Org.nr. ${formatOrgnr(info.orgnr)}`}
           </p>
-          {ctx.shop && <p>Trygg betaling · Angrerett i 14 dager</p>}
+          <ul className="flex flex-wrap gap-x-4 gap-y-1">
+            <li>
+              <a href={siteHref(ctx.basePath, "/personvern")} className="hover:text-[var(--c-text)] hover:underline">
+                Personvern
+              </a>
+            </li>
+            {ctx.shop && (
+              <li>
+                <a href={siteHref(ctx.basePath, "/angrerett")} className="hover:text-[var(--c-text)] hover:underline">
+                  Angrerett i 14 dager
+                </a>
+              </li>
+            )}
+          </ul>
         </Container>
       </div>
     </footer>
@@ -740,18 +834,29 @@ function StructuredData({ ctx, url }: { ctx: RenderContext; url?: string }) {
 
 /** Rammen rundt alle sider på nettstedet: tema, meny, bunntekst og «Hopp til innhold». */
 export function SiteChrome({
-  style,
+  theme,
   ctx,
   children,
   canonicalUrl,
+  embedded = false,
 }: {
-  style: CSSProperties;
+  theme: Theme;
   ctx: RenderContext;
   children: ReactNode;
   canonicalUrl?: string;
+  /** Miniatyr inne i en annen side: uten «Hopp til innhold», landemerker og id-er som ellers ville blitt dobbelt. */
+  embedded?: boolean;
 }) {
+  if (embedded) {
+    return (
+      <div {...themeRootProps(theme)} className="flex min-h-screen flex-col bg-[var(--c-bg)] font-[family-name:var(--f-body)] text-[var(--c-text)]">
+        <SiteHeader ctx={ctx} />
+        <div className="flex-1">{children}</div>
+      </div>
+    );
+  }
   return (
-    <div style={style} className="flex min-h-screen flex-col bg-[var(--c-bg)] font-[family-name:var(--f-body)] text-[var(--c-text)]">
+    <div {...themeRootProps(theme)} className="flex min-h-screen flex-col bg-[var(--c-bg)] font-[family-name:var(--f-body)] text-[var(--c-text)]">
       <a
         href="#innhold"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-[var(--c-bg)] focus:p-3"
@@ -770,20 +875,23 @@ export function SiteChrome({
 
 export function PageRenderer({
   content,
-  style,
+  theme,
   ctx,
   canonicalUrl,
   editor,
+  embedded,
 }: {
   content: PageContent;
-  style: CSSProperties;
+  theme: Theme;
   ctx: RenderContext;
   canonicalUrl?: string;
   /** Bare i redigereren: hver seksjon merkes, så et klikk i forhåndsvisningen kan velge den. */
   editor?: { selectedId: string | null };
+  /** Miniatyr inne i en annen side (temagalleriet og salgssidene). */
+  embedded?: boolean;
 }) {
   return (
-    <SiteChrome style={style} ctx={ctx} canonicalUrl={canonicalUrl}>
+    <SiteChrome theme={theme} ctx={ctx} canonicalUrl={canonicalUrl} embedded={embedded}>
       {content.sections.map((section, i) => {
         const rendered = <SectionBackground background={section.background}>{renderSection(section, i, ctx)}</SectionBackground>;
         return editor ? (
@@ -804,9 +912,9 @@ export function PageRenderer({
 }
 
 /** Én seksjon alene, med nettstedets farger og fonter. Brukes til bildene i seksjonsbiblioteket. */
-export function SectionPreview({ section, style, ctx }: { section: Section; style: CSSProperties; ctx: RenderContext }) {
+export function SectionPreview({ section, theme, ctx }: { section: Section; theme: Theme; ctx: RenderContext }) {
   return (
-    <div style={style} className="bg-[var(--c-bg)] font-[family-name:var(--f-body)] text-[var(--c-text)]">
+    <div {...themeRootProps(theme)} className="bg-[var(--c-bg)] font-[family-name:var(--f-body)] text-[var(--c-text)]">
       <SectionBackground background={section.background}>{renderSection(section, 1, ctx)}</SectionBackground>
     </div>
   );
@@ -838,5 +946,9 @@ function renderSection(section: Section, i: number, ctx: RenderContext) {
       return <Fordeler key={section.id} section={section} first={i === 0} />;
     case "kategorikort":
       return <Kategorikort key={section.id} section={section} first={i === 0} basePath={ctx.basePath} />;
+    case "blogg":
+      return <Blogg key={section.id} section={section} first={i === 0} ctx={ctx} />;
+    case "bestill":
+      return <Bestill key={section.id} section={section} first={i === 0} basePath={ctx.basePath} />;
   }
 }

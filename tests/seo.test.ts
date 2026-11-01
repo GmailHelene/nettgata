@@ -60,9 +60,10 @@ describe("«Fiks nå»", () => {
   it("den første overskriften blir H1, uten å endre utseendet", () => {
     const heading = (props: { level?: 1 | 2; first?: boolean }, text: string) =>
       renderToStaticMarkup(createElement(Heading, props as ComponentProps<typeof Heading>, text));
-    expect(heading({ first: true }, "Om oss")).toMatch(/^<h1 class="[^"]*text-3xl[^"]*">Om oss<\/h1>$/);
+    // Samme stil som en vanlig seksjonsoverskrift (ng-h2), bare som H1.
+    expect(heading({ first: true }, "Om oss")).toMatch(/^<h1 class="[^"]*ng-h2[^"]*">Om oss<\/h1>$/);
     expect(heading({}, "Mer")).toMatch(/^<h2 /);
-    expect(heading({ level: 1 }, "Topp")).toMatch(/^<h1 class="[^"]*text-4xl/);
+    expect(heading({ level: 1 }, "Topp")).toMatch(/^<h1 class="[^"]*ng-h1/);
   });
 
   it("sier fra om manglende og for lang beskrivelse, og for lang tittel", () => {

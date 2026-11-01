@@ -17,7 +17,7 @@ export function productSlug(text: string): string {
     .replace(/ø/g, "o")
     .replace(/å/g, "a")
     .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60)
@@ -44,7 +44,8 @@ const variantSchema = z.object({
   sku: z.string().trim().max(60).optional().default(""),
   priceOre: z.number().int().min(0, "Prisen kan ikke være negativ").max(100_000_000),
   stock: z.number().int().min(0).nullable(),
-  weightGrams: z.number().int().min(0).max(1_000_000).nullable().optional(),
+  /** Variantens egen vekt i gram. Null: samme vekt som varen. */
+  weightGrams: z.number().int("Vekten må være hele gram").min(0, "Vekten kan ikke være negativ").max(1_000_000, "Vekten kan være maks 1 000 kg").nullable().optional(),
 });
 
 export const productInputSchema = z
@@ -57,6 +58,8 @@ export const productInputSchema = z
     vatRate: z.number().refine((v) => (vatRates as readonly number[]).includes(v), "Ugyldig MVA-sats"),
     status: z.enum(["draft", "active", "archived"]),
     categoryId: z.string().uuid().nullable().default(null),
+    /** Vekt i gram for varen, til fraktpris fra Bring. Null: vekten mangler. Utelatt: vekten endres ikke. */
+    weightGrams: z.number().int("Vekten må være hele gram").min(0, "Vekten kan ikke være negativ").max(1_000_000, "Vekten kan være maks 1 000 kg").nullable().optional(),
     variants: z.array(variantSchema).min(1, "Varen må ha minst én variant").max(100),
   })
   .superRefine((p, ctx) => {
@@ -120,7 +123,11 @@ async function saveVariants(db: Db, productId: string, variants: ReturnType<type
     const current = v.id ? byId.get(v.id) : undefined;
     if (current) {
       keep.add(current.id);
-      await db.update(productVariants).set(values).where(eq(productVariants.id, current.id));
+      // Uten vekt i skjemaet beholdes vekten varianten har (for eksempel fra import).
+      await db
+        .update(productVariants)
+        .set(v.weightGrams === undefined ? { ...values, weightGrams: current.weightGrams } : values)
+        .where(eq(productVariants.id, current.id));
       if (current.priceOre !== v.priceOre) await db.insert(variantPriceHistory).values({ variantId: current.id, priceOre: v.priceOre });
     } else {
       const [created] = await db.insert(productVariants).values({ productId, ...values }).returning({ id: productVariants.id });
@@ -147,6 +154,7 @@ export async function createProduct(db: Db, siteId: string, input: ProductInput,
       images: data.images,
       options: data.options,
       vatRate: data.vatRate,
+      weightGrams: data.weightGrams ?? null,
       status: data.status,
       categoryId: data.categoryId,
     })
@@ -171,6 +179,7 @@ export async function updateProduct(db: Db, siteId: string, productId: string, i
       images: data.images,
       options: data.options,
       vatRate: data.vatRate,
+      ...(data.weightGrams !== undefined && { weightGrams: data.weightGrams }),
       status: data.status,
       categoryId: data.categoryId,
       updatedAt: new Date(),

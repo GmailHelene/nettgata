@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useModal } from "./use-modal";
 
 /** Menyskuff for mobil. Lukkes med Esc, ved klikk utenfor og når du velger en side. */
 export function MobileMenu({
@@ -17,6 +18,8 @@ export function MobileMenu({
   const [open, setOpen] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
   const openRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModal(open, dialogRef, openRef);
   const [styleVars, setStyleVars] = useState<React.CSSProperties>();
   useEffect(() => {
     if (!open || !openRef.current) return;
@@ -64,6 +67,7 @@ export function MobileMenu({
       {open &&
         createPortal(
           <div
+            ref={dialogRef}
             style={styleVars}
             className="fixed inset-0 z-50 font-[family-name:var(--f-body)] text-[var(--c-text)] md:hidden"
             role="dialog"

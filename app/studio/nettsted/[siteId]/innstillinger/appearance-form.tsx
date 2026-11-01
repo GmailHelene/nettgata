@@ -4,8 +4,7 @@ import { useState, useTransition } from "react";
 import { FormStatus } from "@/components/studio/form-status";
 import { ImageInput, SiteIdContext } from "@/components/studio/image-input";
 import { inputClass } from "@/components/studio/info-fields";
-import type { SiteLayout } from "@/lib/site-layout";
-import { fontPairs, type Theme } from "@/lib/theme";
+import { socialLabels, type SiteLayout } from "@/lib/site-layout";
 import type { ActionState } from "../../../actions";
 import { saveAppearanceAction } from "../../../site-actions";
 
@@ -38,10 +37,8 @@ function LinkList({ links, onChange, max, addLabel }: { links: Link[]; onChange:
   );
 }
 
-export function AppearanceForm({ siteId, initial, fonts, radius }: { siteId: string; initial: SiteLayout; fonts: Theme["fonts"]; radius: Theme["radius"] }) {
+export function AppearanceForm({ siteId, initial }: { siteId: string; initial: SiteLayout }) {
   const [layout, setLayout] = useState<SiteLayout>(initial);
-  const [font, setFont] = useState(fonts);
-  const [corners, setCorners] = useState(radius);
   const [state, setState] = useState<ActionState>(null);
   const [pending, startTransition] = useTransition();
   const set = <K extends keyof SiteLayout>(key: K, value: SiteLayout[K]) => setLayout({ ...layout, [key]: value });
@@ -49,33 +46,9 @@ export function AppearanceForm({ siteId, initial, fonts, radius }: { siteId: str
   return (
     <SiteIdContext.Provider value={siteId}>
       <section className="mt-8 space-y-6 rounded-lg border bg-white p-5">
-        <h2 className="font-semibold">Utseende</h2>
+        <h2 className="font-semibold">Logo, toppstripe og bunntekst</h2>
 
         <ImageInput label="Logo" optional value={layout.logo} onChange={(v) => set("logo", v)} />
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium">Fonter</span>
-            <select value={font} onChange={(e) => setFont(e.target.value as Theme["fonts"])} className={inputClass}>
-              {(Object.keys(fontPairs) as Theme["fonts"][]).map((k) => (
-                <option key={k} value={k}>
-                  {fontPairs[k].label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium">Hjørner på knapper og bilder</span>
-            <select value={corners} onChange={(e) => setCorners(e.target.value as Theme["radius"])} className={inputClass}>
-              <option value="skarp">Skarpe</option>
-              <option value="myk">Myke</option>
-              <option value="rund">Runde</option>
-            </select>
-          </label>
-        </div>
-        <p className="text-sm" style={{ fontFamily: fontPairs[font].heading }}>
-          <span className="text-2xl font-bold">Slik ser overskriftene ut</span>
-        </p>
 
         <fieldset className="space-y-3 rounded-md border border-neutral-300 p-3">
           <legend className="px-1 text-sm font-medium">Toppstripe</legend>
@@ -129,9 +102,9 @@ export function AppearanceForm({ siteId, initial, fonts, radius }: { siteId: str
 
         <fieldset className="grid gap-3 rounded-md border border-neutral-300 p-3 sm:grid-cols-2">
           <legend className="px-1 text-sm font-medium">Sosiale medier</legend>
-          {(["facebook", "instagram", "tiktok", "linkedin"] as const).map((k) => (
+          {(Object.keys(socialLabels) as (keyof typeof socialLabels)[]).map((k) => (
             <label key={k} className="block">
-              <span className="mb-1 block text-xs capitalize">{k}</span>
+              <span className="mb-1 block text-xs">{socialLabels[k]}</span>
               <input
                 value={layout.social[k]}
                 placeholder="https://"
@@ -145,7 +118,7 @@ export function AppearanceForm({ siteId, initial, fonts, radius }: { siteId: str
         <FormStatus state={state} />
         <button
           disabled={pending}
-          onClick={() => startTransition(async () => setState(await saveAppearanceAction(siteId, { layout, fonts: font, radius: corners })))}
+          onClick={() => startTransition(async () => setState(await saveAppearanceAction(siteId, { layout })))}
           className="rounded-md bg-neutral-900 px-5 py-3 font-semibold text-white disabled:opacity-60"
         >
           {pending ? "Lagrer..." : "Lagre utseende"}

@@ -142,6 +142,29 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
       { key: "knappTekst", label: "Knappetekst til alle varer", type: "text", max: 40, optional: true },
     ],
   },
+  blogg: {
+    label: "Blogginnlegg",
+    description: "De siste innleggene fra bloggen, med bilde, dato og en kort smakebit.",
+    hint: "Innleggene er sidene under /blogg. Lag et nytt innlegg fra Sider.",
+    variants: [
+      { key: "kort", label: "Kort med bilde" },
+      { key: "liste", label: "Liste" },
+    ],
+    fields: [
+      { key: "overskrift", label: "Overskrift", type: "text", optional: true },
+      {
+        key: "antall",
+        label: "Hvor mange",
+        type: "select",
+        options: [
+          { value: "3", label: "De 3 siste" },
+          { value: "6", label: "De 6 siste" },
+          { value: "12", label: "De 12 siste" },
+          { value: "alle", label: "Alle" },
+        ],
+      },
+    ],
+  },
   fordeler: {
     label: "Trygghetspunkter",
     description: "Korte punkter som gjør kunden trygg, som levering, betaling og garanti.",
@@ -223,6 +246,21 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
     fields: [
       { key: "overskrift", label: "Overskrift", type: "text" },
       { key: "tekst", label: "Tekst over skjemaet", type: "textarea", max: 600, optional: true },
+    ],
+  },
+  bestill: {
+    label: "Timebestilling",
+    description: "Knapp til bookingsystemet ditt, eller bestillingen bygd rett inn på siden.",
+    hint: "Lim inn lenken til bestillingssiden din. Innebygd bestilling virker med Timma, Fresha, Resos, DinnerBooking, Calendly, Spond, TicketCo og Hoopla, og lastes først når den besøkende trykker. Andre lenker vises som knapp.",
+    variants: [
+      { key: "knapp", label: "Knapp til bestillingen" },
+      { key: "innebygd", label: "Innebygd bestilling" },
+    ],
+    fields: [
+      { key: "overskrift", label: "Overskrift", type: "text" },
+      { key: "tekst", label: "Tekst", type: "textarea", max: 400, optional: true },
+      { key: "knappTekst", label: "Knappetekst", type: "text", max: 40 },
+      { key: "lenke", label: "Lenke til bestillingssiden", type: "link" },
     ],
   },
   cta: {

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { PageRenderer, type RenderContext } from "@/components/sections";
 import type { PageContent } from "@/lib/content/types";
+import type { Theme } from "@/lib/theme";
 import { readMessage, type FrameCommand, type FromFrame, type ToFrame } from "./protocol";
 
 /**
@@ -32,8 +33,8 @@ const editorCss = `
 }
 `;
 
-type Setup = { ctx: RenderContext; style: CSSProperties };
-type View = { content: PageContent; selectedId: string | null; scale: number };
+type Setup = { ctx: RenderContext; theme: Theme };
+type View = { content: PageContent; selectedId: string | null; scale: number; view?: boolean };
 
 export function FrameView() {
   const [setup, setSetup] = useState<Setup | null>(null);
@@ -48,8 +49,9 @@ export function FrameView() {
 
     const onMessage = (event: MessageEvent) => {
       const message = readMessage<ToFrame>(event, window.parent);
-      if (message?.type === "nettgata:init") setSetup({ ctx: message.ctx, style: message.style });
-      else if (message?.type === "nettgata:update") setView({ content: message.content, selectedId: message.selectedId, scale: message.scale });
+      if (message?.type === "nettgata:init") setSetup({ ctx: message.ctx, theme: message.theme });
+      else if (message?.type === "nettgata:update")
+        setView({ content: message.content, selectedId: message.selectedId, scale: message.scale, view: message.view });
       else if (message?.type === "nettgata:scrollTo") setScrollTarget({ id: message.id, seq: message.seq });
     };
     // Siden skal vises, ikke brukes. Et klikk velger seksjonen i stedet for å følge lenker eller trykke på knapper.
@@ -102,8 +104,8 @@ export function FrameView() {
   if (!setup || !view) return null;
   return (
     <div style={{ "--ed-scale": view.scale } as CSSProperties}>
-      <style>{editorCss}</style>
-      <PageRenderer content={view.content} style={setup.style} ctx={setup.ctx} editor={{ selectedId: view.selectedId }} />
+      {!view.view && <style>{editorCss}</style>}
+      <PageRenderer content={view.content} theme={setup.theme} ctx={setup.ctx} editor={view.view ? undefined : { selectedId: view.selectedId }} />
     </div>
   );
 }

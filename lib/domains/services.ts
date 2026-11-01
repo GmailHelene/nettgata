@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { Db } from "@/db";
 import { domains } from "@/db/schema";
 import { normalizeHost } from "@/lib/hosts";
+import type { CertificateAuthority } from "./caa";
 
 /** Status for et kundedomene hos Cloudflare for SaaS (custom hostname). */
 export type HostnameState = {
@@ -11,19 +12,22 @@ export type HostnameState = {
   /** active når sertifikatet er utstedt og ute på nettet. */
   sslStatus: string;
   errors: string[];
+  /** Utstederen Cloudflare bruker for sertifikatet, når den er kjent. */
+  ca?: string;
 };
 
 export interface DomainProvider {
   readonly name: "cloudflare" | "simulert";
-  create(hostname: string): Promise<HostnameState>;
+  /** `ca`: utstederen kundens CAA-poster tillater (lib/domains/caa.ts). */
+  create(hostname: string, ca?: CertificateAuthority): Promise<HostnameState>;
   /** null når oppføringen ikke finnes lenger. */
   get(id: string): Promise<HostnameState | null>;
-  /** Starter valideringen på nytt, for eksempel etter status «moved». */
-  refresh(id: string): Promise<HostnameState>;
+  /** Starter valideringen på nytt, for eksempel etter status «moved» eller med en annen utsteder. */
+  refresh(id: string, ca?: CertificateAuthority): Promise<HostnameState>;
   remove(id: string): Promise<void>;
 }
 
-export const DNS_TYPE = { A: 1, NS: 2, CNAME: 5, AAAA: 28 } as const;
+export const DNS_TYPE = { A: 1, NS: 2, CNAME: 5, AAAA: 28, CAA: 257 } as const;
 export type DnsAnswer = { type: number; data: string };
 
 export interface DnsResolver {
@@ -46,7 +50,7 @@ type CfHostname = {
   id: string;
   status?: string;
   verification_errors?: string[];
-  ssl?: { status?: string; validation_errors?: { message: string }[] };
+  ssl?: { status?: string; certificate_authority?: string; validation_errors?: { message: string }[] };
 };
 
 function toState(r: CfHostname): HostnameState {
@@ -55,6 +59,7 @@ function toState(r: CfHostname): HostnameState {
     status: r.status ?? "pending",
     sslStatus: r.ssl?.status ?? "",
     errors: [...(r.verification_errors ?? []), ...(r.ssl?.validation_errors ?? []).map((e) => e.message)],
+    ca: r.ssl?.certificate_authority,
   };
 }
 
@@ -73,13 +78,14 @@ export function cloudflareProvider(apiToken: string, zoneId: string): DomainProv
     return { status: res.status, result: body.result ?? null };
   }
   // HTTP-validering: Cloudflare leverer sertifikatbeviset selv når kunden peker til oss, og fornyer automatisk.
-  const ssl = { method: "http", type: "dv", settings: { min_tls_version: "1.2" } };
+  // Utstederen velges ut fra kundens CAA-poster, ellers står sertifikatet fast hvis CAA bare tillater én.
+  const ssl = (ca?: CertificateAuthority) => ({ method: "http", type: "dv", settings: { min_tls_version: "1.2" }, ...(ca && { certificate_authority: ca }) });
 
   return {
     name: "cloudflare",
-    async create(hostname) {
+    async create(hostname, ca) {
       try {
-        const { result } = await call<CfHostname>("", { method: "POST", body: JSON.stringify({ hostname, ssl }) });
+        const { result } = await call<CfHostname>("", { method: "POST", body: JSON.stringify({ hostname, ssl: ssl(ca) }) });
         return toState(result!);
       } catch (err) {
         // Finnes oppføringen fra før (for eksempel etter et avbrutt forsøk), gjenbrukes den.
@@ -93,8 +99,8 @@ export function cloudflareProvider(apiToken: string, zoneId: string): DomainProv
       const { result } = await call<CfHostname>(`/${encodeURIComponent(id)}`);
       return result ? toState(result) : null;
     },
-    async refresh(id) {
-      const { result } = await call<CfHostname>(`/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ ssl }) });
+    async refresh(id, ca) {
+      const { result } = await call<CfHostname>(`/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ ssl: ssl(ca) }) });
       return toState(result!);
     },
     async remove(id) {

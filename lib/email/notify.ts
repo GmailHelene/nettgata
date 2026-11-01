@@ -5,6 +5,7 @@ import { notifyAddress, readNotificationSettings } from "@/lib/notifications";
 import { readShopSettings } from "@/lib/shop/settings";
 import { trackingUrl } from "@/lib/shop/tracking";
 import { readSiteInfo } from "@/lib/site-info";
+import { ordrebekreftelseTekster } from "@/lib/legal/angrerett";
 import { platformUrl, publicSiteUrl } from "@/lib/site-url";
 import { deliver, type EmailProvider } from "./send";
 import { newInquiryEmail, newOrderEmail, orderConfirmationEmail, orderShippedEmail, type OrderData, type ShopInfo } from "./templates";
@@ -59,6 +60,7 @@ export async function notifyOrderPlaced(db: Db, provider: EmailProvider, orderId
     lines: lineData,
     orderUrl: `${base}/ordre/${order.id}?t=${order.accessToken}`,
     termsUrl: `${base}${readShopSettings(site.shop).termsPath}`,
+    angrerett: ordrebekreftelseTekster({ butikk: { navn: site.name, info: readSiteInfo(site.info) } }),
   });
   await deliver(
     db,

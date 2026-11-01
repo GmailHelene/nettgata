@@ -32,6 +32,9 @@ function memoryStore(): MediaStore & { objects: Map<string, StoredObject> } {
     async delete(key) {
       objects.delete(key);
     },
+    async list(prefix) {
+      return [...objects.keys()].filter((k) => k.startsWith(prefix)).sort();
+    },
   };
 }
 

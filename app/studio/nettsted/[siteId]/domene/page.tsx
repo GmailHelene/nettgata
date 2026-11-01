@@ -5,18 +5,21 @@ import { domains } from "@/db/schema";
 import { domainViews, MAX_ROOTS_PER_SITE } from "@/lib/domains";
 import { getDomainServices, missingDomainConfig } from "@/lib/domains/services";
 import { requireSiteAccess } from "@/lib/session";
+import { canConnectDomain, DOMAIN_NEEDS_SUBSCRIPTION } from "@/lib/billing/state";
 import { SiteNav } from "../site-nav";
 import { DomainManager } from "./domain-manager";
 
 export default async function DomainPage({ params }: { params: Promise<{ siteId: string }> }) {
   const { siteId } = await params;
-  const { site, user } = await requireSiteAccess(siteId);
+  const { site, user, role } = await requireSiteAccess(siteId);
+  const owner = role === "owner";
   const db = await getDb();
   const services = getDomainServices(db);
   const rows = await db.select().from(domains).where(eq(domains.siteId, site.id));
   const views = services ? domainViews(rows, services.target) : [];
   const root = process.env.SITES_ROOT_DOMAIN?.trim();
   const freeAddress = root ? `${site.slug}.${root}` : `/vis/${site.slug}`;
+  const allowed = canConnectDomain(site.billing, user.isPlatformAdmin);
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-12">
@@ -30,11 +33,21 @@ export default async function DomainPage({ params }: { params: Promise<{ siteId:
         <span className="font-mono">{freeAddress}</span>.
       </p>
 
+      {!owner && <p className="mb-6 rounded-lg border bg-white p-4 text-sm">Du ser statusen her. Bare eieren av nettstedet kan koble til, endre eller fjerne domener.</p>}
+      {owner && !allowed && (
+        <p className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm">
+          {DOMAIN_NEEDS_SUBSCRIPTION}{" "}
+          <Link href={`/studio/nettsted/${site.id}/abonnement`} className="font-semibold underline">
+            Gå til Abonnement
+          </Link>
+        </p>
+      )}
       {services ? (
         <DomainManager
           siteId={site.id}
           views={views}
-          canAdd={views.length < MAX_ROOTS_PER_SITE}
+          canAdd={owner && allowed && views.length < MAX_ROOTS_PER_SITE}
+          canManage={owner}
           simulated={services.simulated}
         />
       ) : (
