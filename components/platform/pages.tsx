@@ -316,7 +316,7 @@ function StreetHero() {
           Nettsiden til frisøren, rørleggeren og kafeen på hjørnet
         </h1>
         <p className={`mt-7 max-w-xl text-lg leading-relaxed ${muted}`}>
-          Velg bransje, så får du sidene, tekstene og prislisten ferdig. Du fyller inn det som er ditt, eller lar meg gjøre det for deg. Domenet står
+          Velg bransje, så får du sidene, tekstene og prislisten ferdig. Du fyller inn det som er ditt, eller får alt satt opp for deg. Domenet står
           alltid i ditt navn.
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4">
@@ -575,13 +575,13 @@ function Faq({ items }: { items: [string, string][] }) {
 }
 
 const faq: [string, string][] = [
-  ["Hvem eier nettsiden og domenet?", "Du. Domenet registreres i ditt navn, og tekstene og bildene dine er dine. Sier du opp, hjelper jeg deg å få dem med deg videre."],
-  ["Kan jeg bruke domenet jeg har fra før?", "Ja. Du endrer to innstillinger hos den som har domenet ditt i dag, og jeg hjelper deg gjerne. Resten, også den sikre tilkoblingen (https), ordnes automatisk."],
+  ["Hvem eier nettsiden og domenet?", "Du. Domenet registreres i ditt navn, og tekstene og bildene dine er dine. Sier du opp, får du med deg alt videre."],
+  ["Kan jeg bruke domenet jeg har fra før?", "Ja. Du endrer to innstillinger hos den som har domenet ditt i dag, og du får hjelp om du trenger det. Resten, også den sikre tilkoblingen (https), ordnes automatisk."],
   ["Hva koster domenet?", "Domenet kjøper du selv hos en forhandler, for eksempel Domeneshop, slik at det står i ditt navn. En .no-adresse koster vanligvis noen hundrelapper i året, og Nettgata tar ingenting for koblingen."],
-  ["Kan jeg flytte fra Wix, Squarespace eller WordPress?", "Ja. Jeg flytter tekstene og bildene sammen med deg, og de gamle adressene sendes videre til de nye, så du ikke mister plasseringen i Google."],
+  ["Kan jeg flytte fra Wix, Squarespace eller WordPress?", "Ja. Tekstene og bildene flyttes over sammen med deg, og de gamle adressene sendes videre til de nye, så du ikke mister plasseringen i Google."],
   ["Må jeg kunne kode?", "Nei. Du endrer tekst, bilder, farger og sider i Nettgata-studioet, rett i nettleseren, og ser endringene før du publiserer."],
   ["Er det bindingstid?", "Nei, månedsprisen kan sies opp når som helst. Betaler du for et år, gjelder prisen hele året."],
-  ["Hvordan tar jeg betalt i nettbutikken?", "Du inngår avtale direkte med Vipps og Klarna og kobler dem til nettbutikken, og jeg hjelper deg gjerne. Pengene går rett til deg, og Nettgata tar ingen del av salget. Vipps og Klarna tar sine egne gebyrer."],
+  ["Hvordan tar jeg betalt i nettbutikken?", "Du inngår avtale direkte med Vipps og Klarna og kobler dem til nettbutikken, og du får hjelp til oppsettet om du trenger det. Pengene går rett til deg, og Nettgata tar ingen del av salget. Vipps og Klarna tar sine egne gebyrer."],
 ];
 
 function LeadSection({ env, need, bransje, title, intro }: { env: PlatformEnv; need?: Need; bransje?: string; title?: string; intro?: string }) {
@@ -720,7 +720,7 @@ function BransjerIndex({ env }: { env: PlatformEnv }) {
         <Eyebrow>Bransjer</Eyebrow>
         <h1 className={`${heading} max-w-3xl text-4xl leading-[1.04] text-balance sm:text-5xl`}>Ferdige nettsider for din bransje</h1>
         <p className={`mt-5 max-w-2xl text-lg leading-relaxed ${muted}`}>
-          Hver bransjepakke har sidene, tekstene og prislisten bransjen trenger. Finner du ikke din, send meg en melding, så finner vi den som passer best.
+          Hver bransjepakke har sidene, tekstene og prislisten bransjen trenger. Finner du ikke din, send en melding, så får du hjelp til å finne den som passer best.
         </p>
       </section>
       <section className={`${container} py-10`}>
