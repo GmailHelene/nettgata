@@ -206,7 +206,7 @@ Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske 
 | Kreditnota | A | MVP |
 | Rabattkoder: prosent, beløp eller fri frakt, minstebeløp, periode og bruksgrense | N | Ferdig (automatiske kampanjer: MVP) |
 | Salgs- og MVA-rapport per måned, termin, år eller egen periode, med MVA per sats og CSV | A | Ferdig |
-| Fiken-eksport og ordreeksport som stemmer mot Vipps-oppgjør | A | MVP |
+| Fiken-eksport (betalte ordre sendes til butikkens egen Fiken som salg, én linje per MVA-sats) og ordreeksport som stemmer mot Vipps-oppgjør | A | Fiken: Bygget, men bare åpent for plattformadmin (`fikenAvailableTo`). Ikke prøvd mot ekte Fiken, og den personlige API-nøkkelen må byttes til OAuth2 før butikkene får den, se docs/FIKEN.md. Vipps-oppgjør: MVP |
 | Produktfeed til Google og Meta | S | Bygget (/produktfeed.xml på butikkens domene) |
 | Sortering (pris, nyeste) og filtre på valg og lager | N | Ferdig |
 | Søk i varer for kunden | N | MVP |

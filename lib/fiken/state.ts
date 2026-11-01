@@ -68,6 +68,17 @@ export const storedFikenSchema = z.object({
 });
 export type StoredFiken = z.infer<typeof storedFikenSchema>;
 
+/**
+ * Fiken tillater ikke personlige API-nøkler i tredjepartsløsninger, og krever OAuth2 når en løsning kobler til på
+ * vegne av kundene sine (api.fiken.no/api/v2/docs, lest 1. november 2026). Til OAuth2 er bygget, er koblingen bare
+ * for plattformadmin, som tester med sitt eget selskap. Både studiosiden og handlingene sjekker dette.
+ */
+export function fikenAvailableTo(user: { isPlatformAdmin: boolean }): boolean {
+  return user.isPlatformAdmin;
+}
+
+export const fikenClosedMessage = "Fiken-koblingen er ikke åpnet for butikkene ennå.";
+
 export function readStoredFiken(shop: unknown): StoredFiken | null {
   if (!shop || typeof shop !== "object") return null;
   const parsed = storedFikenSchema.safeParse((shop as { fiken?: unknown }).fiken);

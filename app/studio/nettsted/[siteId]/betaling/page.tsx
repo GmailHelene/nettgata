@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
 import { fikenOverview, fikenPeriods } from "@/lib/fiken/send";
-import { fikenView } from "@/lib/fiken/state";
+import { fikenAvailableTo, fikenView } from "@/lib/fiken/state";
 import { paymentSetupView } from "@/lib/payments/config";
 import { requireSiteAccess } from "@/lib/session";
 import { SiteNav } from "../site-nav";
@@ -15,12 +15,13 @@ import { ProviderForm } from "./provider-form";
  */
 export default async function PaymentPage({ params }: { params: Promise<{ siteId: string }> }) {
   const { siteId } = await params;
-  const { site, role } = await requireSiteAccess(siteId);
+  const { site, role, user } = await requireSiteAccess(siteId);
   if (site.kind !== "nettbutikk") notFound();
   const view = paymentSetupView(site.shop);
   const canEdit = role === "owner";
+  const showFiken = fikenAvailableTo(user);
   // Fiken-oppsettet uten nøkkelen. Bare det studioet trenger, sendes videre til nettleseren.
-  const fiken = fikenView(site.shop);
+  const fiken = showFiken ? fikenView(site.shop) : null;
   const fikenStatus = fiken ? await fikenOverview(await getDb(), site.id) : null;
 
   return (
@@ -59,9 +60,11 @@ export default async function PaymentPage({ params }: { params: Promise<{ siteId
         </p>
       </section>
 
-      <div className="mt-8">
-        <FikenSection siteId={site.id} view={fiken} canEdit={canEdit} periods={fikenPeriods()} overview={fikenStatus} />
-      </div>
+      {showFiken && (
+        <div className="mt-8">
+          <FikenSection siteId={site.id} view={fiken} canEdit={canEdit} periods={fikenPeriods()} overview={fikenStatus} />
+        </div>
+      )}
     </main>
   );
 }

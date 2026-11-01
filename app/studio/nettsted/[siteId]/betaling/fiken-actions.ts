@@ -5,7 +5,7 @@ import { unstable_rethrow } from "next/navigation";
 import { getDb } from "@/db";
 import { connectFiken, removeFiken, saveFikenSettings, testFikenConnection } from "@/lib/fiken/config";
 import { describeSendResult, fikenPeriodKeys, sendOrdersToFiken, type FikenPeriodKey } from "@/lib/fiken/send";
-import type { FikenCompanyOption } from "@/lib/fiken/state";
+import { fikenAvailableTo, fikenClosedMessage, type FikenCompanyOption } from "@/lib/fiken/state";
 import { hit } from "@/lib/rate-limit";
 import { requireSiteAccess } from "@/lib/session";
 import { ShopError } from "@/lib/shop/catalog";
@@ -19,6 +19,7 @@ async function fikenOwnerAccess(siteId: string, kind: "oppsett" | "sending") {
   const { site, user, role } = await requireSiteAccess(siteId);
   if (site.kind !== "nettbutikk") throw new ShopError("Fiken-koblingen gjelder bare nettbutikker");
   if (role !== "owner") throw new ShopError("Bare eieren av butikken kan koble til Fiken og sende ordre dit.");
+  if (!fikenAvailableTo(user)) throw new ShopError(fikenClosedMessage);
   const db = await getDb();
   const rule = kind === "sending" ? { limit: 30, windowSeconds: 3600 } : { limit: 20, windowSeconds: 3600 };
   if (!(await hit(db, `fiken-${kind}:${site.id}`, rule))) throw new ShopError("Mange forsøk på kort tid. Vent litt og prøv igjen.");
