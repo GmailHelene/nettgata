@@ -6,6 +6,8 @@ import { headers } from "next/headers";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { z } from "zod";
 import { getDb } from "@/db";
+import { auditLog } from "@/db/schema";
+import { TEKSTVERSJON } from "@/lib/legal/felles";
 import type { ActionState } from "@/app/studio/actions";
 import { addAiAddon, removeAiAddon } from "@/lib/billing/addon";
 import { BillingError, createPortalSession, NOT_READY, startCheckout } from "@/lib/billing/checkout";
@@ -51,6 +53,9 @@ export async function startCheckoutAction(siteId: string, _prev: ActionState, fo
     setup: formData.get("setup") === "on",
   });
   if (!choice.success) return { ok: false, message: "Velg månedlig eller årlig betaling." };
+  if (formData.get("terms") !== "on") {
+    return { ok: false, message: "Du må godta vilkårene og databehandleravtalen før du kan gå til betaling." };
+  }
 
   let url: string;
   try {
@@ -58,6 +63,8 @@ export async function startCheckoutAction(siteId: string, _prev: ActionState, fo
     if (!(await hit(db, `checkout:${site.id}`, { limit: 10, windowSeconds: 3600 }))) {
       return { ok: false, message: "Mange forsøk på kort tid. Vent litt og prøv igjen." };
     }
+    // Dokumentasjon på at kunden har godtatt vilkårene og databehandleravtalen, og hvilken versjon.
+    await db.insert(auditLog).values({ siteId: site.id, userId: user.id, action: "billing.terms_accepted", detail: { version: TEKSTVERSJON } });
     url = await startCheckout(db, stripe, { site, user, choice: choice.data, baseUrl: await baseUrl() });
   } catch (err) {
     return toState(err, user.isPlatformAdmin);

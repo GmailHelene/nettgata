@@ -128,7 +128,7 @@ export function plattformVilkar(o: Valg = {}): PageContent {
   const seksjoner: Section[] = [
     tekstSeksjon("vilkar", "Vilkår for Nettgata", [
       `Disse vilkårene gjelder når virksomheten din har abonnement på Nettgata. Nettgata leveres av ${leverandor()}, som er enkeltpersonforetaket mitt. Når det står «jeg» her, er det ${GRONBERG.navn}. «Du» er virksomheten som har abonnementet.`,
-      "Nettgata selges til virksomheter, foreninger og andre som bruker tjenesten i næring eller organisasjon. Avtalen er inngått når du oppretter abonnementet og godtar vilkårene. Databehandleravtalen på nettgata.no/databehandleravtale er en del av avtalen.",
+      "Nettgata selges til virksomheter, foreninger og andre som bruker tjenesten i næring eller organisasjon. Kjøpet er derfor ikke et forbrukerkjøp, og angrerettloven gjelder ikke. Avtalen er inngått når du oppretter abonnementet og godtar vilkårene. Databehandleravtalen på nettgata.no/databehandleravtale er en del av avtalen.",
       sistEndret(o),
     ]),
 
@@ -162,6 +162,7 @@ export function plattformVilkar(o: Valg = {}): PageContent {
 
     tekstSeksjon("ditt-ansvar", "Ditt ansvar", [
       "Du er ansvarlig for innholdet på nettstedet ditt, altså tekster, bilder, priser og varer. Du må ha rett til å bruke bildene og tekstene, og omtaler skal være ekte.",
+      "Temaene og seksjonene i Nettgata er laget for å oppfylle kravene til universell utforming etter WCAG 2.0. Innholdet du legger inn selv, må også være universelt utformet. Det gjelder for eksempel alternativ tekst på bilder, tekst i bilder, lenketekster og dokumenter du laster opp.",
       "Overfor kundene dine er det du som er selger. Du har ansvaret for kjøpsvilkår, priser og førpriser, merverdiavgift, angrerett, reklamasjoner og bokføring. Nettgata hjelper med maler og automatikk, men den juridiske plikten er din.",
       "Avtalene med Vipps MobilePay, Klarna, Posten Bring, Fiken og andre leverandører inngår du selv. Pengene fra salget går rett til deg, og gebyrene følger avtalene dine med dem. Jeg er ikke part i de avtalene og har ikke ansvar for tjenestene deres.",
       "Du er behandlingsansvarlig for personopplysningene om besøkende og kunder på nettstedet ditt. Personvernerklæringen Nettgata lager, bygger på valgene dine i studioet. Les den, og si fra hvis noe ikke stemmer.",

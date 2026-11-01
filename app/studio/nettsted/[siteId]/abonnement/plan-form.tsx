@@ -115,6 +115,20 @@ export function PlanForm({
         <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">{blockedReason}</p>
       ) : (
         <div>
+          <label className="mb-4 flex items-start gap-3">
+            <input type="checkbox" name="terms" required className="mt-1" />
+            <span className="text-sm">
+              Jeg har lest og godtar{" "}
+              <a href="/vilkar" target="_blank" rel="noopener" className="underline">
+                vilkårene<span className="sr-only"> (åpnes i ny fane)</span>
+              </a>{" "}
+              og{" "}
+              <a href="/databehandleravtale" target="_blank" rel="noopener" className="underline">
+                databehandleravtalen<span className="sr-only"> (åpnes i ny fane)</span>
+              </a>{" "}
+              på vegne av bedriften.
+            </span>
+          </label>
           <button disabled={pending} className="rounded-md bg-[#173b6c] px-5 py-2 font-semibold text-white disabled:opacity-60">
             {pending ? "Åpner betalingen..." : "Gå til betaling"}
           </button>
