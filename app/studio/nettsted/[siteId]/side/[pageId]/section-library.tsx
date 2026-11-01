@@ -53,7 +53,7 @@ export function SectionLibrary({
             </h2>
             <p className="text-sm text-neutral-700">{position}</p>
           </div>
-          <button type="button" onClick={() => ref.current?.close()} className="rounded-md border border-neutral-900 px-3 py-1.5 text-sm font-semibold">
+          <button type="button" onClick={() => ref.current?.close()} className="rounded-md border border-[#173b6c] px-3 py-1.5 text-sm font-semibold">
             Lukk
           </button>
         </div>

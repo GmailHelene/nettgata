@@ -48,9 +48,9 @@ export default async function CustomersPage({
             placeholder="Navn, e-post eller telefon"
             className="min-w-0 flex-1 rounded-md border border-neutral-400 px-3 py-2"
           />
-          <button className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">Søk</button>
+          <button className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold">Søk</button>
         </form>
-        <a href={`${base}/eksport`} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+        <a href={`${base}/eksport`} className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold">
           Last ned CSV
         </a>
       </div>
@@ -62,7 +62,7 @@ export default async function CustomersPage({
               <Link
                 href={href({ sorter: key, side: 1 })}
                 aria-current={key === query.sort ? "page" : undefined}
-                className="block rounded-full border px-3 py-1 text-sm aria-[current=page]:border-neutral-900 aria-[current=page]:bg-neutral-900 aria-[current=page]:text-white"
+                className="block rounded-full border px-3 py-1 text-sm aria-[current=page]:border-[#173b6c] aria-[current=page]:bg-[#173b6c] aria-[current=page]:text-white"
               >
                 {customerSorts[key]}
               </Link>

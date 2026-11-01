@@ -47,16 +47,16 @@ export function SalesChart({ daily }: { daily: DailySales[] }) {
                 key={d.date}
                 tabIndex={0}
                 aria-label={`${label}: ${formatNok(d.ore)}, ${d.orders} ordre`}
-                className="group relative flex h-full flex-1 items-end justify-center rounded-t outline-none hover:bg-neutral-100 focus-visible:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-neutral-900"
+                className="group relative flex h-full flex-1 items-end justify-center rounded-t outline-none hover:bg-neutral-100 focus-visible:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-[#173b6c]"
               >
                 <span
                   aria-hidden="true"
-                  className="block w-full max-w-6 rounded-t bg-neutral-700 group-hover:bg-neutral-950 group-focus-visible:bg-neutral-950"
+                  className="block w-full max-w-6 rounded-t bg-neutral-700 group-hover:bg-[#0f2c55] group-focus-visible:bg-neutral-950"
                   style={{ height: `${(d.ore / max) * 100}%`, minHeight: d.ore > 0 ? 2 : 0 }}
                 />
                 <span
                   aria-hidden="true"
-                  className={`pointer-events-none absolute bottom-full z-10 mb-2 hidden w-max rounded-md bg-neutral-900 px-3 py-2 text-xs text-white shadow-lg group-hover:block group-focus-visible:block ${tipPosition}`}
+                  className={`pointer-events-none absolute bottom-full z-10 mb-2 hidden w-max rounded-md bg-[#173b6c] px-3 py-2 text-xs text-white shadow-lg group-hover:block group-focus-visible:block ${tipPosition}`}
                 >
                   <span className="block font-semibold">{label}</span>
                   {formatNok(d.ore)} · {d.orders} ordre

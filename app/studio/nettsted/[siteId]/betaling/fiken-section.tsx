@@ -8,9 +8,9 @@ import { fikenMethods, type FikenAccount, type FikenCompanyOption, type FikenMet
 import type { ActionState } from "../../../actions";
 import { connectFikenAction, disconnectFikenAction, saveFikenSettingsAction, sendOrdersToFikenAction, testFikenAction } from "./fiken-actions";
 
-const focus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900";
-const primaryButton = `rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 ${focus}`;
-const secondaryButton = `rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold disabled:opacity-60 ${focus}`;
+const focus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173b6c]";
+const primaryButton = `rounded-md bg-[#173b6c] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 ${focus}`;
+const secondaryButton = `rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold disabled:opacity-60 ${focus}`;
 const dangerButton = `rounded-md border border-red-800 px-4 py-2 text-sm font-semibold text-red-800 disabled:opacity-60 ${focus}`;
 
 /** Tekstene per betalingsmåte. hint står under de som ofte allerede er ført i regnskapet på en annen måte. */

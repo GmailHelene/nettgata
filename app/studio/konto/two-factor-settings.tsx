@@ -12,8 +12,8 @@ import {
 } from "../account-actions";
 
 const inputClass = "w-full rounded-md border border-neutral-400 bg-white px-3 py-2";
-const primary = "rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60";
-const secondary = "rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold disabled:opacity-60";
+const primary = "rounded-md bg-[#173b6c] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60";
+const secondary = "rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold disabled:opacity-60";
 
 function Status({ state }: { state: ActionState }) {
   if (!state) return null;

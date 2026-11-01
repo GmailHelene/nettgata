@@ -113,7 +113,7 @@ export function BringAccountForm({ siteId, view, canEdit }: { siteId: string; vi
             type="button"
             disabled={pending}
             onClick={() => run(() => testBringConnectionAction(siteId))}
-            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className="rounded-md bg-[#173b6c] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
           >
             {pending ? "Vent litt..." : "Test tilkoblingen"}
           </button>
@@ -125,7 +125,7 @@ export function BringAccountForm({ siteId, view, canEdit }: { siteId: string; vi
               setEnvironment(view.environment);
               setEditing(true);
             }}
-            className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold disabled:opacity-60"
+            className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold disabled:opacity-60"
           >
             Bytt nøkler
           </button>
@@ -188,7 +188,7 @@ export function BringAccountForm({ siteId, view, canEdit }: { siteId: string; vi
             API-nøkkelen lagres kryptert og vises aldri igjen, heller ikke for deg. Vil du bytte den senere, fyller du inn alle feltene på nytt.
           </p>
           <div className="flex flex-wrap gap-3">
-            <button disabled={pending} className="rounded-md bg-neutral-900 px-5 py-3 font-semibold text-white disabled:opacity-60">
+            <button disabled={pending} className="rounded-md bg-[#173b6c] px-5 py-3 font-semibold text-white disabled:opacity-60">
               {pending ? "Lagrer og tester..." : "Lagre og test tilkoblingen"}
             </button>
             {view && (
@@ -199,7 +199,7 @@ export function BringAccountForm({ siteId, view, canEdit }: { siteId: string; vi
                   setValues({});
                   setEditing(false);
                 }}
-                className="rounded-md border border-neutral-900 px-5 py-3 font-semibold disabled:opacity-60"
+                className="rounded-md border border-[#173b6c] px-5 py-3 font-semibold disabled:opacity-60"
               >
                 Avbryt
               </button>

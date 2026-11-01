@@ -107,7 +107,7 @@ export function VariantGrid({ siteId, rows }: { siteId: string; rows: GridRow[] 
           type="button"
           disabled={!dirty || pending}
           onClick={() => setEdits({})}
-          className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold disabled:opacity-40"
+          className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold disabled:opacity-40"
         >
           Angre
         </button>
@@ -115,7 +115,7 @@ export function VariantGrid({ siteId, rows }: { siteId: string; rows: GridRow[] 
           type="button"
           disabled={!dirty || pending}
           onClick={save}
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+          className="rounded-md bg-[#173b6c] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
         >
           {pending ? "Lagrer..." : "Lagre endringer"}
         </button>

@@ -1,11 +1,15 @@
 import Link from "next/link";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
+import { heading } from "@/components/brand";
+import { SiteHouse, VacantPlot, type SiteHouseData } from "@/components/studio/site-street";
+import { StudioTopBar } from "@/components/studio/top-bar";
+import { ui } from "@/components/studio/ui";
 import { getDb } from "@/db";
-import { memberships, sites } from "@/db/schema";
+import { memberships, pages, sites } from "@/db/schema";
 import { getPack } from "@/lib/packs";
 import { PLATFORM_SITE_SLUG } from "@/lib/platform-site";
 import { requireUser } from "@/lib/session";
-import { logout } from "./actions";
+import { publicSiteUrl } from "@/lib/site-url";
 
 export default async function StudioHome() {
   const user = await requireUser();
@@ -21,40 +25,73 @@ export default async function StudioHome() {
           .orderBy(asc(sites.name))
       ).map((r) => r.site);
 
+  // Hvilke nettsteder som har minst én publisert side, i én spørring.
+  const published = new Set(
+    rows.length
+      ? (
+          await db
+            .selectDistinct({ siteId: pages.siteId })
+            .from(pages)
+            .where(and(inArray(pages.siteId, rows.map((s) => s.id)), isNotNull(pages.publishedVersionId)))
+        ).map((r) => r.siteId)
+      : [],
+  );
+  const houses: SiteHouseData[] = await Promise.all(
+    rows.map(async (site) => ({
+      id: site.id,
+      name: site.name,
+      description:
+        site.slug === PLATFORM_SITE_SLUG
+          ? "Henvendelser fra skjemaet på nettgata.no"
+          : `${site.kind === "nettbutikk" ? "Nettbutikk" : "Nettside"} · ${getPack(site.industryPack)?.label ?? site.industryPack}`,
+      host: new URL(await publicSiteUrl(db, site)).host,
+      published: published.has(site.id),
+      theme: site.theme,
+    })),
+  );
+
   return (
-    <main className="mx-auto max-w-4xl px-5 py-12">
-      <header className="mb-10 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Dine nettsteder</h1>
-        {user.isPlatformAdmin && (
-          <Link href="/studio/nytt" className="ml-auto mr-6 rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white">
-            Nytt nettsted
-          </Link>
+    <>
+      <StudioTopBar email={user.email} active="nettsteder" />
+      <main className={`${ui.page} pb-20 pt-10 sm:pt-14`}>
+        <div className="mb-10 flex flex-wrap items-end justify-between gap-x-6 gap-y-5">
+          <div>
+            <p className={ui.eyebrow}>Gata di</p>
+            <h1 className={`${heading} text-[2.4rem] leading-none sm:text-5xl`}>Dine nettsteder</h1>
+            <p className={`mt-3 ${ui.muted}`}>
+              {houses.length === 1 ? "Ett nettsted." : `${houses.length} nettsteder.`} Trykk på et hus for å redigere nettstedet.
+            </p>
+          </div>
+          {user.isPlatformAdmin && (
+            <Link href="/studio/nytt" className={ui.button}>
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Nytt nettsted
+            </Link>
+          )}
+        </div>
+
+        {houses.length === 0 && !user.isPlatformAdmin ? (
+          <div className={`${ui.card} max-w-xl p-6`}>
+            <h2 className={`${heading} text-xl`}>Du har ingen nettsteder ennå</h2>
+            <p className={`mt-2 ${ui.muted}`}>Har du fått en invitasjon på e-post, åpner du lenken i den, så dukker nettstedet opp her.</p>
+          </div>
+        ) : (
+          <ul className="grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+            {houses.map((site, i) => (
+              <li key={site.id}>
+                <SiteHouse site={site} index={i} />
+              </li>
+            ))}
+            {user.isPlatformAdmin && (
+              <li>
+                <VacantPlot index={houses.length} />
+              </li>
+            )}
+          </ul>
         )}
-        <Link href="/studio/konto" className={`text-sm underline ${user.isPlatformAdmin ? "mr-4" : "ml-auto mr-4"}`}>
-          Konto
-        </Link>
-        <form action={logout}>
-          <button className="text-sm underline">Logg ut ({user.email})</button>
-        </form>
-      </header>
-      {rows.length === 0 ? (
-        <p>Du har ingen nettsteder ennå.</p>
-      ) : (
-        <ul className="grid gap-4 sm:grid-cols-2">
-          {rows.map((site) => (
-            <li key={site.id}>
-              <Link href={`/studio/nettsted/${site.id}`} className="block rounded-lg border bg-white p-5 hover:border-neutral-900">
-                <span className="block font-semibold">{site.name}</span>
-                <span className="text-sm text-neutral-600">
-                  {site.slug === PLATFORM_SITE_SLUG
-                    ? "Henvendelser fra skjemaet på nettgata.no"
-                    : `${site.kind === "nettbutikk" ? "Nettbutikk" : "Nettside"} · ${getPack(site.industryPack)?.label ?? site.industryPack}`}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </main>
+      </main>
+    </>
   );
 }

@@ -57,17 +57,17 @@ export function ProductTable({
         </label>
         {selected.size > 0 && (
           <>
-            <button type="button" disabled={pending} onClick={() => apply({ status: "active" })} className="rounded-md border border-neutral-900 px-3 py-1 text-sm disabled:opacity-60">
+            <button type="button" disabled={pending} onClick={() => apply({ status: "active" })} className="rounded-md border border-[#173b6c] px-3 py-1 text-sm disabled:opacity-60">
               Sett i butikken
             </button>
-            <button type="button" disabled={pending} onClick={() => apply({ status: "draft" })} className="rounded-md border border-neutral-900 px-3 py-1 text-sm disabled:opacity-60">
+            <button type="button" disabled={pending} onClick={() => apply({ status: "draft" })} className="rounded-md border border-[#173b6c] px-3 py-1 text-sm disabled:opacity-60">
               Gjør til kladd
             </button>
             <button
               type="button"
               disabled={pending}
               onClick={() => apply({ status: "archived" }, `Arkivere ${selected.size} varer? De forsvinner fra butikken, men gamle ordre beholder dem.`)}
-              className="rounded-md border border-neutral-900 px-3 py-1 text-sm disabled:opacity-60"
+              className="rounded-md border border-[#173b6c] px-3 py-1 text-sm disabled:opacity-60"
             >
               Arkiver
             </button>
@@ -78,7 +78,7 @@ export function ProductTable({
                   disabled={pending}
                   value=""
                   onChange={(e) => e.target.value && apply({ categoryId: e.target.value === "ingen" ? null : e.target.value })}
-                  className="rounded-md border border-neutral-900 px-2 py-1"
+                  className="rounded-md border border-[#173b6c] px-2 py-1"
                 >
                   <option value="">Flytt til kategori...</option>
                   {categories.map((c) => (

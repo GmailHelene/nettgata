@@ -68,8 +68,8 @@ export function OrderActions({ siteId, orderId, status, online, owner }: { siteI
             }}
             className={
               a.primary
-                ? "rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                : "rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold disabled:opacity-60"
+                ? "rounded-md bg-[#173b6c] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                : "rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold disabled:opacity-60"
             }
           >
             {a.label}

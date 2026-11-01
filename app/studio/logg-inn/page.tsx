@@ -1,13 +1,26 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AuthShell } from "@/components/studio/auth-shell";
+import { ui } from "@/components/studio/ui";
 import { getCurrentUser } from "@/lib/session";
 import { LoginForm } from "./login-form";
 
 export default async function LoginPage() {
   if (await getCurrentUser()) redirect("/studio");
   return (
-    <main className="mx-auto max-w-sm px-5 py-24">
-      <h1 className="mb-8 text-2xl font-bold">Logg inn i studioet</h1>
+    <AuthShell
+      title="Logg inn i studioet"
+      intro="Her bygger og driver du nettstedet ditt."
+      footer={
+        <p className={`mt-10 text-sm ${ui.muted}`}>
+          Har du ikke konto ennå?{" "}
+          <Link href="/#kom-i-gang" className={ui.link}>
+            Kom i gang på nettgata.no
+          </Link>
+        </p>
+      }
+    >
       <LoginForm />
-    </main>
+    </AuthShell>
   );
 }

@@ -1,10 +1,12 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { heading, signType } from "@/components/brand";
 import { FormStatus } from "@/components/studio/form-status";
 import { GenrePicker } from "@/components/studio/genre-picker";
 import { InfoFields, inputClass } from "@/components/studio/info-fields";
 import { ThemeGallery, type ThemeChoice } from "@/components/studio/theme-gallery";
+import { ui } from "@/components/studio/ui";
 import { bransjeLabel, findBransje, lowerLabel, suggestFromBrreg, type BransjeMatch } from "@/lib/genres";
 import { packPreview } from "@/lib/pack-preview";
 import { getPack } from "@/lib/packs";
@@ -83,21 +85,33 @@ export function NewSiteForm() {
       <input type="hidden" name="theme" value={choice?.theme ?? ""} />
       <input type="hidden" name="palette" value={choice?.palette ?? ""} />
 
-      <nav aria-label="Steg">
-        <ol className="flex flex-wrap gap-2 text-sm">
+      <nav aria-label="Steg i veiviseren">
+        <ol className="flex items-center">
           {steps.map((label, i) => {
             const reachable = i <= step || (i === step + 1 && canContinue);
+            const plate =
+              i === step
+                ? "bg-[#173b6c] [&>span]:border-white [&>span]:text-white"
+                : i < step
+                  ? "bg-white hover:bg-[#e9f1ed] [&>span]:border-[#2f5a47] [&>span]:text-[#2f5a47]"
+                  : reachable
+                    ? "bg-white hover:bg-[#eef3f9] [&>span]:border-[#173b6c]/60 [&>span]:text-[#173b6c]"
+                    : "bg-transparent [&>span]:border-[#c3ccd3] [&>span]:text-[#5e6a75]";
             return (
-              <li key={label}>
+              <li key={label} className="flex items-center">
+                {i > 0 && <span aria-hidden="true" className={`mx-1.5 block h-[3px] w-4 rounded-full sm:mx-2 sm:w-10 ${i <= step ? "bg-[#173b6c]" : "bg-[#c3ccd3]"}`} />}
                 <button
                   type="button"
                   disabled={!reachable || i === step}
                   aria-current={i === step ? "step" : undefined}
                   onClick={() => setStep(i)}
-                  className="flex items-center gap-2 rounded-full border border-neutral-300 bg-white px-3 py-1.5 font-medium aria-[current=step]:border-neutral-900 aria-[current=step]:bg-neutral-900 aria-[current=step]:text-white disabled:opacity-100 disabled:[&:not([aria-current])]:text-neutral-400"
+                  className={`${signType} rounded-[6px] p-[3px] text-[0.8rem] leading-none transition-colors disabled:cursor-default ${plate}`}
                 >
-                  <span aria-hidden="true">{i < step ? "✓" : i + 1}</span>
-                  {label}
+                  <span className="flex items-center gap-2 rounded-[4px] border-2 px-2.5 pb-[5px] pt-[7px]">
+                    <span aria-hidden="true">{i < step ? "✓" : i + 1}</span>
+                    <span className={i === step ? "" : "sr-only sm:not-sr-only"}>{label}</span>
+                    {i < step && <span className="sr-only"> (ferdig)</span>}
+                  </span>
                 </button>
               </li>
             );
@@ -105,46 +119,46 @@ export function NewSiteForm() {
         </ol>
       </nav>
 
-      <section hidden={step !== 0} className="max-w-3xl space-y-3 rounded-lg border bg-white p-5">
-        <h2 ref={(el) => void (headings.current[0] = el)} tabIndex={-1} className="text-lg font-semibold outline-none">Bedriften</h2>
+      <section hidden={step !== 0} className={`${ui.card} max-w-3xl space-y-5 p-5 sm:p-7`}>
+        <h2 ref={(el) => void (headings.current[0] = el)} tabIndex={-1} className={`${heading} text-2xl outline-none`}>Bedriften</h2>
         <div className="flex items-end gap-2">
           <label className="block flex-1">
-            <span className="mb-1 block text-sm font-medium">Org.nr.</span>
+            <span className={ui.label}>Org.nr.</span>
             <input name="orgnr" value={info.orgnr} onChange={(e) => setInfo({ ...info, orgnr: e.target.value })} inputMode="numeric" className={inputClass} />
           </label>
           <button
             type="button"
             onClick={fetchCompany}
             disabled={looking || info.orgnr.replace(/\s/g, "").length !== 9}
-            className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold disabled:opacity-50"
+            className={`${ui.buttonGhost} shrink-0 px-4 text-sm`}
           >
             {looking ? "Henter..." : "Hent fra Brreg"}
           </button>
         </div>
-        {lookup && <p className="text-sm text-neutral-700">{lookup}</p>}
+        <p aria-live="polite" className="rounded-lg bg-[#f2f4f5] px-3.5 py-2.5 text-sm text-[#1b232b] empty:hidden">{lookup}</p>
         <label className="block">
-          <span className="mb-1 block text-sm font-medium">Navn på nettstedet</span>
+          <span className={ui.label}>Navn på nettstedet</span>
           <input name="name" required minLength={2} maxLength={80} value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
         </label>
         <label className="block">
-          <span className="mb-1 block text-sm font-medium">Ønsket adresse (valgfritt)</span>
+          <span className={ui.label}>Ønsket adresse (valgfritt)</span>
           <input name="slug" placeholder="lages fra navnet" className={inputClass} />
-          <span className="mt-1 block text-xs text-neutral-600">Blir til navn.nettgata.no. Eget domene kobles senere.</span>
+          <span className={`mt-1.5 block text-sm ${ui.muted}`}>Blir til navn.nettgata.no. Eget domene kobles senere.</span>
         </label>
       </section>
 
       <section hidden={step !== 1} className="space-y-4">
         <div>
-          <h2 ref={(el) => void (headings.current[1] = el)} tabIndex={-1} className="text-lg font-semibold outline-none">Hva driver dere med?</h2>
-          <p className="text-sm text-neutral-600">Bransjen bestemmer sidene og tekstutkastene. Utseendet velger du i neste steg, og alt kan endres senere.</p>
+          <h2 ref={(el) => void (headings.current[1] = el)} tabIndex={-1} className={`${heading} text-2xl outline-none`}>Hva driver dere med?</h2>
+          <p className={`mt-1 ${ui.muted}`}>Bransjen bestemmer sidene og tekstutkastene. Utseendet velger du i neste steg, og alt kan endres senere.</p>
         </div>
         <GenrePicker value={packKey} onChange={choosePack} suggestion={suggestion} />
       </section>
 
       <section hidden={step !== 2} className="space-y-4">
         <div>
-          <h2 ref={(el) => void (headings.current[2] = el)} tabIndex={-1} className="text-lg font-semibold outline-none">Velg design</h2>
-          <p className="text-sm text-neutral-600">
+          <h2 ref={(el) => void (headings.current[2] = el)} tabIndex={-1} className={`${heading} text-2xl outline-none`}>Velg design</h2>
+          <p className={`mt-1 max-w-3xl ${ui.muted}`}>
             Hvert tema har egne fonter, knapper, menyer og fargevarianter. Miniatyrene viser {name.trim() || "nettstedet ditt"} med innholdet for{" "}
             {chosen ? lowerLabel(bransjeLabel(chosen.bransje)) : "bransjen"}. Trykk «Forhåndsvis» for å se hele siden, også på mobil.
           </p>
@@ -164,15 +178,15 @@ export function NewSiteForm() {
         )}
       </section>
 
-      <section hidden={step !== 3} className="max-w-3xl space-y-3 rounded-lg border bg-white p-5">
-        <h2 ref={(el) => void (headings.current[3] = el)} tabIndex={-1} className="text-lg font-semibold outline-none">Kontaktinfo</h2>
-        <p className="text-sm text-neutral-600">Dette vises i menyen, bunnteksten, kontaktsiden og i Google.</p>
+      <section hidden={step !== 3} className={`${ui.card} max-w-3xl space-y-5 p-5 sm:p-7`}>
+        <h2 ref={(el) => void (headings.current[3] = el)} tabIndex={-1} className={`${heading} text-2xl outline-none`}>Kontaktinfo</h2>
+        <p className={ui.muted}>Dette vises i menyen, bunnteksten, kontaktsiden og i Google.</p>
         <InfoFields value={info} onChange={setInfo} hideOrgnr />
       </section>
 
-      <div className="sticky bottom-0 -mx-5 flex flex-wrap items-center gap-3 border-t border-neutral-200 bg-neutral-50/95 px-5 py-4 backdrop-blur">
+      <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-3 border-t border-[#d5dbe0] bg-white/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6">
         {step > 0 && (
-          <button type="button" onClick={() => setStep(step - 1)} className="rounded-md border border-neutral-900 px-5 py-3 font-semibold">
+          <button type="button" onClick={() => setStep(step - 1)} className={ui.buttonGhost}>
             Tilbake
           </button>
         )}
@@ -184,19 +198,19 @@ export function NewSiteForm() {
             type="button"
             disabled={!canContinue}
             onClick={() => setStep(step + 1)}
-            className="rounded-md bg-neutral-900 px-5 py-3 font-semibold text-white disabled:opacity-50"
+            className={ui.button}
           >
             Neste
           </button>
         ) : (
-          <button key="send" type="submit" disabled={pending || !pack || !choice} className="rounded-md bg-neutral-900 px-5 py-3 font-semibold text-white disabled:opacity-60">
+          <button key="send" type="submit" disabled={pending || !pack || !choice} className={ui.button}>
             {pending ? "Lager nettstedet..." : "Lag nettstedet som kladd"}
           </button>
         )}
         {!canContinue && step < steps.length - 1 && (
-          <p className="text-sm text-neutral-700">{["Skriv navnet på nettstedet for å gå videre.", "Velg en bransje for å gå videre.", "Velg et tema for å gå videre."][step]}</p>
+          <p className={`text-sm ${ui.muted}`}>{["Skriv navnet på nettstedet for å gå videre.", "Velg en bransje for å gå videre.", "Velg et tema for å gå videre."][step]}</p>
         )}
-        <p className="text-sm text-neutral-700">
+        <p className={`text-sm font-medium sm:ml-auto ${ui.muted}`}>
           {[name.trim(), chosen && bransjeLabel(chosen.bransje), themeDef && `${themeDef.label}, ${themeDef.palettes.find((p) => p.key === choice?.palette)?.label ?? ""}`]
             .filter(Boolean)
             .join(" · ")}

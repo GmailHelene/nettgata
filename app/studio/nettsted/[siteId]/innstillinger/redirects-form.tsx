@@ -40,7 +40,7 @@ export function RedirectsForm({ siteId, initial }: { siteId: string; initial: Re
         type="button"
         disabled={pending}
         onClick={() => startTransition(async () => setState(await saveRedirectsAction(siteId, text)))}
-        className="rounded-md bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+        className="rounded-md bg-[#173b6c] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
       >
         {pending ? "Lagrer..." : "Lagre omdirigeringer"}
       </button>

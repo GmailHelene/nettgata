@@ -40,7 +40,7 @@ export default async function ReportsPage({
               <Link
                 href={`${base}?periode=${p.key}`}
                 aria-current={p.key === period.key ? "page" : undefined}
-                className="block rounded-full border px-3 py-1 text-sm aria-[current=page]:border-neutral-900 aria-[current=page]:bg-neutral-900 aria-[current=page]:text-white"
+                className="block rounded-full border px-3 py-1 text-sm aria-[current=page]:border-[#173b6c] aria-[current=page]:bg-[#173b6c] aria-[current=page]:text-white"
               >
                 {p.label}
               </Link>
@@ -57,8 +57,8 @@ export default async function ReportsPage({
           <span className="mb-1 block">Til og med</span>
           <input type="date" name="til" defaultValue={period.to} required className="rounded-md border border-neutral-400 px-3 py-2" />
         </label>
-        <button className="rounded-md border border-neutral-900 px-4 py-2 font-semibold">Vis periode</button>
-        <a href={csvHref} className="ml-auto rounded-md border border-neutral-900 px-4 py-2 font-semibold">
+        <button className="rounded-md border border-[#173b6c] px-4 py-2 font-semibold">Vis periode</button>
+        <a href={csvHref} className="ml-auto rounded-md border border-[#173b6c] px-4 py-2 font-semibold">
           Last ned CSV
         </a>
       </form>

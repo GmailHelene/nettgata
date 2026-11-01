@@ -31,7 +31,7 @@ type Props = {
 /** `undoFor` er siden rett etter slettingen. «Angre» vises bare så lenge ingenting annet er endret. */
 type Notice = { ok: boolean; message: string; undoFor?: Doc } | null;
 
-const secondaryButton = "rounded-md border border-neutral-900 bg-white px-3 py-2 text-sm font-semibold disabled:opacity-40";
+const secondaryButton = "rounded-md border border-[#173b6c] bg-white px-3 py-2 text-sm font-semibold disabled:opacity-40";
 const timeFormat = new Intl.DateTimeFormat("nb-NO", { hour: "2-digit", minute: "2-digit" });
 
 /** Teller for rulle- og fokusbeskjeder, så samme seksjon kan vises flere ganger på rad. */
@@ -289,7 +289,7 @@ export function PageEditor({ siteId, preview, pageId, path, initialTitle, initia
             type="button"
             disabled={pending}
             onClick={publish}
-            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className="rounded-md bg-[#173b6c] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
           >
             Publiser
           </button>
@@ -356,7 +356,7 @@ export function PageEditor({ siteId, preview, pageId, path, initialTitle, initia
             <button
               type="button"
               onClick={() => setLibrary(sections.length)}
-              className="mt-4 w-full rounded-lg border-2 border-dashed border-neutral-400 px-4 py-3 font-semibold text-neutral-800 hover:border-neutral-900"
+              className="mt-4 w-full rounded-lg border-2 border-dashed border-neutral-400 px-4 py-3 font-semibold text-neutral-800 hover:border-[#173b6c]"
             >
               + Legg til seksjon
             </button>
@@ -418,7 +418,7 @@ export function PageEditor({ siteId, preview, pageId, path, initialTitle, initia
                       type="button"
                       aria-pressed={device === d}
                       onClick={() => setDevice(d)}
-                      className={`rounded px-3 py-1 font-medium ${device === d ? "bg-neutral-900 text-white" : "text-neutral-800"}`}
+                      className={`rounded px-3 py-1 font-medium ${device === d ? "bg-[#173b6c] text-white" : "text-neutral-800"}`}
                     >
                       {d === "datamaskin" ? "Datamaskin" : "Mobil"}
                     </button>

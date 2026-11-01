@@ -39,7 +39,7 @@ export function Categories({ siteId, categories }: { siteId: string; categories:
           <span className="mb-1 block text-sm font-medium">Ny kategori</span>
           <input name="name" placeholder="F.eks. Luer" className={inputClass} />
         </label>
-        <button disabled={creating} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+        <button disabled={creating} className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold">
           Legg til
         </button>
       </form>

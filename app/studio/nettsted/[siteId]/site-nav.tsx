@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { and, count, eq, isNull } from "drizzle-orm";
+import { heading, StreetSign } from "@/components/brand";
+import { ui } from "@/components/studio/ui";
 import { getDb } from "@/db";
 import { inquiries, orders } from "@/db/schema";
 
@@ -45,18 +47,19 @@ export async function SiteNav({
       : Promise.resolve([{ toShip: 0 }]),
   ]);
   const badges: Partial<Record<SiteTab, { text: string; className: string }>> = {};
-  if (unread > 0) badges.henvendelser = { text: `${unread} ${unread === 1 ? "ny" : "nye"}`, className: "bg-red-700 text-white" };
-  if (toShip > 0) badges.ordre = { text: `${toShip} å sende`, className: "bg-blue-700 text-white" };
+  if (unread > 0) badges.henvendelser = { text: `${unread} ${unread === 1 ? "ny" : "nye"}`, className: "bg-[#a13a2c] text-white" };
+  if (toShip > 0) badges.ordre = { text: `${toShip} å sende`, className: "bg-[#173b6c] text-white" };
 
   return (
     <div className="mb-8">
-      <Link href="/studio" className="text-sm underline">
-        Alle nettsteder
+      <Link href="/studio" className="group inline-flex items-center gap-3 rounded-md text-sm">
+        <StreetSign />
+        <span className={ui.link}>Alle nettsteder</span>
       </Link>
-      <h1 className="mt-4 text-2xl font-bold">{name}</h1>
+      <h1 className={`${heading} mt-6 text-[2.1rem] leading-none sm:text-4xl`}>{name}</h1>
       {/* Ruller sidelengs på mobil i stedet for å bryte over flere linjer. */}
       <nav aria-label="Nettsted" className="-mx-5 mt-4 overflow-x-auto px-5">
-        <div className="flex min-w-max gap-x-6 border-b">
+        <div className="flex min-w-max gap-x-6 border-b border-[#d5dbe0]">
           {tabs
             .filter((t) => shop || !t.shopOnly)
             .map((t) => (
@@ -64,7 +67,7 @@ export async function SiteNav({
                 key={t.key}
                 href={`/studio/nettsted/${siteId}${t.href}`}
                 aria-current={t.key === active ? "page" : undefined}
-                className="-mb-px whitespace-nowrap border-b-2 border-transparent pb-2 aria-[current=page]:border-neutral-900 aria-[current=page]:font-semibold"
+                className="-mb-px whitespace-nowrap border-b-[3px] border-transparent pb-2.5 font-medium text-[#47525c] transition-colors hover:text-[#1b232b] aria-[current=page]:border-[#173b6c] aria-[current=page]:font-semibold aria-[current=page]:text-[#173b6c]"
               >
                 {t.label}
                 {badges[t.key] && <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${badges[t.key]!.className}`}>{badges[t.key]!.text}</span>}

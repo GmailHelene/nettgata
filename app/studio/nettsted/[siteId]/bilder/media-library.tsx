@@ -73,7 +73,7 @@ export function MediaLibrary({ siteId, items }: { siteId: string; items: Item[] 
             Vis bare bilder som ikke er i bruk
           </label>
         )}
-        <label className="cursor-pointer rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2">
+        <label className="cursor-pointer rounded-md bg-[#173b6c] px-4 py-2 text-sm font-semibold text-white has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2">
           {uploading ? `Laster opp ${uploading.done + 1} av ${uploading.total}...` : "Last opp bilder"}
           <input
             ref={fileRef}
@@ -155,7 +155,7 @@ export function MediaLibrary({ siteId, items }: { siteId: string; items: Item[] 
                     className="w-full rounded-md border border-neutral-400 bg-white px-2 py-1.5 text-sm"
                   />
                 </label>
-                <button type="submit" disabled={pending} className="rounded-md border border-neutral-900 px-3 py-1.5 text-sm font-semibold">
+                <button type="submit" disabled={pending} className="rounded-md border border-[#173b6c] px-3 py-1.5 text-sm font-semibold">
                   Lagre
                 </button>
               </form>

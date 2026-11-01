@@ -38,7 +38,7 @@ export function ManualBilling({ siteId, manual, note }: { siteId: string; manual
         type="button"
         disabled={pending}
         onClick={() => startTransition(async () => setState(await saveManualBillingAction(siteId, { manual: on, note: text })))}
-        className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold disabled:opacity-60"
+        className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold disabled:opacity-60"
       >
         Lagre
       </button>

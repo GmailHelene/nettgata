@@ -48,7 +48,7 @@ export default async function PickListPage({ params }: { params: Promise<{ siteI
       ) : (
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="border-b-2 border-neutral-900 text-left">
+            <tr className="border-b-2 border-[#173b6c] text-left">
               <th className="w-10 py-2">
                 <span className="sr-only">Plukket</span>
               </th>
@@ -62,7 +62,7 @@ export default async function PickListPage({ params }: { params: Promise<{ siteI
             {rows.map(([key, r]) => (
               <tr key={key} className="border-b align-top">
                 <td className="py-2">
-                  <span aria-hidden="true" className="inline-block h-4 w-4 border border-neutral-900" />
+                  <span aria-hidden="true" className="inline-block h-4 w-4 border border-[#173b6c]" />
                 </td>
                 <td className="py-2 pr-3">
                   {r.name}

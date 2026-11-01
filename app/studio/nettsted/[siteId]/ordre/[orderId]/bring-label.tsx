@@ -73,7 +73,7 @@ export function BringLabelForm({
           Bring står i testmodus. Dette blir en testbestilling: Bring henter ikke pakken og sender ingen faktura.
         </p>
       )}
-      <button disabled={pending} className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+      <button disabled={pending} className="rounded-md bg-[#173b6c] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
         {pending ? "Bestiller hos Bring..." : "Lag fraktetikett hos Bring"}
       </button>
       <FormStatus state={state} />

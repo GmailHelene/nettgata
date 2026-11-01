@@ -101,7 +101,7 @@ export function AccessForm({
                 ))}
               </select>
             </label>
-            <button disabled={inviting} className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+            <button disabled={inviting} className="rounded-md bg-[#173b6c] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
               {inviting ? "Lager invitasjon..." : "Inviter"}
             </button>
           </div>
@@ -121,7 +121,7 @@ export function AccessForm({
                 onClick={() => {
                   void navigator.clipboard?.writeText(state.link!).then(() => setCopied(true));
                 }}
-                className="rounded-md border border-neutral-900 bg-white px-3 py-1.5 text-sm font-semibold"
+                className="rounded-md border border-[#173b6c] bg-white px-3 py-1.5 text-sm font-semibold"
               >
                 {copied ? "Kopiert" : "Kopier lenken"}
               </button>

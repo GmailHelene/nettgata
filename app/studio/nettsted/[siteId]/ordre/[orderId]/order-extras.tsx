@@ -53,7 +53,7 @@ export function TrackingForm({
             type="button"
             disabled={pending || !value.trim()}
             onClick={() => save(true)}
-            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className="rounded-md bg-[#173b6c] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
           >
             Lagre og marker som sendt
           </button>
@@ -62,7 +62,7 @@ export function TrackingForm({
           type="button"
           disabled={pending}
           onClick={() => save(false)}
-          className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold disabled:opacity-60"
+          className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold disabled:opacity-60"
         >
           {value.trim() || !number ? "Lagre sporing" : "Fjern sporing"}
         </button>
@@ -87,7 +87,7 @@ export function StaffNoteForm({ siteId, orderId, note }: { siteId: string; order
         type="button"
         disabled={pending || value === (note ?? "")}
         onClick={() => startTransition(async () => setState(await saveStaffNoteAction(siteId, orderId, value)))}
-        className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold disabled:opacity-60"
+        className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold disabled:opacity-60"
       >
         Lagre notat
       </button>

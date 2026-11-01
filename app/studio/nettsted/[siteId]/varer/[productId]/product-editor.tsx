@@ -310,11 +310,11 @@ export function ProductEditor({
 
         <FormStatus state={state} />
         <div className="flex flex-wrap gap-3">
-          <button disabled={pending} onClick={save} className="rounded-md bg-neutral-900 px-5 py-3 font-semibold text-white disabled:opacity-60">
+          <button disabled={pending} onClick={save} className="rounded-md bg-[#173b6c] px-5 py-3 font-semibold text-white disabled:opacity-60">
             {pending ? "Lagrer..." : initial.id ? "Lagre" : "Opprett vare"}
           </button>
           {viewPath && status === "active" && (
-            <a href={viewPath} target="_blank" rel="noreferrer" className="rounded-md border border-neutral-900 px-5 py-3 font-semibold">
+            <a href={viewPath} target="_blank" rel="noreferrer" className="rounded-md border border-[#173b6c] px-5 py-3 font-semibold">
               Se i butikken
             </a>
           )}

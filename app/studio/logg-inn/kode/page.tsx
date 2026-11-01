@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AuthShell } from "@/components/studio/auth-shell";
+import { ui } from "@/components/studio/ui";
 import { getCurrentUser, readPendingSecondFactor } from "@/lib/session";
 import { CodeForm } from "./code-form";
 
@@ -8,18 +10,23 @@ export default async function CodePage() {
   if (await getCurrentUser()) redirect("/studio");
   if (!(await readPendingSecondFactor())) redirect("/studio/logg-inn");
   return (
-    <main className="mx-auto max-w-sm px-5 py-24">
-      <h1 className="mb-3 text-2xl font-bold">Skriv inn koden</h1>
-      <p className="mb-8 text-neutral-700">
-        Åpne appen du satte opp tofaktorinnlogging i, og skriv inn den sekssifrede koden for Nettgata. Har du ikke telefonen, kan du
-        bruke en av reservekodene.
-      </p>
+    <AuthShell
+      title="Skriv inn koden"
+      intro={
+        <p>
+          Åpne appen du satte opp tofaktorinnlogging i, og skriv inn den sekssifrede koden for Nettgata. Har du ikke telefonen, kan du bruke en
+          av reservekodene.
+        </p>
+      }
+      footer={
+        <p className="mt-10 text-sm">
+          <Link href="/studio/logg-inn" className={ui.link}>
+            Tilbake til innloggingen
+          </Link>
+        </p>
+      }
+    >
       <CodeForm />
-      <p className="mt-8 text-sm">
-        <Link href="/studio/logg-inn" className="underline">
-          Tilbake til innloggingen
-        </Link>
-      </p>
-    </main>
+    </AuthShell>
   );
 }

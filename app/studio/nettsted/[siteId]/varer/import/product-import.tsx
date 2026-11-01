@@ -57,7 +57,7 @@ export function ProductImport({ siteId }: { siteId: string }) {
 
   return (
     <div className="space-y-6">
-      <label className="block rounded-lg border-2 border-dashed border-neutral-400 bg-white p-6 text-center hover:border-neutral-900">
+      <label className="block rounded-lg border-2 border-dashed border-neutral-400 bg-white p-6 text-center hover:border-[#173b6c]">
         <span className="block font-semibold">{fileName || "Velg en CSV-fil"}</span>
         <span className="mt-1 block text-sm text-neutral-600">Fra Excel, Numbers eller Google Regneark. Maks 2000 rader.</span>
         <input type="file" accept=".csv,text/csv" onChange={(e) => choose(e.target.files?.[0])} className="mt-3 text-sm" />
@@ -115,7 +115,7 @@ export function ProductImport({ siteId }: { siteId: string }) {
           {nothingToDo && <p className="text-sm">Filen er lik det som ligger i butikken. Ingenting å importere.</p>}
 
           {plan.errors.length === 0 && !nothingToDo && (
-            <button type="button" disabled={pending} onClick={apply} className="rounded-md bg-neutral-900 px-5 py-2 font-semibold text-white disabled:opacity-60">
+            <button type="button" disabled={pending} onClick={apply} className="rounded-md bg-[#173b6c] px-5 py-2 font-semibold text-white disabled:opacity-60">
               Importer{" "}
               {[plan.creates.length > 0 && varer(plan.creates.length, "ny", "nye"), plan.updates.length > 0 && varer(plan.updates.length, "endret", "endrede")]
                 .filter(Boolean)
@@ -126,7 +126,7 @@ export function ProductImport({ siteId }: { siteId: string }) {
       )}
 
       {done && (
-        <Link href={`/studio/nettsted/${siteId}/varer`} className="inline-block rounded-md bg-neutral-900 px-5 py-2 font-semibold text-white">
+        <Link href={`/studio/nettsted/${siteId}/varer`} className="inline-block rounded-md bg-[#173b6c] px-5 py-2 font-semibold text-white">
           Se varene
         </Link>
       )}

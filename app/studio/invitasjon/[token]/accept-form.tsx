@@ -43,7 +43,7 @@ export function AcceptForm({ token, mode, email, owner }: { token: string; mode:
         </label>
       )}
       <FormStatus state={state} />
-      <button disabled={pending} className="rounded-md bg-neutral-900 px-5 py-3 font-semibold text-white disabled:opacity-60">
+      <button disabled={pending} className="rounded-md bg-[#173b6c] px-5 py-3 font-semibold text-white disabled:opacity-60">
         {pending ? "Et øyeblikk..." : mode === "new" ? "Lag bruker og gå videre" : "Godta invitasjonen"}
       </button>
     </form>

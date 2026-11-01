@@ -76,7 +76,7 @@ export function DesignStudio({
             Et nytt tema endrer bare utseendet. Tekstene, bildene og sidene dine står urørt.
           </p>
         </div>
-        <div role="tablist" aria-label="Design" className="flex overflow-hidden rounded-md border border-neutral-900 text-sm font-semibold">
+        <div role="tablist" aria-label="Design" className="flex overflow-hidden rounded-md border border-[#173b6c] text-sm font-semibold">
           {(
             [
               ["temaer", "Temaer"],
@@ -89,7 +89,7 @@ export function DesignStudio({
               role="tab"
               aria-selected={view === key}
               onClick={() => setView(key)}
-              className="px-4 py-2 aria-selected:bg-neutral-900 aria-selected:text-white"
+              className="px-4 py-2 aria-selected:bg-[#173b6c] aria-selected:text-white"
             >
               {label}
             </button>
@@ -171,7 +171,7 @@ function Customizer({
                   type="button"
                   aria-pressed={theme.preset?.palette === p.key}
                   onClick={() => set({ ...p.colors, preset: { theme: preset.def.key, palette: p.key } })}
-                  className="flex items-center gap-2 rounded-full border border-neutral-300 py-1 pl-1 pr-3 text-sm aria-pressed:border-neutral-900 aria-pressed:ring-1 aria-pressed:ring-neutral-900"
+                  className="flex items-center gap-2 rounded-full border border-neutral-300 py-1 pl-1 pr-3 text-sm aria-pressed:border-[#173b6c] aria-pressed:ring-1 aria-pressed:ring-[#173b6c]"
                 >
                   <span
                     aria-hidden="true"
@@ -241,7 +241,7 @@ function Customizer({
                 {Object.entries(styleOptions[field].options).map(([key, label]) => (
                   <label
                     key={key}
-                    className="cursor-pointer rounded-full border border-neutral-300 px-3 py-1 text-sm has-[:checked]:border-neutral-900 has-[:checked]:bg-neutral-900 has-[:checked]:text-white has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-blue-700"
+                    className="cursor-pointer rounded-full border border-neutral-300 px-3 py-1 text-sm has-[:checked]:border-[#173b6c] has-[:checked]:bg-[#173b6c] has-[:checked]:text-white has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-blue-700"
                   >
                     <input
                       type="radio"
@@ -264,11 +264,11 @@ function Customizer({
             type="button"
             disabled={pending || !changed || problems.length > 0}
             onClick={onSave}
-            className="rounded-md bg-neutral-900 px-5 py-3 font-semibold text-white disabled:opacity-50"
+            className="rounded-md bg-[#173b6c] px-5 py-3 font-semibold text-white disabled:opacity-50"
           >
             {pending ? "Lagrer..." : "Lagre designet"}
           </button>
-          <button type="button" disabled={!changed} onClick={onReset} className="rounded-md border border-neutral-900 px-5 py-3 font-semibold disabled:opacity-50">
+          <button type="button" disabled={!changed} onClick={onReset} className="rounded-md border border-[#173b6c] px-5 py-3 font-semibold disabled:opacity-50">
             Angre endringene
           </button>
           {changed && <span className="text-sm text-neutral-700">Ikke lagret ennå</span>}
@@ -294,7 +294,7 @@ function Customizer({
                 type="button"
                 aria-pressed={device === d}
                 onClick={() => setDevice(d)}
-                className="px-3 py-1.5 font-medium capitalize aria-pressed:bg-neutral-900 aria-pressed:text-white"
+                className="px-3 py-1.5 font-medium capitalize aria-pressed:bg-[#173b6c] aria-pressed:text-white"
               >
                 {d}
               </button>

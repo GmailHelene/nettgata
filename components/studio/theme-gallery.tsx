@@ -30,7 +30,7 @@ export function ThemeThumb({ theme, content, ctx }: { theme: Theme; content: Pag
   }, []);
   const short = useMemo(() => ({ ...content, sections: content.sections.slice(0, 3) }), [content]);
   return (
-    <div ref={box} inert aria-hidden="true" className="relative aspect-[16/11] w-full overflow-hidden bg-neutral-100 [&_header]:!static">
+    <div ref={box} inert aria-hidden="true" className="relative aspect-[16/11] w-full overflow-hidden bg-[#e7ebee] [&_header]:!static">
       {width > 0 && (
         <div style={{ width: SOURCE_WIDTH, zoom: width / SOURCE_WIDTH }}>
           <PageRenderer content={short} theme={theme} ctx={ctx} embedded />
@@ -65,7 +65,7 @@ function PalettePicker({ def, value, onChange }: { def: ThemeDef; value: string;
           aria-label={p.label}
           aria-pressed={p.key === value}
           onClick={() => onChange(p.key)}
-          className="rounded-full p-0.5 outline-offset-2 aria-pressed:ring-2 aria-pressed:ring-neutral-900 focus-visible:outline-2 focus-visible:outline-blue-700"
+          className="rounded-full p-0.5 outline-offset-2 aria-pressed:ring-2 aria-pressed:ring-[#173b6c] focus-visible:outline-2 focus-visible:outline-[#173b6c]"
         >
           <Swatch palette={p} />
         </button>
@@ -139,7 +139,7 @@ export function ThemeGallery({
             type="button"
             aria-pressed={filter === key}
             onClick={() => setFilter(key)}
-            className="rounded-full border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium aria-pressed:border-neutral-900 aria-pressed:bg-neutral-900 aria-pressed:text-white"
+            className="rounded-full border border-[#c3ccd3] bg-white px-3.5 py-2 text-sm font-medium transition-colors hover:border-[#173b6c] aria-pressed:border-[#173b6c] aria-pressed:bg-[#173b6c] aria-pressed:text-white"
           >
             {label}
           </button>
@@ -165,7 +165,7 @@ export function ThemeGallery({
           />
         ))}
       </ul>
-      {visible.length === 0 && <p className="text-sm text-neutral-600">Ingen temaer passer filteret.</p>}
+      {visible.length === 0 && <p className="text-sm text-[#47525c]">Ingen temaer passer filteret.</p>}
 
       {open && (
         <ThemePreviewDialog
@@ -228,7 +228,7 @@ function ThemeCard({
   return (
     <li
       className={`flex flex-col overflow-hidden rounded-xl border bg-white transition-shadow ${
-        selected ? "border-neutral-900 ring-2 ring-neutral-900" : "border-neutral-200 hover:shadow-md"
+        selected ? "border-[#173b6c] ring-2 ring-[#173b6c]" : "border-[#d5dbe0] hover:shadow-[0_10px_24px_-14px_rgb(23_59_108/0.45)]"
       }`}
     >
       {/* Knappen ligger over miniatyren, ikke rundt den: miniatyren har lenker og knapper fra nettsiden inni seg. */}
@@ -245,12 +245,12 @@ function ThemeCard({
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h3 className="flex flex-wrap items-center gap-2 font-semibold">
+            <h3 className="flex flex-wrap items-center gap-2 font-[family-name:var(--font-bricolage)] text-lg font-extrabold tracking-[-0.02em]">
               {def.label}
-              {recommended && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-900">Anbefalt</span>}
-              {inUse && <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-xs font-semibold text-white">I bruk</span>}
+              {recommended && <span className="rounded-full bg-[#e9f1ed] px-2 py-0.5 font-[family-name:var(--font-archivo)] text-xs font-semibold tracking-normal text-[#1e3d30]">Anbefalt</span>}
+              {inUse && <span className="rounded-full bg-[#173b6c] px-2 py-0.5 font-[family-name:var(--font-archivo)] text-xs font-semibold tracking-normal text-white">I bruk</span>}
             </h3>
-            <p className="mt-1 text-sm text-neutral-600">{def.bestFor}</p>
+            <p className="mt-1 text-sm text-[#47525c]">{def.bestFor}</p>
           </div>
         </div>
         <div className="flex items-center justify-between gap-3">
@@ -262,10 +262,10 @@ function ThemeCard({
               if (selected && !confirm) onChoose({ theme: def.key, palette: key });
             }}
           />
-          <span className="text-xs text-neutral-600">{palette.label}</span>
+          <span className="text-xs text-[#47525c]">{palette.label}</span>
         </div>
         <div className="mt-auto flex flex-wrap gap-2 pt-1">
-          <button type="button" onClick={() => onPreview(choice)} className="rounded-md border border-neutral-900 px-3 py-2 text-sm font-semibold">
+          <button type="button" onClick={() => onPreview(choice)} className="min-h-10 rounded-lg border-2 border-[#173b6c] px-3.5 py-1.5 text-sm font-semibold text-[#173b6c] transition-colors hover:bg-[#eef3f9]">
             Forhåndsvis
           </button>
           {!confirm && (
@@ -273,7 +273,7 @@ function ThemeCard({
               type="button"
               onClick={() => onChoose(choice)}
               aria-pressed={Boolean(selected)}
-              className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-semibold text-white aria-pressed:bg-emerald-800"
+              className="min-h-10 rounded-lg bg-[#173b6c] px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0f2c55] aria-pressed:bg-[#2f5a47]"
             >
               {selected ? "Valgt" : "Velg"}
             </button>
@@ -322,18 +322,18 @@ export function ThemePreviewDialog({
       ref={ref}
       onClose={onClose}
       aria-label={`Forhåndsvisning av ${def.label}`}
-      className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none bg-neutral-200 p-0 backdrop:bg-black/50"
+      className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none bg-[#e7ebee] p-0 backdrop:bg-black/50"
     >
       <div className="flex h-full flex-col">
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-neutral-300 bg-white px-4 py-3">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-[#d5dbe0] bg-white px-4 py-3">
           <div className="mr-auto">
             <h2 className="font-semibold">{def.label}</h2>
-            <p className="text-sm text-neutral-600">{def.description}</p>
+            <p className="text-sm text-[#47525c]">{def.description}</p>
           </div>
           <PalettePicker def={def} value={palette} onChange={setPalette} />
           <label className="flex items-center gap-2 text-sm">
             <span className="font-medium">Side</span>
-            <select value={page.path} onChange={(e) => setPath(e.target.value)} className="rounded-md border border-neutral-300 px-2 py-1.5">
+            <select value={page.path} onChange={(e) => setPath(e.target.value)} className="min-h-10 rounded-lg border border-[#7d8a96] bg-white px-2.5 py-1.5">
               {pages.map((p) => (
                 <option key={p.path} value={p.path}>
                   {p.title}
@@ -341,14 +341,14 @@ export function ThemePreviewDialog({
               ))}
             </select>
           </label>
-          <div role="group" aria-label="Skjermstørrelse" className="flex overflow-hidden rounded-md border border-neutral-300 text-sm">
+          <div role="group" aria-label="Skjermstørrelse" className="flex overflow-hidden rounded-lg border border-[#7d8a96] text-sm">
             {(["datamaskin", "mobil"] as const).map((d) => (
               <button
                 key={d}
                 type="button"
                 aria-pressed={device === d}
                 onClick={() => setDevice(d)}
-                className="px-3 py-1.5 font-medium capitalize aria-pressed:bg-neutral-900 aria-pressed:text-white"
+                className="px-3 py-2 font-medium capitalize aria-pressed:bg-[#173b6c] aria-pressed:text-white"
               >
                 {d}
               </button>
@@ -357,11 +357,11 @@ export function ThemePreviewDialog({
           <button
             type="button"
             onClick={() => onChoose({ theme: def.key, palette })}
-            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white"
+            className="min-h-10 rounded-lg bg-[#173b6c] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0f2c55]"
           >
             {chooseLabel}
           </button>
-          <button type="button" onClick={() => ref.current?.close()} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+          <button type="button" onClick={() => ref.current?.close()} className="min-h-10 rounded-lg border-2 border-[#173b6c] bg-white px-4 py-1.5 text-sm font-semibold text-[#173b6c]">
             Lukk
           </button>
         </div>

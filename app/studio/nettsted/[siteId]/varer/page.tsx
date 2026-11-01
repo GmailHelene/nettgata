@@ -57,16 +57,16 @@ export default async function ProductsPage({
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Varer</h2>
         <div className="flex flex-wrap gap-2">
-          <a href={`${base}/eksport`} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+          <a href={`${base}/eksport`} className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold">
             Last ned CSV
           </a>
-          <Link href={`${base}/import`} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+          <Link href={`${base}/import`} className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold">
             Importer CSV
           </Link>
-          <Link href={`${base}/pris-og-lager`} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+          <Link href={`${base}/pris-og-lager`} className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold">
             Pris og lager
           </Link>
-          <Link href={`${base}/ny`} className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white">
+          <Link href={`${base}/ny`} className="rounded-md bg-[#173b6c] px-4 py-2 text-sm font-semibold text-white">
             Ny vare
           </Link>
         </div>
@@ -105,7 +105,7 @@ export default async function ProductsPage({
                 </select>
               </>
             )}
-            <button className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">Søk</button>
+            <button className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold">Søk</button>
           </form>
 
           <nav aria-label="Filtrer varer" className="-mx-5 mb-4 overflow-x-auto px-5">
@@ -115,7 +115,7 @@ export default async function ProductsPage({
                   <Link
                     href={href({ status: key })}
                     aria-current={key === query.status ? "page" : undefined}
-                    className="block rounded-full border px-3 py-1 text-sm aria-[current=page]:border-neutral-900 aria-[current=page]:bg-neutral-900 aria-[current=page]:text-white"
+                    className="block rounded-full border px-3 py-1 text-sm aria-[current=page]:border-[#173b6c] aria-[current=page]:bg-[#173b6c] aria-[current=page]:text-white"
                   >
                     {productStatusFilters[key].label}
                   </Link>
@@ -125,7 +125,7 @@ export default async function ProductsPage({
                 <Link
                   href={href({ lager: query.lowStock ? "" : "lite" })}
                   aria-pressed={query.lowStock}
-                  className="block rounded-full border px-3 py-1 text-sm aria-pressed:border-neutral-900 aria-pressed:bg-neutral-900 aria-pressed:text-white"
+                  className="block rounded-full border px-3 py-1 text-sm aria-pressed:border-[#173b6c] aria-pressed:bg-[#173b6c] aria-pressed:text-white"
                 >
                   Lite på lager ({settings.lowStockAt} eller færre)
                 </Link>

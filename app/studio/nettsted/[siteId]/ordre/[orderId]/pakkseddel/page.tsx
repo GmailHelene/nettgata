@@ -55,7 +55,7 @@ export default async function PackingSlipPage({ params }: { params: Promise<{ si
 
       <table className="w-full border-collapse">
         <thead>
-          <tr className="border-b-2 border-neutral-900 text-left text-sm">
+          <tr className="border-b-2 border-[#173b6c] text-left text-sm">
             <th className="py-2 pr-3">Vare</th>
             <th className="py-2 pr-3">Varenr.</th>
             <th className="py-2 text-right">Antall</th>

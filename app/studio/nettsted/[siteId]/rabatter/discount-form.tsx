@@ -97,7 +97,7 @@ export function DiscountForm({ siteId, discountId, initial }: { siteId: string; 
         <legend className="mb-2 text-sm font-medium">Type rabatt</legend>
         <div className="grid gap-2 sm:grid-cols-3">
           {kinds.map((k) => (
-            <label key={k.key} className="flex cursor-pointer gap-2 rounded-md border p-3 has-[:checked]:border-neutral-900 has-[:checked]:bg-neutral-50">
+            <label key={k.key} className="flex cursor-pointer gap-2 rounded-md border p-3 has-[:checked]:border-[#173b6c] has-[:checked]:bg-neutral-50">
               <input type="radio" name="kind" checked={kind === k.key} onChange={() => setKind(k.key)} className="mt-1" />
               <span>
                 <span className="block font-medium">{k.label}</span>
@@ -138,7 +138,7 @@ export function DiscountForm({ siteId, discountId, initial }: { siteId: string; 
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
-        <button disabled={pending} className="rounded-md bg-neutral-900 px-5 py-2 font-semibold text-white disabled:opacity-60">
+        <button disabled={pending} className="rounded-md bg-[#173b6c] px-5 py-2 font-semibold text-white disabled:opacity-60">
           {pending ? "Lagrer..." : discountId ? "Lagre endringer" : "Opprett rabattkode"}
         </button>
         {message && (

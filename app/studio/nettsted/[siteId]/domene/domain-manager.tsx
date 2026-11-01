@@ -193,7 +193,7 @@ export function DomainManager({
               spellCheck={false}
               className="min-w-0 flex-1 rounded-md border border-neutral-400 px-3 py-2"
             />
-            <button disabled={pending || !input.trim()} className="rounded-md bg-neutral-900 px-5 py-2 font-semibold text-white disabled:opacity-60">
+            <button disabled={pending || !input.trim()} className="rounded-md bg-[#173b6c] px-5 py-2 font-semibold text-white disabled:opacity-60">
               {pending ? "Kobler til..." : "Koble til"}
             </button>
           </div>
@@ -278,7 +278,7 @@ export function DomainManager({
                 type="button"
                 disabled={pending}
                 onClick={() => run(() => checkDomainsAction(siteId))}
-                className="rounded-md border border-neutral-900 px-4 py-2 font-semibold disabled:opacity-60"
+                className="rounded-md border border-[#173b6c] px-4 py-2 font-semibold disabled:opacity-60"
               >
                 Sjekk nå
               </button>

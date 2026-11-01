@@ -24,7 +24,7 @@ export function SettingsForm({ siteId, name, info: initialInfo }: Props) {
         <InfoFields value={info} onChange={setInfo} />
       </section>
       <FormStatus state={state} />
-      <button disabled={pending} className="rounded-md bg-neutral-900 px-5 py-3 font-semibold text-white disabled:opacity-60">
+      <button disabled={pending} className="rounded-md bg-[#173b6c] px-5 py-3 font-semibold text-white disabled:opacity-60">
         {pending ? "Lagrer..." : "Lagre"}
       </button>
     </form>

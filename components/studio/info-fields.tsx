@@ -2,12 +2,14 @@
 
 import type { SiteInfo } from "@/lib/site-info";
 
-export const inputClass = "w-full rounded-md border border-neutral-400 bg-white px-3 py-2";
+/** Feltene i hele studioet. Kanten (#7d8a96) synes godt mot hvitt, og fokus får gateblå ring fra studiorammen. */
+export const inputClass =
+  "w-full min-h-11 rounded-lg border border-[#7d8a96] bg-white px-3.5 py-2.5 text-[#1b232b] transition-colors placeholder:text-[#6b7783] hover:border-[#47525c] focus:border-[#173b6c]";
 
 function Text({ name, label, value, onChange, ...rest }: { name: string; label: string; value: string; onChange: (v: string) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange" | "value" | "name">) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-medium">{label}</span>
+      <span className="mb-1.5 block text-sm font-semibold">{label}</span>
       <input name={name} value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} {...rest} />
     </label>
   );

@@ -169,7 +169,7 @@ export function ImageInput({
         <div className="min-w-48 flex-1 space-y-2">
           {isExample && <p className="text-sm text-amber-900">Bytt ut eksempelbildet med et eget bilde før du publiserer.</p>}
           <div className="flex flex-wrap gap-3 text-sm">
-            <label className="cursor-pointer rounded-md border border-neutral-900 px-3 py-1.5 font-semibold has-[:focus-visible]:outline-2">
+            <label className="cursor-pointer rounded-md border border-[#173b6c] px-3 py-1.5 font-semibold has-[:focus-visible]:outline-2">
               {busy ? "Laster opp..." : hasImage ? "Bytt bilde" : "Last opp bilde"}
               <input
                 ref={fileRef}

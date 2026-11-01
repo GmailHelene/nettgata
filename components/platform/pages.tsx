@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
+import { heading, signType, StreetSign } from "@/components/brand";
 import { PageRenderer } from "@/components/sections";
 import { bransjeLabel, genres, lowerLabel } from "@/lib/genres";
 import { packPreview } from "@/lib/pack-preview";
@@ -20,8 +21,6 @@ import { LeadForm } from "./lead-form";
  * Det kunden ser her, er det hun får.
  */
 
-const heading = "font-[family-name:var(--font-bricolage)] font-extrabold tracking-[-0.025em]";
-const signType = "font-[family-name:var(--font-barlow)] font-bold uppercase tracking-[0.14em]";
 const muted = "text-[#47525c]";
 const container = "mx-auto w-full max-w-6xl px-4 sm:px-6";
 const button =
@@ -82,19 +81,6 @@ function Swatches({ themeKey }: { themeKey: string }) {
         />
       ))}
     </ul>
-  );
-}
-
-/** Logoen er et emaljert gateskilt: hvit skrift og hvit kant på gateblått. */
-function StreetSign({ size = "md" }: { size?: "md" | "lg" }) {
-  return (
-    <span className="inline-flex rounded-[6px] bg-[#173b6c] p-[3px] shadow-[0_1px_0_rgb(0_0_0/0.3)]">
-      <span
-        className={`${signType} rounded-[4px] border-2 border-white leading-none text-white ${size === "lg" ? "px-3.5 pb-1 pt-1.5 text-xl" : "px-2.5 pb-[3px] pt-[5px] text-[1.05rem]"}`}
-      >
-        Nettgata
-      </span>
-    </span>
   );
 }
 

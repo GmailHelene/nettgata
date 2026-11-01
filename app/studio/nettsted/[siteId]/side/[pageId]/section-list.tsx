@@ -129,7 +129,7 @@ export function SectionList({
               key={section.id}
               id={`seksjon-${section.id}`}
               data-card-id={section.id}
-              className={`relative rounded-lg border bg-white ${open ? "border-neutral-900 shadow-sm" : "border-neutral-300"} ${
+              className={`relative rounded-lg border bg-white ${open ? "border-[#173b6c] shadow-sm" : "border-neutral-300"} ${
                 dragging ? "z-10 shadow-xl ring-2 ring-blue-600" : ""
               }`}
               style={dragging ? { transform: `translateY(${drag.dy}px)` } : undefined}
@@ -257,7 +257,7 @@ export function SectionList({
                   </div>
                   <FieldGroup fields={def.fields} value={section.props} onChange={(props) => onChange(i, { ...section, props }, true)} />
                   <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-neutral-200 pt-4 text-sm">
-                    <button type="button" onClick={() => onAdd(i + 1)} className="rounded-md border border-neutral-900 px-3 py-1.5 font-semibold">
+                    <button type="button" onClick={() => onAdd(i + 1)} className="rounded-md border border-[#173b6c] px-3 py-1.5 font-semibold">
                       + Legg til seksjon under
                     </button>
                     <button type="button" onClick={() => onDuplicate(i)} className="underline">

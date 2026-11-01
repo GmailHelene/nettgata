@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   // PGlite brukes kun lokalt og i tester; den skal ikke bundles.
   serverExternalPackages: ["@electric-sql/pglite"],
   poweredByHeader: false,
+  // Bare for utviklingsserveren (npm run dev lytter på localhost): nettstedene vises på *.localhost, og uten dette
+  // avviser Next forespørslene derfra til utviklingsressursene.
+  allowedDevOrigins: ["localhost", "*.localhost"],
   async headers() {
     return [
       {

@@ -43,7 +43,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ siteI
                 : "Nettstedet har ikke eget domene ennå"}
           </p>
         </div>
-        <Link href={`/studio/nettsted/${site.id}/domene`} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+        <Link href={`/studio/nettsted/${site.id}/domene`} className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold">
           {primary || waiting ? "Administrer domene" : "Koble til domene"}
         </Link>
       </section>
@@ -54,7 +54,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ siteI
             {preset ? `Temaet ${preset.def.label}, fargene ${preset.palette.label}` : "Eget oppsett fra før temaene kom"}
           </p>
         </div>
-        <Link href={`/studio/nettsted/${site.id}/design`} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+        <Link href={`/studio/nettsted/${site.id}/design`} className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold">
           Bytt tema eller tilpass
         </Link>
       </section>
@@ -115,7 +115,7 @@ function BringLink({ siteId, shop }: { siteId: string; shop: unknown }) {
               : "Pris fra Bring i kassen og fraktetikett fra ordren, med din egen Bring-avtale"}
         </p>
       </div>
-      <Link href={`/studio/nettsted/${siteId}/innstillinger/bring`} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+      <Link href={`/studio/nettsted/${siteId}/innstillinger/bring`} className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold">
         {account ? "Administrer Bring" : "Sett opp Bring"}
       </Link>
     </section>

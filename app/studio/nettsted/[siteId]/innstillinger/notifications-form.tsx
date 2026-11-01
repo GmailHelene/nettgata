@@ -70,7 +70,7 @@ export function NotificationsForm({
         type="button"
         disabled={pending}
         onClick={() => startTransition(async () => setState(await saveNotificationsAction(siteId, settings)))}
-        className="rounded-md bg-neutral-900 px-5 py-2 font-semibold text-white disabled:opacity-60"
+        className="rounded-md bg-[#173b6c] px-5 py-2 font-semibold text-white disabled:opacity-60"
       >
         Lagre varsler
       </button>

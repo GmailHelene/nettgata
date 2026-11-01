@@ -57,14 +57,14 @@ export default async function OrdersPage({
             placeholder="Ordrenummer, navn, e-post eller sporingsnummer"
             className="min-w-0 flex-1 rounded-md border border-neutral-400 px-3 py-2"
           />
-          <button className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">Søk</button>
+          <button className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold">Søk</button>
         </form>
         {(counts.paid ?? 0) > 0 && (
-          <Link href={`${base}/plukkliste`} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+          <Link href={`${base}/plukkliste`} className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold">
             Plukkliste ({counts.paid})
           </Link>
         )}
-        <a href={exportHref} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+        <a href={exportHref} className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold">
           Last ned CSV
         </a>
       </div>
@@ -76,7 +76,7 @@ export default async function OrdersPage({
               <Link
                 href={href({ status: key, side: 1 })}
                 aria-current={key === query.filter ? "page" : undefined}
-                className="block rounded-full border px-3 py-1 text-sm aria-[current=page]:border-neutral-900 aria-[current=page]:bg-neutral-900 aria-[current=page]:text-white"
+                className="block rounded-full border px-3 py-1 text-sm aria-[current=page]:border-[#173b6c] aria-[current=page]:bg-[#173b6c] aria-[current=page]:text-white"
               >
                 {orderFilters[key].label} <span className="tabular-nums opacity-80">({countFor(key)})</span>
               </Link>

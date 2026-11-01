@@ -3,6 +3,9 @@
 import { Fragment, useState, type ReactNode } from "react";
 import { bransjeLabel, findBransje, genres, lowerLabel, searchBransjer, type BransjeMatch, type GenreIcon } from "@/lib/genres";
 import { getPack } from "@/lib/packs";
+import { heading } from "@/components/brand";
+import { inputClass } from "./info-fields";
+import { ui } from "./ui";
 
 /** Enkle strekikoner, tegnet for sjangrene. 24 x 24, farge fra teksten rundt. */
 const icons: Record<GenreIcon, ReactNode> = {
@@ -51,7 +54,7 @@ const icons: Record<GenreIcon, ReactNode> = {
 
 function Icon({ name }: { name: GenreIcon }) {
   return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {icons[name]}
     </svg>
   );
@@ -84,24 +87,24 @@ export function GenrePicker({
   return (
     <div className="space-y-5">
       {suggestion && suggestion.bransje.pack !== value && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-950">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#2f5a47]/35 bg-[#e9f1ed] p-4 text-sm text-[#1e3d30]">
           <p>
             Ut fra Brønnøysundregistrene ser det ut som dere driver med <strong>{lowerLabel(bransjeLabel(suggestion.bransje))}</strong>.
           </p>
-          <button type="button" onClick={() => choose(suggestion)} className="rounded-md bg-emerald-900 px-3 py-1.5 font-semibold text-white">
+          <button type="button" onClick={() => choose(suggestion)} className="min-h-10 rounded-lg bg-[#2f5a47] px-4 py-2 font-semibold text-white transition-colors hover:bg-[#244636]">
             Bruk forslaget
           </button>
         </div>
       )}
 
       <label className="block">
-        <span className="mb-1 block text-sm font-medium">Søk etter bransje</span>
+        <span className={ui.label}>Søk etter bransje</span>
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="For eksempel frisør, rørlegger eller kafé"
-          className="w-full rounded-md border border-neutral-300 px-3 py-2"
+          className={inputClass}
         />
       </label>
       {query.trim().length >= 2 && (
@@ -114,7 +117,7 @@ export function GenrePicker({
                     type="button"
                     aria-pressed={m.bransje.pack === value}
                     onClick={() => choose(m)}
-                    className="rounded-full border border-neutral-300 bg-white px-3 py-1.5 text-sm aria-pressed:border-neutral-900 aria-pressed:bg-neutral-900 aria-pressed:text-white"
+                    className="rounded-full border border-[#c3ccd3] bg-white px-3.5 py-2 text-sm transition-colors hover:border-[#173b6c] aria-pressed:border-[#173b6c] aria-pressed:bg-[#173b6c] aria-pressed:text-white"
                   >
                     <span className="font-semibold">{bransjeLabel(m.bransje)}</span>
                     <span className="ml-1 opacity-75">· {m.genre.label}</span>
@@ -123,7 +126,7 @@ export function GenrePicker({
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-neutral-700">
+            <p className={`text-sm ${ui.muted}`}>
               Fant ingen bransje med det navnet. Velg «Annen bedrift» under Service og annet, så kan du tilpasse alt selv.
             </p>
           )}
@@ -142,23 +145,23 @@ export function GenrePicker({
                   aria-expanded={open}
                   aria-controls={open ? `sjanger-${genre.key}` : undefined}
                   onClick={() => setOpenGenre(open ? null : genre.key)}
-                  className={`flex h-full w-full items-start gap-3 rounded-lg border bg-white p-4 text-left transition-colors hover:border-neutral-900 ${
-                    open || holdsValue ? "border-neutral-900 ring-1 ring-neutral-900" : "border-neutral-200"
+                  className={`flex h-full w-full items-start gap-3.5 rounded-xl border bg-white p-4 text-left transition-[border-color,box-shadow] hover:border-[#173b6c] ${
+                    open || holdsValue ? "border-[#173b6c] shadow-[0_0_0_1px_#173b6c]" : "border-[#d5dbe0]"
                   }`}
                 >
-                  <span className="mt-0.5 shrink-0 text-neutral-800">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-[#173b6c] text-white">
                     <Icon name={genre.icon} />
                   </span>
                   <span>
-                    <span className="block font-semibold">{genre.label}</span>
-                    <span className="mt-0.5 block text-sm text-neutral-600">{genre.description}</span>
-                    {holdsValue && chosen && <span className="mt-2 block text-sm font-semibold text-emerald-800">Valgt: {bransjeLabel(chosen.bransje)}</span>}
+                    <span className={`${heading} block text-lg leading-tight`}>{genre.label}</span>
+                    <span className={`mt-1 block text-sm ${ui.muted}`}>{genre.description}</span>
+                    {holdsValue && chosen && <span className="mt-2 block text-sm font-semibold text-[#2f5a47]">✓ Valgt: {bransjeLabel(chosen.bransje)}</span>}
                   </span>
                 </button>
               </li>
               {open && (
-                <li id={`sjanger-${genre.key}`} className="rounded-lg border border-neutral-300 bg-neutral-50 p-4 sm:col-span-2 lg:col-span-3">
-                  <p className="mb-3 text-sm font-medium">Hva passer best for dere?</p>
+                <li id={`sjanger-${genre.key}`} className="rounded-xl border border-[#d5dbe0] bg-[#f7f9fa] p-4 sm:col-span-2 sm:p-5 lg:col-span-3">
+                  <p className="mb-3 text-sm font-semibold">Hva passer best for dere?</p>
                   <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {genre.bransjer.map((bransje) => {
                       const pack = getPack(bransje.pack);
@@ -169,7 +172,7 @@ export function GenrePicker({
                             type="button"
                             aria-pressed={selected}
                             onClick={() => onChange(bransje.pack)}
-                            className="h-full w-full rounded-md border border-neutral-300 bg-white p-3 text-left hover:border-neutral-900 aria-pressed:border-neutral-900 aria-pressed:bg-neutral-900 aria-pressed:text-white"
+                            className="h-full w-full rounded-lg border border-[#d5dbe0] bg-white p-3.5 text-left transition-colors hover:border-[#173b6c] aria-pressed:border-[#173b6c] aria-pressed:bg-[#173b6c] aria-pressed:text-white"
                           >
                             <span className="block font-semibold">{bransjeLabel(bransje)}</span>
                             {pack && <span className="mt-0.5 block text-sm opacity-80">{pack.description}</span>}

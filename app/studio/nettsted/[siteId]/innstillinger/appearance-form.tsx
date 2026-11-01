@@ -119,7 +119,7 @@ export function AppearanceForm({ siteId, initial }: { siteId: string; initial: S
         <button
           disabled={pending}
           onClick={() => startTransition(async () => setState(await saveAppearanceAction(siteId, { layout })))}
-          className="rounded-md bg-neutral-900 px-5 py-3 font-semibold text-white disabled:opacity-60"
+          className="rounded-md bg-[#173b6c] px-5 py-3 font-semibold text-white disabled:opacity-60"
         >
           {pending ? "Lagrer..." : "Lagre utseende"}
         </button>

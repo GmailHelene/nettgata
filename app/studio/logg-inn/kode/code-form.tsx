@@ -1,14 +1,16 @@
 "use client";
 
 import { useActionState } from "react";
+import { inputClass } from "@/components/studio/info-fields";
+import { ui } from "@/components/studio/ui";
 import { verifyCodeAction } from "../../actions";
 
 export function CodeForm() {
   const [state, action, pending] = useActionState(verifyCodeAction, null);
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} className="space-y-5">
       <label className="block">
-        <span className="mb-1 block text-sm font-medium">Kode fra appen eller reservekode</span>
+        <span className={ui.label}>Kode fra appen eller reservekode</span>
         <input
           name="code"
           autoComplete="one-time-code"
@@ -16,15 +18,15 @@ export function CodeForm() {
           required
           maxLength={20}
           spellCheck={false}
-          className="w-full rounded-md border border-neutral-400 px-3 py-2 text-lg tracking-widest"
+          className={`${inputClass} text-lg tracking-widest`}
         />
       </label>
       {state && !state.ok && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className={ui.error}>
           {state.message}
         </p>
       )}
-      <button disabled={pending} className="w-full rounded-md bg-neutral-900 px-4 py-2 font-semibold text-white disabled:opacity-60">
+      <button disabled={pending} className={`${ui.button} w-full`}>
         {pending ? "Sjekker koden..." : "Logg inn"}
       </button>
     </form>

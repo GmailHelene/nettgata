@@ -6,7 +6,7 @@ import { ADDON, ADDON_AVAILABLE, PLANS, VAT_PERCENT, quote, type BillingInterval
 import { formatNok } from "@/lib/shop/money";
 import { startCheckoutAction } from "./actions";
 
-const card = "flex cursor-pointer items-start gap-3 rounded-md border border-neutral-300 p-4 has-checked:border-neutral-900 has-checked:bg-neutral-50";
+const card = "flex cursor-pointer items-start gap-3 rounded-md border border-neutral-300 p-4 has-checked:border-[#173b6c] has-checked:bg-neutral-50";
 
 /**
  * Valg av betaling, tillegg og oppstart. Planen følger nettstedets type. Prisene og summen regnes ut her
@@ -115,7 +115,7 @@ export function PlanForm({
         <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950">{blockedReason}</p>
       ) : (
         <div>
-          <button disabled={pending} className="rounded-md bg-neutral-900 px-5 py-2 font-semibold text-white disabled:opacity-60">
+          <button disabled={pending} className="rounded-md bg-[#173b6c] px-5 py-2 font-semibold text-white disabled:opacity-60">
             {pending ? "Åpner betalingen..." : "Gå til betaling"}
           </button>
           <p className="mt-2 text-sm text-neutral-600">

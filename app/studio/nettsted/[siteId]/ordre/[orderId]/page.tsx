@@ -86,7 +86,7 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
           href={`/studio/nettsted/${site.id}/ordre/${order.id}/pakkseddel`}
           target="_blank"
           rel="noreferrer"
-          className="ml-auto rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold"
+          className="ml-auto rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold"
         >
           Pakkseddel
         </a>
@@ -211,7 +211,7 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
                   href={`/studio/nettsted/${site.id}/ordre/${order.id}/etikett`}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-block rounded-md border border-neutral-900 px-4 py-2 font-semibold"
+                  className="inline-block rounded-md border border-[#173b6c] px-4 py-2 font-semibold"
                 >
                   Last ned etiketten (PDF)
                 </a>

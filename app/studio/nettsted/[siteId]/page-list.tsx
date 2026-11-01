@@ -25,7 +25,7 @@ export function PageList({ siteId, pages }: { siteId: string; pages: PageRow[] }
             <button
               disabled={pending}
               onClick={() => startTransition(async () => setStatus(await publishAllAction(siteId)))}
-              className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              className="rounded-md bg-[#173b6c] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
             >
               Publiser alle sider ({unpublished} ikke publisert)
             </button>
@@ -98,7 +98,7 @@ export function PageList({ siteId, pages }: { siteId: string; pages: PageRow[] }
             <span className="mb-1 block text-sm font-medium">Adresse (valgfritt)</span>
             <input name="path" placeholder="/om-oss" className={inputClass} />
           </label>
-          <button disabled={creating} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+          <button disabled={creating} className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold">
             Lag side
           </button>
         </form>
@@ -117,7 +117,7 @@ export function PageList({ siteId, pages }: { siteId: string; pages: PageRow[] }
             <span className="mb-1 block text-sm font-medium">Tittel på innlegget</span>
             <input name="title" required maxLength={120} className={inputClass} />
           </label>
-          <button disabled={posting} className="rounded-md border border-neutral-900 px-4 py-2 text-sm font-semibold">
+          <button disabled={posting} className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold">
             Lag innlegg
           </button>
         </form>
