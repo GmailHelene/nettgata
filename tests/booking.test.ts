@@ -2,10 +2,12 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SectionPreview, type RenderContext } from "@/components/sections";
-import { embeddableHost } from "@/lib/booking";
+import { embeddableHost, embeddedBookingHosts } from "@/lib/booking";
 import { exampleSection, hasExampleText } from "@/lib/content/examples";
 import { validatePageContent } from "@/lib/content/registry";
 import type { Section } from "@/lib/content/types";
+import { sideSomTekst } from "@/lib/legal/felles";
+import { lagPersonvernerklaering } from "@/lib/legal/personvern";
 import { readSiteInfo } from "@/lib/site-info";
 import { readSiteLayout } from "@/lib/site-layout";
 import { buildTheme } from "@/lib/themes";
@@ -63,5 +65,34 @@ describe("timebestilling", () => {
     expect(validatePageContent({ seo: {}, sections: [example] }, "draft").ok).toBe(true);
     expect(validatePageContent({ seo: {}, sections: [example] }).ok).toBe(false);
     expect(validatePageContent({ seo: {}, sections: [section("knapp", "https://timma.no/salong/x")] }).ok).toBe(true);
+  });
+});
+
+describe("personvernerklæringen og innebygd timebestilling", () => {
+  const side = (...sections: Section[]) => ({ seo: {}, sections });
+  const salongen = { navn: "Salongen", info: readSiteInfo({ email: "post@salongen.no" }) };
+  const tekst = (bookingtjenester?: string[]) =>
+    sideSomTekst(lagPersonvernerklaering({ virksomhet: salongen, type: "nettside", bookingtjenester }))
+      .flatMap((s) => [s.overskrift, ...s.avsnitt])
+      .join(" ");
+
+  it("finner bare systemene som faktisk er bygget inn, uten dubletter", () => {
+    const hosts = embeddedBookingHosts([
+      side(section("innebygd", "https://salongen.timma.no/booking"), section("knapp", "https://calendly.com/salongen")),
+      side(section("innebygd", "https://timma.no/salong"), section("innebygd", "https://example.com/booking")),
+    ]);
+    expect(hosts).toEqual(["timma.no"]);
+    expect(embeddedBookingHosts([side(section("knapp", "https://timma.no/salong"))])).toEqual([]);
+  });
+
+  it("nevner timebestillingen bare når den er bygget inn", () => {
+    const med = tekst(["timma.no"]);
+    expect(med).toContain("Timebestillingen på nettstedet kommer fra timma.no.");
+    expect(med).toContain("Da får timma.no IP-adressen din");
+    expect(med).toContain("ta kontakt med oss på e-post post@salongen.no");
+    expect(med).toContain("Mer om det under «Timebestilling».");
+    const uten = tekst();
+    expect(uten).not.toContain("Timebestilling");
+    expect(tekst(["calendly.com", "timma.no"])).toContain("kommer fra calendly.com og timma.no");
   });
 });

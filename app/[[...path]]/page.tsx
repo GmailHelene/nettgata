@@ -9,13 +9,14 @@ import { effectiveTitle, firstContentImage, shareImageSrc } from "@/lib/content/
 import { getDb } from "@/db";
 import { productCategories, sites } from "@/db/schema";
 import { isPlatformHost, resolveHost } from "@/lib/hosts";
-import { getPublishedPage, normalizePath } from "@/lib/publishing";
+import { getPublishedContents, getPublishedPage, normalizePath } from "@/lib/publishing";
+import { embeddedBookingHosts } from "@/lib/booking";
 import { buildRenderContext } from "@/lib/render";
 import { listCatalog } from "@/lib/shop/catalog";
 import { readShopSettings } from "@/lib/shop/settings";
 import { parseBrowseQuery } from "@/lib/shop/browse";
 import { findRedirect } from "@/lib/redirects";
-import { generatedLegalPage } from "@/lib/legal/kundesider";
+import { GENERATED_PATHS, generatedLegalPage } from "@/lib/legal/kundesider";
 import type { PageContent } from "@/lib/content/types";
 import { renderPlatformPage } from "@/components/platform/pages";
 import { platformMetadata, platformRoute } from "@/lib/platform-routes";
@@ -224,7 +225,10 @@ export default async function PublicPage(props: Props) {
     // Personvernerklæring og angrerett lages automatisk når kunden ikke har laget en egen side der.
     // Er ikke forsiden publisert ennå, får den som har fått adressen en «snart klar»-side, ikke «Fant ikke siden».
     const at = normalizePath(path);
-    const generated = generatedLegalPage(site, at) ?? (at === "/" ? comingSoonPage(site.name) : null);
+    // Personvernerklæringen nevner bookingsystemene som er bygget inn på de publiserte sidene.
+    const bookingHosts =
+      at === GENERATED_PATHS.personvern ? embeddedBookingHosts(await getPublishedContents(db, site.id)) : [];
+    const generated = generatedLegalPage(site, at, { bookingHosts }) ?? (at === "/" ? comingSoonPage(site.name) : null);
     if (!generated) notFound();
     const legalCtx = await buildRenderContext(db, site, at, false, basePath);
     return <PageRenderer content={generated} theme={site.theme} ctx={legalCtx} />;

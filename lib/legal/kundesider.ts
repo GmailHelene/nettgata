@@ -12,14 +12,25 @@ export const GENERATED_PATHS = { personvern: "/personvern", angrerett: "/angrere
 /**
  * Personvernerklæringen (alle) og angrerettsiden (nettbutikker), laget fra nettstedets egne opplysninger og valg.
  * Oppdateres av seg selv når kunden endrer info eller betalingsmåter, fordi de lages når siden vises.
+ * bookingHosts er bookingsystemene som er bygget inn på de publiserte sidene (embeddedBookingHosts).
  */
-export function generatedLegalPage(site: SiteLike, path: string): PageContent | null {
+export function generatedLegalPage(
+  site: SiteLike,
+  path: string,
+  extra: { bookingHosts?: readonly string[] } = {},
+): PageContent | null {
   const butikk = { navn: site.name, info: readSiteInfo(site.info) };
   const shop = site.kind === "nettbutikk";
   const betalingsmater = shop ? availablePaymentMethods(readShopSettings(site.shop)) : [];
   if (path === GENERATED_PATHS.personvern) {
     // AI-rapporten er ikke bygget ennå. Erklæringen nevner den først når den er slått på.
-    return lagPersonvernerklaering({ virksomhet: butikk, type: site.kind, betalingsmater, ai: false });
+    return lagPersonvernerklaering({
+      virksomhet: butikk,
+      type: site.kind,
+      betalingsmater,
+      ai: false,
+      bookingtjenester: extra.bookingHosts,
+    });
   }
   if (path === GENERATED_PATHS.angrerett && shop) return lagAngrerettside({ butikk, betalingsmater });
   return null;

@@ -1,6 +1,16 @@
 import type { PageContent, Section } from "@/lib/content/types";
 import type { PaymentMethod } from "@/lib/shop/settings";
-import { GRONBERG, identitet, kontaktmater, lagSide, norskDato, tekstSeksjon, TEKSTVERSJON, type Virksomhet } from "./felles";
+import {
+  GRONBERG,
+  identitet,
+  kontaktmater,
+  lagSide,
+  norskDato,
+  oppramsing,
+  tekstSeksjon,
+  TEKSTVERSJON,
+  type Virksomhet,
+} from "./felles";
 
 /*
  * UTKAST. Helene må lese teksten før den brukes. Den er ikke juridisk rådgivning.
@@ -33,6 +43,8 @@ export type PersonvernInput = {
   bring?: boolean;
   /** Kontaktskjema på nettstedet. Standard er ja. */
   kontaktskjema?: boolean;
+  /** Bookingsystemene som er bygget inn på de publiserte sidene (embeddedBookingHosts), for eksempel «timma.no». */
+  bookingtjenester?: readonly string[];
   /** Nyhetsbrev med dobbel opt-in. Standard er nei, til nyhetsbrevet er bygget. */
   nyhetsbrev?: boolean;
   /** Ukentlig AI-rapport eller AI-team. Standard er ja, fordi AI-rapporten er med i begge abonnementene. */
@@ -71,6 +83,8 @@ export function lagPersonvernerklaering(input: PersonvernInput): PageContent {
   const betalingstekster = betaling(input, metoder);
   const klarna = metoder.includes("klarna");
   const bring = input.bring ?? true;
+  const booking = input.bookingtjenester ?? [];
+  const enBooking = booking.length === 1 ? booking[0] : null;
 
   const seksjoner = [
     tekstSeksjon("personvern", "Personvernerklæring", [
@@ -82,7 +96,7 @@ export function lagPersonvernerklaering(input: PersonvernInput): PageContent {
     tekstSeksjon("besok", "Når du besøker nettstedet", [
       "Når du åpner en side, får serveren IP-adressen din og vet hvilken nettleser du bruker. Det trengs for å sende siden til deg. De samme opplysningene brukes til å oppdage og stoppe angrep og misbruk. Grunnlaget er vår berettigede interesse i et nettsted som virker og er trygt (personvernforordningen artikkel 6 nr. 1 bokstav f).",
       "Tekniske logger slettes automatisk innen sju dager. Når noen sender et skjema, lagres ikke IP-adressen i klartekst, bare en kort kode som brukes til å stoppe spam. Koden slettes automatisk etter kort tid.",
-      "Vi bruker ingen informasjonskapsler til statistikk eller markedsføring, og vi følger deg ikke fra side til side på nettet. Teller vi besøk, skjer det uten informasjonskapsler og uten at vi ser hvem du er. Derfor møter du ikke noe samtykkebanner her.",
+      `Vi bruker ingen informasjonskapsler til statistikk eller markedsføring, og vi følger deg ikke fra side til side på nettet. Teller vi besøk, skjer det uten informasjonskapsler og uten at vi ser hvem du er. Derfor møter du ikke noe samtykkebanner her.${booking.length ? " Timebestillingen hentes fra en annen leverandør, og bare når du selv åpner den. Mer om det under «Timebestilling»." : ""}`,
       butikk &&
         "Handlekurven lagres i nettleseren din, slik at varene fortsatt ligger der når du kommer tilbake. Den inneholder bare hvilke varer og hvor mange, ikke hvem du er. Lagringen trengs for at handlekurven du selv fyller skal virke, og krever derfor ikke samtykke etter ekomloven § 3-15. Kurven tømmes når du har bestilt, og du kan tømme den selv når du vil.",
     ]),
@@ -92,6 +106,13 @@ export function lagPersonvernerklaering(input: PersonvernInput): PageContent {
         "Skriver du til oss i kontaktskjemaet, lagrer vi navnet ditt, e-postadressen og telefonnummeret du oppgir, selve meldingen og hvilken side du sendte den fra. Meldingen havner i innboksen vår, og vi får et varsel på e-post.",
         "Vi bruker opplysningene til å svare deg og følge opp det du spør om. Gjelder det et kjøp eller et tilbud, er grunnlaget at vi skal kunne inngå en avtale med deg (artikkel 6 nr. 1 bokstav b). Ellers er det vår berettigede interesse i å svare på det du lurer på (bokstav f).",
         "Vi sletter henvendelser når saken er ferdig, og senest tolv måneder etter at vi sist hadde kontakt, med mindre de blir en del av et kundeforhold eller vi må ta vare på dem etter loven.",
+      ]),
+
+    booking.length > 0 &&
+      tekstSeksjon("timebestilling", "Timebestilling", [
+        `Timebestillingen på nettstedet kommer fra ${oppramsing(booking)}. Den lastes først når du trykker på knappen for å åpne den. Da får ${enBooking ?? "leverandøren"} IP-adressen din og vet hvilken nettleser du bruker, og kan lagre informasjonskapsler hos deg.`,
+        "Det du fyller inn når du bestiller, går rett til bookingsystemet, og vi får bestillingen derfra. Vi bruker den til å gi deg timen eller plassen du har bestilt. Grunnlaget er avtalen med deg (artikkel 6 nr. 1 bokstav b).",
+        `Hva ${enBooking ?? "leverandørene"} selv gjør med opplysningene, står i personvernerklæringen ${enBooking ? "deres" : "til hver av dem"}. Vil du heller bestille uten å åpne bookingsystemet, kan du ta kontakt med oss${kontakt ? ` på ${kontakt}` : ""}.`,
       ]),
 
     butikk &&

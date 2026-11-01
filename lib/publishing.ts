@@ -25,6 +25,16 @@ export async function getPublishedPage(db: Db, siteId: string, path: string) {
   return { pageId: row.page.id, title: row.version.title, content: row.version.content, versionNumber: row.version.number };
 }
 
+/** Innholdet på alle publiserte sider på nettstedet, for eksempel for å se hva personvernerklæringen må nevne. */
+export async function getPublishedContents(db: Db, siteId: string): Promise<PageContent[]> {
+  const rows = await db
+    .select({ content: pageVersions.content })
+    .from(pages)
+    .innerJoin(pageVersions, eq(pages.publishedVersionId, pageVersions.id))
+    .where(eq(pages.siteId, siteId));
+  return rows.map((r) => r.content);
+}
+
 /** Stopper publisering av en side med bilder som er slettet fra bildebiblioteket. */
 async function assertMediaExists(db: Db, siteId: string, content: unknown) {
   const missing = await missingMedia(db, siteId, content);

@@ -251,6 +251,7 @@ export function plattformDatabehandleravtale(o: Valg = {}): PageContent {
       "Vil jeg ta i bruk en ny underleverandør eller bytte ut en, sier jeg fra på e-post minst 30 dager før. Du kan protestere. Finner vi ikke en løsning, kan du si opp abonnementet før endringen og få tilbake det du har betalt for tiden etterpå.",
       ...UNDERLEVERANDORER.map(underleverandorAvsnitt),
       "Vipps MobilePay, Klarna og Posten Bring er ikke underleverandører. Butikken har egne avtaler med dem, og de er selv behandlingsansvarlige for opplysningene de får.",
+      "Fiken er heller ikke underleverandør. Kobler du til Fiken, sender jeg bestillingene dit fordi du har bedt om det, og hvordan Fiken behandler dem, følger av avtalen du har med Fiken.",
     ]),
 
     tekstSeksjon("dba-overforing", "Overføring utenfor EØS", [
