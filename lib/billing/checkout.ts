@@ -163,6 +163,9 @@ export async function startCheckout(db: Db, stripe: StripeClient, input: StartCh
 
   const session = await stripe.post<StripeCheckoutSession>("/v1/checkout/sessions", {
     mode: "subscription",
+    // Grønberg Tech Solutions selger selv og beregner mva med egen skattesats. Stripe sin «Managed Payments»
+    // (Stripe som selger) kan være slått på som standard på kontoen, og krever da skattekode på hvert produkt.
+    managed_payments: { enabled: false },
     customer,
     // Adressen og bedriftsnavnet fra Checkout lagres på kunden, så de kommer med på fakturaen.
     customer_update: { address: "auto", name: "auto" },
