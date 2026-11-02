@@ -24,6 +24,10 @@ import {
  * - Vipps: «Bedriften blir behandlingsansvarlig for de personopplysningene som deles med den», og Vipps er
  *   behandlingsansvarlig for sin egen behandling (vilkår for privatbrukere, 16. oktober 2026). Vipps MobilePay AS heter
  *   Vipps AS fra 12. januar 2027.
+ * - Kart og video (sjekket 2. november 2026): Datatilsynets veileder om samtykke til informasjonskapsler (april 2025)
+ *   sier at ekomloven § 3-15 krever samtykke etter personvernforordningen for informasjonskapsler som ikke er strengt
+ *   nødvendige. Innebygd innhold fra Google lastes derfor først når den besøkende har lest knappeteksten og trykket.
+ *   Google Ireland Limited er behandlingsansvarlig for brukere i EØS (Googles personvernerklæring).
  * - Klarna: «independent data controller» (Klarna Merchant Privacy Factsheet).
  * - Posten Bring: «Vi er behandlingsansvarlig for slik informasjon» (personvernerklæringen til Posten Bring-konsernet).
  */
@@ -47,7 +51,9 @@ export type PersonvernInput = {
   bookingtjenester?: readonly string[];
   /** Egen timebestilling (lib/egen-booking) er i bruk. Standard er nei. */
   egenBooking?: boolean;
-  /** Nyhetsbrev med dobbel opt-in. Standard er nei, til nyhetsbrevet er bygget. */
+  /** Kart (Google Maps) og video (YouTube) som lastes ved trykk (embeddedServices i lib/embeds.ts). Standard er nei. */
+  innebygd?: { kart?: boolean; video?: boolean };
+  /** Nyhetsbrev med dobbel opt-in (usesNewsletter i lib/nyhetsbrev/subscribers.ts). Standard er nei. */
   nyhetsbrev?: boolean;
   /** Ukentlig AI-rapport eller AI-team. Standard er ja, fordi AI-rapporten er med i begge abonnementene. */
   ai?: boolean;
@@ -87,6 +93,9 @@ export function lagPersonvernerklaering(input: PersonvernInput): PageContent {
   const bring = input.bring ?? true;
   const booking = input.bookingtjenester ?? [];
   const enBooking = booking.length === 1 ? booking[0] : null;
+  const kart = input.innebygd?.kart ?? false;
+  const video = input.innebygd?.video ?? false;
+  const kartOgVideo = kart && video ? "kartet og videoene" : kart ? "kartet" : "videoene";
 
   const seksjoner = [
     tekstSeksjon("personvern", "Personvernerklæring", [
@@ -98,7 +107,7 @@ export function lagPersonvernerklaering(input: PersonvernInput): PageContent {
     tekstSeksjon("besok", "Når du besøker nettstedet", [
       "Når du åpner en side, får serveren IP-adressen din og vet hvilken nettleser du bruker. Det trengs for å sende siden til deg. De samme opplysningene brukes til å oppdage og stoppe angrep og misbruk. Grunnlaget er vår berettigede interesse i et nettsted som virker og er trygt (personvernforordningen artikkel 6 nr. 1 bokstav f).",
       "Tekniske logger slettes automatisk innen sju dager. Når noen sender et skjema, lagres ikke IP-adressen i klartekst, bare en kort kode som brukes til å stoppe spam. Koden slettes automatisk etter kort tid.",
-      `Vi bruker ingen informasjonskapsler til statistikk eller markedsføring, og vi følger deg ikke fra side til side på nettet. Teller vi besøk, skjer det uten informasjonskapsler og uten at vi ser hvem du er. Derfor møter du ikke noe samtykkebanner her.${booking.length ? " Timebestillingen hentes fra en annen leverandør, og bare når du selv åpner den. Mer om det under «Timebestilling»." : ""}`,
+      `Vi bruker ingen informasjonskapsler til statistikk eller markedsføring, og vi følger deg ikke fra side til side på nettet. Besøk telles uten informasjonskapsler og uten at vi ser hvem du er. For at hver besøkende bare skal telles én gang per dag, lages en kode av IP-adressen og nettleseren din. Koden byttes hver dag og slettes innen to døgn, og IP-adressen lagres ikke. Derfor møter du ikke noe samtykkebanner her.${booking.length ? " Timebestillingen hentes fra en annen leverandør, og bare når du selv åpner den. Mer om det under «Timebestilling»." : ""}${kart || video ? ` ${kartOgVideo[0].toUpperCase()}${kartOgVideo.slice(1)} hentes fra Google, og bare når du selv trykker på dem. Mer om det under «Kart og video».` : ""}`,
       butikk &&
         "Handlekurven lagres i nettleseren din, slik at varene fortsatt ligger der når du kommer tilbake. Den inneholder bare hvilke varer og hvor mange, ikke hvem du er. Lagringen trengs for at handlekurven du selv fyller skal virke, og krever derfor ikke samtykke etter ekomloven § 3-15. Kurven tømmes når du har bestilt, og du kan tømme den selv når du vil.",
     ]),
@@ -115,6 +124,13 @@ export function lagPersonvernerklaering(input: PersonvernInput): PageContent {
         `Timebestillingen på nettstedet kommer fra ${oppramsing(booking)}. Den lastes først når du trykker på knappen for å åpne den. Da får ${enBooking ?? "leverandøren"} IP-adressen din og vet hvilken nettleser du bruker, og kan lagre informasjonskapsler hos deg.`,
         "Det du fyller inn når du bestiller, går rett til bookingsystemet, og vi får bestillingen derfra. Vi bruker den til å gi deg timen eller plassen du har bestilt. Grunnlaget er avtalen med deg (artikkel 6 nr. 1 bokstav b).",
         `Hva ${enBooking ?? "leverandørene"} selv gjør med opplysningene, står i personvernerklæringen ${enBooking ? "deres" : "til hver av dem"}. Vil du heller bestille uten å åpne bookingsystemet, kan du ta kontakt med oss${kontakt ? ` på ${kontakt}` : ""}.`,
+      ]),
+
+    (kart || video) &&
+      tekstSeksjon("kart-og-video", "Kart og video", [
+        `${kart && video ? "Kartet kommer fra Google Maps og videoene fra YouTube, som begge leveres av Google" : kart ? "Kartet kommer fra Google Maps" : "Videoene kommer fra YouTube, som leveres av Google"}. De lastes først når du trykker på knappen for å vise ${kart && video ? "kartet eller spille av en video" : kart ? "kartet" : "en video"}. Før det sendes ingenting til Google.`,
+        `Når du trykker, får Google IP-adressen din og vet hvilken nettleser du bruker og hvilken side du er på, og Google kan lagre informasjonskapsler hos deg.${video ? " Videoene hentes fra youtube-nocookie.com, YouTube sin utgave med mindre sporing." : ""} Knappen sier dette før du trykker, og grunnlaget er samtykket ditt (personvernforordningen artikkel 6 nr. 1 bokstav a og ekomloven § 3-15). Du kan la være å trykke og bruke resten av nettstedet som vanlig.`,
+        `Google Ireland Limited er selv ansvarlig for det Google gjør med opplysningene, og det står i Googles personvernerklæring.${kart ? " Vil du ikke åpne kartet, kan du bruke adressen eller lenkene til Google Maps og OpenStreetMap ved siden av." : ""}`,
       ]),
 
     input.egenBooking &&
@@ -145,7 +161,7 @@ export function lagPersonvernerklaering(input: PersonvernInput): PageContent {
 
     input.nyhetsbrev &&
       tekstSeksjon("nyhetsbrev", "Nyhetsbrev", [
-        "Melder du deg på nyhetsbrevet, lagrer vi e-postadressen din, navnet hvis du oppgir det, og når du meldte deg på. Du får først en e-post der du bekrefter påmeldingen, og vi sender ingen nyhetsbrev før du har bekreftet.",
+        "Melder du deg på nyhetsbrevet, lagrer vi e-postadressen din, navnet hvis du oppgir det, når du meldte deg på og bekreftet, og hvilken side du meldte deg på fra. Du får først en e-post der du bekrefter påmeldingen, og vi sender ingen nyhetsbrev før du har bekreftet. Bekrefter du ikke innen 30 dager, sletter vi påmeldingen.",
         "Grunnlaget er samtykket ditt (artikkel 6 nr. 1 bokstav a). Du melder deg av med lenken nederst i hvert nyhetsbrev. Da slutter vi å sende, men tar vare på at du har meldt deg av, så du ikke får nyhetsbrev ved en feil senere.",
       ]),
 

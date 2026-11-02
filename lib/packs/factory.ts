@@ -34,7 +34,13 @@ export type Profile = {
   gallery?: { heading: string; image: string; page?: { path: string; title: string } };
   faq: [sporsmal: string, svar: string][];
   cta: { heading: string; text: string; button: string; link?: string };
-  contact: { text: string };
+  /** `fields`: egne felt i kontaktskjemaet, i samme form som seksjonen lagrer dem (skjemafelt). */
+  contact: { text: string; fields?: { etikett: string; felttype: string; valg?: string; pakrevd: "ja" | "nei" }[] };
+  /**
+   * Lokalpakken for bransjen: ansatte på «Om oss», åpningstider på forsiden, kart på kontaktsiden
+   * og PDF-meny på prissiden. Menyen starter slått av, og kunden slår den på når PDF-en er lastet opp.
+   */
+  local?: { team?: string; hours?: boolean; map?: boolean; menu?: boolean };
 };
 
 const image = (alt: string): ImageValue => ({ src: EXAMPLE_IMAGE_SRC, alt });
@@ -57,8 +63,33 @@ function cta(profile: Profile, id = "cta"): Section {
   };
 }
 
+/** Plassholdere i «Skriv ...»-form, så publisering stopper til kunden har fylt inn ekte folk. */
+function team(heading: string): Section {
+  const person = () => ({
+    navn: "Skriv navn",
+    rolle: "Skriv rolle",
+    bilde: image("Bilde av personen"),
+    tekst: "Skriv et par setninger om hva personen jobber med.",
+    epost: "",
+    telefon: "",
+  });
+  return { id: "ansatte", type: "ansatte", variant: "kort", props: { overskrift: heading, tekst: "", personer: [person(), person()] } };
+}
+
+const hoursSection: Section = { id: "apningstider", type: "apningstider", variant: "standard", props: { overskrift: "Åpningstider", tekst: "" } };
+const mapSection: Section = { id: "kart", type: "kart", variant: "kart", props: { overskrift: "Finn veien hit", tekst: "" } };
+// Slått av til kunden har lastet opp menyen, så siden kan publiseres uten den.
+const menuSection: Section = {
+  id: "pdf-meny",
+  type: "filer",
+  variant: "standard",
+  hidden: true,
+  props: { overskrift: "Menyen som PDF", tekst: "", filer: [{ tittel: "Last ned menyen", fil: null }] },
+};
+
 /** Lager en bransjepakke med forside, prisside, om oss, galleri (hvis bransjen har det) og kontakt. */
 export function servicePack(profile: Profile): Pack {
+  const local = profile.local ?? {};
   return {
     key: profile.key,
     label: profile.label,
@@ -114,6 +145,7 @@ export function servicePack(profile: Profile): Pack {
               ...(gallery
                 ? [{ id: "galleri", type: "galleri", variant: "rutenett", props: { overskrift: gallery.heading, bilder: galleryItems(gallery.image, 3) } } satisfies Section]
                 : []),
+              ...(local.hours ? [hoursSection] : []),
               cta(profile),
             ],
           },
@@ -126,6 +158,7 @@ export function servicePack(profile: Profile): Pack {
             seo: { title: clip(`${profile.prices.title} | ${c.name}`, 70) },
             sections: [
               { id: "priser", type: "tjenester", variant: "liste", props: { overskrift: profile.prices.heading, tjenester: items(profile.prices.items) } },
+              ...(local.menu ? [menuSection] : []),
               {
                 id: "faq",
                 type: "faq",
@@ -149,6 +182,7 @@ export function servicePack(profile: Profile): Pack {
                 variant: "bilde-venstre",
                 props: { overskrift: `Om ${c.name}`, brodtekst: profile.about.text, bilde: image(profile.about.image) },
               },
+              ...(local.team ? [team(local.team)] : []),
               {
                 id: "fordeler",
                 type: "fordeler",
@@ -177,7 +211,19 @@ export function servicePack(profile: Profile): Pack {
         showInMenu: true,
         content: {
           seo: { title: clip(`Kontakt ${c.name}`, 70) },
-          sections: [{ id: "kontakt", type: "kontakt", variant: "skjema", props: { overskrift: "Kontakt oss", tekst: profile.contact.text } }],
+          sections: [
+            {
+              id: "kontakt",
+              type: "kontakt",
+              variant: "skjema",
+              props: {
+                overskrift: "Kontakt oss",
+                tekst: profile.contact.text,
+                skjemafelt: (profile.contact.fields ?? []).map((f) => ({ valg: "", ...f })),
+              },
+            },
+            ...(local.map ? [mapSection] : []),
+          ],
         },
       });
       return pages;

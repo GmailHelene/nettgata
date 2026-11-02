@@ -5,11 +5,13 @@ import { useActionState, useState, useTransition } from "react";
 import { FormStatus } from "@/components/studio/form-status";
 import { inputClass } from "@/components/studio/info-fields";
 import type { ActionState } from "../../actions";
-import { createPageAction, createPostAction, deletePageAction, movePageAction, publishAllAction, setMenuAction } from "../../site-actions";
+import { createPageAction, createPostAction, deletePageAction, duplicatePageAction, movePageAction, publishAllAction, setMenuAction } from "../../site-actions";
+import { PublishLockNotice } from "@/components/studio/publish-lock";
+import { PageIntro } from "@/components/studio/help";
 
 type PageRow = { id: string; title: string; path: string; showInMenu: boolean; published: boolean };
 
-export function PageList({ siteId, pages }: { siteId: string; pages: PageRow[] }) {
+export function PageList({ siteId, pages, publishLocked = false }: { siteId: string; pages: PageRow[]; publishLocked?: boolean }) {
   const [status, setStatus] = useState<ActionState>(null);
   const [pending, startTransition] = useTransition();
   const [createState, createAction, creating] = useActionState(createPageAction.bind(null, siteId), null);
@@ -21,7 +23,8 @@ export function PageList({ siteId, pages }: { siteId: string; pages: PageRow[] }
       <section>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">Sider</h2>
-          {unpublished > 0 && (
+          {unpublished > 0 && publishLocked && <PublishLockNotice siteId={siteId} compact />}
+          {unpublished > 0 && !publishLocked && (
             <button
               disabled={pending}
               onClick={() => startTransition(async () => setStatus(await publishAllAction(siteId)))}
@@ -31,6 +34,10 @@ export function PageList({ siteId, pages }: { siteId: string; pages: PageRow[] }
             </button>
           )}
         </div>
+        <PageIntro className="mb-3" article="publisere">
+          Det du endrer på en side, er en kladd til du publiserer den.
+        </PageIntro>
+        {publishLocked && <PublishLockNotice siteId={siteId} />}
         <FormStatus state={status} />
         <ul className="mt-3 divide-y rounded-lg border bg-white">
           {pages.map((page, i) => (
@@ -68,6 +75,14 @@ export function PageList({ siteId, pages }: { siteId: string; pages: PageRow[] }
                 className="text-sm underline disabled:opacity-40"
               >
                 Ned
+              </button>
+              <button
+                disabled={pending}
+                onClick={() => startTransition(async () => setStatus(await duplicatePageAction(siteId, page.id)))}
+                aria-label={`Dupliser ${page.title}`}
+                className="text-sm underline disabled:opacity-40"
+              >
+                Dupliser
               </button>
               {page.path !== "/" && (
                 <button

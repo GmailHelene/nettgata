@@ -5,7 +5,18 @@ import { PageRenderer } from "@/components/sections";
 import { bransjeLabel, genres, lowerLabel } from "@/lib/genres";
 import { packPreview } from "@/lib/pack-preview";
 import { getPack } from "@/lib/packs";
-import { bransjeHeading, landingBransjer, type PlatformRoute } from "@/lib/platform-routes";
+import {
+  bransjeDetails,
+  bransjeHeading,
+  bransjeMonthly,
+  landingBransjer,
+  PLATFORM_DEFAULT_ORIGIN,
+  platformBreadcrumbs,
+  platformJsonLd,
+  platformOrigin,
+  type Crumb,
+  type PlatformRoute,
+} from "@/lib/platform-routes";
 import { buildTheme, getThemeDef, themes } from "@/lib/themes";
 import type { Need } from "@/lib/leads";
 import { plattformDokument, type PlattformDokument } from "@/lib/legal/plattform";
@@ -59,7 +70,8 @@ function Thumb({ theme, palette, pack, name, width = THUMB }: { theme: string; p
   const front = pages.find((x) => x.path === "/") ?? pages[0];
   return (
     // Smalere skjerm enn miniatyren: den kuttes til høyre i stedet for å gjøre hele siden bredere.
-    <div inert aria-hidden="true" className="max-w-full overflow-hidden rounded-[3px] bg-white [&_header]:!static" style={{ width, height: Math.round(width * 0.6875) }}>
+    // data-nosnippet: teksten i miniatyren («Salongen», «Rørleggeren») skal ikke bli utdraget i Google.
+    <div inert aria-hidden="true" data-nosnippet="" className="max-w-full overflow-hidden rounded-[3px] bg-white [&_header]:!static" style={{ width, height: Math.round(width * 0.6875) }}>
       <div style={{ width: 1280, zoom: width / 1280 }}>
         <PageRenderer content={{ ...front.content, sections: front.content.sections.slice(0, 3) }} theme={t} ctx={ctx} embedded />
       </div>
@@ -208,6 +220,41 @@ function Eyebrow({ children, dark = false }: { children: ReactNode; dark?: boole
   return <p className={`mb-3 text-sm font-semibold uppercase tracking-[0.12em] ${dark ? "text-[#a8d5c0]" : "text-[#2f5a47]"}`}>{children}</p>;
 }
 
+/** Strukturerte data for Google. `<` skrives om, så teksten aldri kan avslutte script-taggen. */
+function JsonLd({ data }: { data: unknown }) {
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, "\\u003c") }} />;
+}
+
+/** Brødsmuler øverst på undersidene. Den siste er siden du står på, og er ikke en lenke. */
+function Breadcrumbs({ crumbs }: { crumbs: Crumb[] }) {
+  if (crumbs.length < 2) return null;
+  return (
+    <nav aria-label="Brødsmuler" className={`${container} pt-6 text-sm ${muted}`}>
+      <ol className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        {crumbs.map((c, i) => {
+          const last = i === crumbs.length - 1;
+          return (
+            <li key={c.path} className="flex items-center gap-2">
+              {last ? (
+                <span aria-current="page" className="text-[#1b232b]">
+                  {c.name}
+                </span>
+              ) : (
+                <>
+                  <Link href={c.path} className="underline underline-offset-4 hover:no-underline">
+                    {c.name}
+                  </Link>
+                  <span aria-hidden="true">›</span>
+                </>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
 /* ---------- Gata ---------- */
 
 type Shop = {
@@ -311,13 +358,16 @@ function StreetHero() {
   return (
     <section className="overflow-hidden pt-12 sm:pt-16 lg:pt-20">
       <div className={container}>
-        <Eyebrow>Nettsider og nettbutikker for norske bedrifter</Eyebrow>
-        <h1 className={`${heading} max-w-4xl text-[2.55rem] leading-[1.02] text-balance sm:text-6xl lg:text-[4.3rem]`}>
-          Nettsiden til frisøren, rørleggeren og kafeen på hjørnet
+        {/* Linjen over overskriften er en del av h1, så hovedsøket «nettside for bedrift» står i overskriften. */}
+        <h1>
+          <span className="mb-3 block text-sm font-semibold uppercase tracking-[0.12em] text-[#2f5a47]">Nettside og nettbutikk for bedrifter</span>
+          <span className={`${heading} block max-w-4xl text-[2.55rem] leading-[1.02] text-balance sm:text-6xl lg:text-[4.3rem]`}>
+            Nettsiden til frisøren, rørleggeren og kafeen på hjørnet
+          </span>
         </h1>
         <p className={`mt-7 max-w-xl text-lg leading-relaxed ${muted}`}>
-          Velg bransje, så får du sidene, tekstene og prislisten ferdig. Du fyller inn det som er ditt, eller får alt satt opp for deg. Domenet står
-          alltid i ditt navn.
+          Velg bransje, så får du en nettside for bedriften med sidene, tekstene og prislisten ferdig. Du fyller inn det som er ditt, eller får alt satt
+          opp for deg. Domenet står alltid i ditt navn.
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4">
           <div className="flex flex-wrap gap-3">
@@ -340,13 +390,42 @@ function StreetHero() {
 }
 
 /** Toppen på de andre salgssidene: tekst til venstre, bilde eller gate til høyre. */
-function Hero({ eyebrow, title, text, children }: { eyebrow: string; title: string; text: string; children?: ReactNode }) {
+/**
+ * `eyebrowInTitle`: linjen over overskriften blir en del av h1, for sider der den bærer søkeordet
+ * («Nettbutikk for små bedrifter»). Brødsmulene står over, når siden har dem.
+ */
+function Hero({
+  eyebrow,
+  title,
+  text,
+  children,
+  crumbs = [],
+  eyebrowInTitle = false,
+}: {
+  eyebrow: string;
+  title: string;
+  text: string;
+  children?: ReactNode;
+  crumbs?: Crumb[];
+  eyebrowInTitle?: boolean;
+}) {
+  const titleClass = `${heading} text-4xl leading-[1.04] text-balance sm:text-5xl lg:text-[3.5rem]`;
   return (
     <section className="overflow-hidden">
-      <div className={`${container} grid items-end gap-12 pb-14 pt-14 lg:grid-cols-[1.05fr_1fr] lg:pb-20 lg:pt-20 [&>*]:min-w-0`}>
+      <Breadcrumbs crumbs={crumbs} />
+      <div className={`${container} grid items-end gap-12 pb-14 ${crumbs.length ? "pt-8 lg:pt-12" : "pt-14 lg:pt-20"} lg:grid-cols-[1.05fr_1fr] lg:pb-20 [&>*]:min-w-0`}>
         <div className="lg:pb-6">
-          <Eyebrow>{eyebrow}</Eyebrow>
-          <h1 className={`${heading} text-4xl leading-[1.04] text-balance sm:text-5xl lg:text-[3.5rem]`}>{title}</h1>
+          {eyebrowInTitle ? (
+            <h1>
+              <span className="mb-3 block text-sm font-semibold uppercase tracking-[0.12em] text-[#2f5a47]">{eyebrow}</span>
+              <span className={`block ${titleClass}`}>{title}</span>
+            </h1>
+          ) : (
+            <>
+              <Eyebrow>{eyebrow}</Eyebrow>
+              <h1 className={titleClass}>{title}</h1>
+            </>
+          )}
           <p className={`mt-6 max-w-xl text-lg leading-relaxed ${muted}`}>{text}</p>
           <div className="mt-8 flex flex-wrap gap-3">
             <a href="#kom-i-gang" className={button}>
@@ -448,18 +527,30 @@ function Showcase({ keys }: { keys?: string[] }) {
   );
 }
 
+/*
+ * Bare det som er bygget og i bruk (markedsføringsloven). Sjekk koden før noe legges til her.
+ * Ikke bygget, skal ikke stå: Fiken for butikkene, alt-tekst fra AI, helsesjekk, publisering til Facebook
+ * og Instagram, full eksport, nyhetsbrev (under arbeid).
+ */
 function Features({ shop = false }: { shop?: boolean }) {
-  const all: [string, string][] = [
-    ["Bransjepakker", "Frisør, rørlegger, regnskap, kafé og 41 andre. Sidene, tekstene og prislisten passer bransjen fra start."],
-    ["Nettbutikk med Vipps og Klarna", "Varer, varianter, lager, rabattkoder og frakt. Betalingen går rett til deg gjennom dine egne avtaler."],
-    ["Domenet er ditt", "Domenet registreres alltid i ditt navn. Har du et fra før, kobler vi det til sammen."],
-    ["Lover og regler på plass", "Personvernerklæring og vilkår lages ut fra nettstedet ditt. Nettbutikken har angrerettskjema og opplysningene loven krever."],
-    ["Universell utforming", "Alle temaene holder kontrastkravene, og knapper og skjemaer virker med tastatur og skjermleser."],
-    ["Trygg drift", "Sikkerhetskopi hver natt, tofaktor-innlogging og ingen tillegg du må holde oppdatert. Databasen ligger i Frankfurt."],
-    ["Synlig i Google", "Raske sider, riktige titler og strukturerte data for bransjen din. Du får beskjed når noe mangler."],
-    ["Kommer: AI-team med Godkjenn", "Et tillegg med forslag til innlegg og forbedringer. Ingenting endres eller publiseres før du trykker Godkjenn."],
-  ];
-  const list = shop ? [all[1], all[3], all[2], all[5], all[6], all[4]] : all;
+  const f = {
+    pakker: ["Bransjepakker", "Frisør, rørlegger, regnskap, kafé og 41 andre. Sidene, tekstene og prislisten passer bransjen fra start."],
+    booking: [
+      "Timebestilling",
+      "Kundene bestiller time rett på nettsiden, med tjenestene, de ansatte og arbeidstidene du setter. Bruker du Timma, Fresha, Resos eller Spond, kan du bygge inn den i stedet.",
+    ],
+    butikk: ["Nettbutikk med Vipps og Klarna", "Varer, varianter, lager, rabattkoder og frakt. Betalingen går rett til deg gjennom dine egne avtaler."],
+    bring: ["Frakt med Bring", "Med din egen Bring-avtale regnes frakten ut fra vekt og postnummer, og etiketten lager du rett fra ordren. Faste fraktpriser og henting går også."],
+    domene: ["Domenet er ditt", "Domenet registreres alltid i ditt navn. Har du et fra før, kobler vi det til sammen."],
+    lover: ["Lover og regler på plass", "Personvernerklæring og vilkår lages ut fra nettstedet ditt. Nettbutikken har angrerettskjema og opplysningene loven krever."],
+    uu: ["Universell utforming", "Alle temaene holder kontrastkravene, og knapper og skjemaer virker med tastatur og skjermleser."],
+    drift: ["Trygg drift", "Sikkerhetskopi hver natt, tofaktor-innlogging og ingen tillegg du må holde oppdatert. Databasen ligger i Frankfurt."],
+    google: [
+      "Synlig i Google",
+      "Raske sider, riktige titler og strukturerte data for bransjen din. Du får beskjed når noe mangler, og besøkstallene ser du uten informasjonskapsler.",
+    ],
+  } satisfies Record<string, [string, string]>;
+  const list = shop ? [f.butikk, f.bring, f.lover, f.domene, f.drift, f.google] : [f.pakker, f.booking, f.butikk, f.domene, f.lover, f.uu, f.drift, f.google];
   return (
     <ul className="grid gap-x-10 gap-y-9 sm:grid-cols-2 lg:grid-cols-4">
       {list.map(([title, text]) => (
@@ -487,7 +578,9 @@ function Owner() {
             hadde: enkel nok til å bruke selv, og trygg nok til at jeg kan stå inne for den.
           </p>
           <p>Du skriver til meg, ikke til et kundesenter, og du får svar innen én virkedag. Vil du heller at jeg setter alt opp, gjør jeg det.</p>
-          <p className="text-base text-white/75">Grønberg Tech Solutions · Org.nr. 927 889 404 MVA · Modum</p>
+          <p className="text-base text-white/75">
+            {GRONBERG.innehaver} · {GRONBERG.navn} · Org.nr. {GRONBERG.orgnr} MVA · {GRONBERG.adresse}
+          </p>
         </div>
       </div>
     </section>
@@ -544,11 +637,17 @@ function Pricing({ shop = false }: { shop?: boolean }) {
       <div className="mt-6 grid gap-6 md:grid-cols-2">
         <div className="rounded-2xl bg-white p-6 ring-1 ring-[#1b232b]/15">
           <h3 className={`${heading} text-lg`}>Vil du at jeg setter alt opp?</h3>
-          <p className={`mt-1 ${muted}`}>Oppstart 3 900 kr for nettside og 9 900 kr for nettbutikk, eks. mva. Bygger du selv, koster oppstarten ingenting.</p>
+          <p className={`mt-1 ${muted}`}>
+            Oppstart for nettside koster 3 900 kr, med opptil 7 sider, design, tekst og flytting fra den gamle siden din. For nettbutikk er det 9 900 kr,
+            med betaling, frakt og import av opptil 100 varer. Bygger du selv, koster oppstarten ingenting.
+          </p>
         </div>
         <div className="rounded-2xl bg-white p-6 ring-1 ring-[#1b232b]/15">
-          <h3 className={`${heading} text-lg`}>Kommer: AI-team og sosiale medier</h3>
-          <p className={`mt-1 ${muted}`}>Et tillegg til 249 kr/mnd eks. mva, med forslag til innlegg og forbedringer hver dag. Ingenting skjer før du trykker Godkjenn. Det er ikke lansert ennå.</p>
+          <h3 className={`${heading} text-lg`}>Tillegg: AI-team, 249 kr/mnd</h3>
+          <p className={`mt-1 ${muted}`}>
+            Hver natt kommer forslag til tekster, titler for Google, blogginnlegg og innlegg til sosiale medier, som du kopierer og legger ut selv.
+            Ingenting endres før du trykker Godkjenn, og det du godkjenner havner i kladden.
+          </p>
         </div>
       </div>
       <p className={`mt-6 text-sm ${muted}`}>Alle priser er eks. mva. Domenet kjøper du selv, og i nettbutikken tar Vipps og Klarna sine egne gebyrer.</p>
@@ -574,15 +673,48 @@ function Faq({ items }: { items: [string, string][] }) {
   );
 }
 
-const faq: [string, string][] = [
-  ["Hvem eier nettsiden og domenet?", "Du. Domenet registreres i ditt navn, og tekstene og bildene dine er dine. Sier du opp, får du med deg alt videre."],
+/**
+ * Spørsmålene på forsiden. De står synlig på siden og går også inn som FAQPage i de strukturerte dataene.
+ * Svarene lover bare det som er bygget: det finnes ingen full eksport ennå, så «du får med deg alt» står ikke her.
+ */
+export const landingFaq: [string, string][] = [
+  [
+    "Hva koster en nettside hos Nettgata?",
+    "199 kr i måneden eks. mva, eller 169 kr i måneden når du betaler for et år om gangen. Nettbutikk koster 399 kr i måneden. Alle temaer og bransjepakker er med, og det er ingen bindingstid. Vil du ha alt satt opp for deg, koster oppstarten 3 900 kr.",
+  ],
+  ["Hvem eier nettsiden og domenet?", "Du. Domenet registreres i ditt navn, så det tar du med deg om du sier opp. Tekstene og bildene du legger inn, er dine."],
   ["Kan jeg bruke domenet jeg har fra før?", "Ja. Du endrer to innstillinger hos den som har domenet ditt i dag, og du får hjelp om du trenger det. Resten, også den sikre tilkoblingen (https), ordnes automatisk."],
   ["Hva koster domenet?", "Domenet kjøper du selv hos en forhandler, for eksempel Domeneshop, slik at det står i ditt navn. En .no-adresse koster vanligvis noen hundrelapper i året, og Nettgata tar ingenting for koblingen."],
-  ["Kan jeg flytte fra Wix, Squarespace eller WordPress?", "Ja. Tekstene og bildene flyttes over sammen med deg, og de gamle adressene sendes videre til de nye, så du ikke mister plasseringen i Google."],
+  [
+    "Kan jeg flytte fra Wix, Squarespace eller WordPress?",
+    "Ja. Med oppstarten flyttes tekstene og bildene over for deg. Gjør du det selv, legger du dem inn i studioet. De gamle adressene sendes videre til de nye, så du ikke mister plasseringen i Google.",
+  ],
   ["Må jeg kunne kode?", "Nei. Du endrer tekst, bilder, farger og sider i Nettgata-studioet, rett i nettleseren, og ser endringene før du publiserer."],
   ["Er det bindingstid?", "Nei, månedsprisen kan sies opp når som helst. Betaler du for et år, gjelder prisen hele året."],
-  ["Hvordan tar jeg betalt i nettbutikken?", "Du inngår avtale direkte med Vipps og Klarna og kobler dem til nettbutikken, og du får hjelp til oppsettet om du trenger det. Pengene går rett til deg, og Nettgata tar ingen del av salget. Vipps og Klarna tar sine egne gebyrer."],
 ];
+
+/** Spørsmålene på /nettbutikk. Egen liste, så ingen spørsmål står på to sider. */
+export const shopFaq: [string, string][] = [
+  [
+    "Hva koster nettbutikken?",
+    "399 kr i måneden eks. mva, eller 339 kr i måneden når du betaler for et år. Nettgata tar ingen andel av salget. Vil du ha butikken satt opp med betaling, frakt og opptil 100 varer, koster oppstarten 9 900 kr.",
+  ],
+  [
+    "Hvordan tar jeg betalt i nettbutikken?",
+    "Du inngår avtale direkte med Vipps og Klarna og kobler dem til nettbutikken, og du får hjelp til oppsettet om du trenger det. Pengene går rett til deg. Vipps og Klarna tar sine egne gebyrer.",
+  ],
+  [
+    "Hvordan sender jeg varene?",
+    "Du kan ha faste fraktpriser, gratis frakt over et beløp og henting. Har du avtale med Bring, regnes frakten ut fra vekt og postnummer i kassen, og etiketten lager du fra ordren.",
+  ],
+  [
+    "Hva med angrerett og kjøpsvilkår?",
+    "Nettbutikken har angrerettskjema og opplysningene loven krever. Kjøpsvilkårene fyller du ut fra Forbrukertilsynets mal, og kassen åpner først når de er publisert.",
+  ],
+];
+
+/** De mest søkte bransjene, som lenker fra forsiden. */
+const popular = ["rorlegger", "elektriker", "snekker", "frisor", "kafe", "restaurant", "regnskap", "fysioterapeut", "fotograf", "idrettslag"];
 
 function LeadSection({ env, need, bransje, title, intro }: { env: PlatformEnv; need?: Need; bransje?: string; title?: string; intro?: string }) {
   return (
@@ -603,6 +735,24 @@ function LeadSection({ env, need, bransje, title, intro }: { env: PlatformEnv; n
   );
 }
 
+/** Lenker til bransjesidene, med søkeordet som lenketekst («Nettside for frisør»). */
+function BransjeLinks({ packs, label }: { packs: string[]; label: string }) {
+  const all = landingBransjer();
+  const items = packs.map((key) => all.find((m) => m.pack.key === key)).filter((m) => m !== undefined);
+  if (!items.length) return null;
+  return (
+    <ul aria-label={label} className="flex flex-wrap gap-x-6 gap-y-2">
+      {items.map((m) => (
+        <li key={m.pack.key}>
+          <Link href={`/bransjer/${m.pack.key}`} className="text-[#173b6c] underline underline-offset-4 hover:no-underline">
+            {bransjeHeading(m)}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function Landing({ env }: { env: PlatformEnv }) {
   return (
     <>
@@ -612,6 +762,21 @@ function Landing({ env }: { env: PlatformEnv }) {
       </Section>
       <Section eyebrow="Bransjer" title="Finn bransjen din" intro="Hver bransjepakke har sidene, tekstene og prislisten bransjen trenger. Velg din, så ser du hva som ligger klart.">
         <GenreSigns />
+        <div className="mt-10">
+          <h3 className={`${heading} text-lg`}>Mest valgt</h3>
+          <div className="mt-3">
+            <BransjeLinks packs={popular} label="Mest valgte bransjer" />
+          </div>
+          <p className="mt-5">
+            <Link href="/bransjer" className="font-semibold text-[#173b6c] underline underline-offset-4">
+              Se alle bransjene
+            </Link>
+            {" · "}
+            <Link href="/nettbutikk" className="font-semibold text-[#173b6c] underline underline-offset-4">
+              Nettbutikk for små bedrifter
+            </Link>
+          </p>
+        </div>
       </Section>
       <Section
         eyebrow="Temaer"
@@ -629,20 +794,22 @@ function Landing({ env }: { env: PlatformEnv }) {
         <Pricing />
       </Section>
       <Section eyebrow="Spørsmål" title="Det folk lurer på" tone="kalk">
-        <Faq items={faq} />
+        <Faq items={landingFaq} />
       </Section>
       <LeadSection env={env} />
     </>
   );
 }
 
-function ShopLanding({ env }: { env: PlatformEnv }) {
+function ShopLanding({ env, crumbs }: { env: PlatformEnv; crumbs: Crumb[] }) {
   return (
     <>
       <Hero
-        eyebrow="Nettbutikk"
+        eyebrow="Nettbutikk for små bedrifter"
+        eyebrowInTitle
+        crumbs={crumbs}
         title="Nettbutikk med Vipps og Klarna, klar til å selge"
-        text="Varer med varianter og lager, rabattkoder, frakt og ordre på ett sted. Kundene betaler med Vipps eller Klarna, og pengene går rett til deg."
+        text="Lag nettbutikken selv, eller få den satt opp. Varer med varianter og lager, rabattkoder, frakt og ordre på ett sted. Kundene betaler med Vipps eller Klarna, og pengene går rett til deg."
       >
         <Street shops={shopStreet} width={160} vacant={false} inset={false} label="Eksempler på nettbutikker fra bransjepakkene" />
       </Hero>
@@ -667,24 +834,37 @@ function ShopLanding({ env }: { env: PlatformEnv }) {
           ))}
         </ul>
       </Section>
+      <Section
+        eyebrow="Bransjer"
+        title="Nettbutikk ferdig satt opp for varene dine"
+        intro="Butikkpakkene har tekster og oppsett for bransjen, og alle temaene kan brukes. Selger du noe annet, passer den vanlige nettbutikken."
+        tone="kalk"
+      >
+        <BransjeLinks packs={["klaer", "interior", "lokalmat"]} label="Nettbutikk for bransjen" />
+      </Section>
       <Owner />
       <Section id="priser" eyebrow="Pris" title="399 kr i måneden. Ingen andel av salget.">
         <Pricing shop />
+      </Section>
+      <Section eyebrow="Spørsmål" title="Det folk lurer på om nettbutikken" tone="kalk">
+        <Faq items={shopFaq} />
       </Section>
       <LeadSection env={env} need="nettbutikk" title="Klar for nettbutikk?" />
     </>
   );
 }
 
-function ThemesPage({ env }: { env: PlatformEnv }) {
+function ThemesPage({ env, crumbs }: { env: PlatformEnv; crumbs: Crumb[] }) {
+  const byPack = new Map(landingBransjer().map((m) => [m.pack.key, m]));
   return (
     <>
-      <section className={`${container} pb-4 pt-14`}>
+      <Breadcrumbs crumbs={crumbs} />
+      <section className={`${container} pb-4 pt-8`}>
         <Eyebrow>Temaer</Eyebrow>
         <h1 className={`${heading} max-w-3xl text-4xl leading-[1.04] text-balance sm:text-5xl`}>Finn utseendet som passer bedriften din</h1>
         <p className={`mt-5 max-w-2xl text-lg leading-relaxed ${muted}`}>
-          Tolv temaer med fire fargevarianter hver. Miniatyrene er ekte nettsider fra bransjepakkene. I studioet ser du din egen side i hvert tema, både på
-          datamaskin og mobil, før du velger.
+          Tolv ferdige design for nettsiden, med fire fargevarianter hver. Miniatyrene er ekte nettsider fra bransjepakkene. I studioet ser du din egen
+          side i hvert tema, både på datamaskin og mobil, før du velger. Bytter du tema senere, står tekstene og bildene urørt.
         </p>
       </section>
       <section className={`${container} py-10`}>
@@ -701,6 +881,14 @@ function ThemesPage({ env }: { env: PlatformEnv }) {
                   </div>
                   <p className="leading-relaxed">{def.description}</p>
                   <p className={`text-sm ${muted}`}>{def.bestFor}</p>
+                  {byPack.get(item.pack) && (
+                    <p className="text-sm">
+                      Eksempel:{" "}
+                      <Link href={`/bransjer/${item.pack}`} className="text-[#173b6c] underline underline-offset-4 hover:no-underline">
+                        {bransjeHeading(byPack.get(item.pack)!)}
+                      </Link>
+                    </p>
+                  )}
                 </div>
               </li>
             );
@@ -712,15 +900,17 @@ function ThemesPage({ env }: { env: PlatformEnv }) {
   );
 }
 
-function BransjerIndex({ env }: { env: PlatformEnv }) {
+function BransjerIndex({ env, crumbs }: { env: PlatformEnv; crumbs: Crumb[] }) {
   const listed = new Set(landingBransjer().map((m) => m.bransje.pack));
   return (
     <>
-      <section className={`${container} pb-4 pt-14`}>
+      <Breadcrumbs crumbs={crumbs} />
+      <section className={`${container} pb-4 pt-8`}>
         <Eyebrow>Bransjer</Eyebrow>
         <h1 className={`${heading} max-w-3xl text-4xl leading-[1.04] text-balance sm:text-5xl`}>Ferdige nettsider for din bransje</h1>
         <p className={`mt-5 max-w-2xl text-lg leading-relaxed ${muted}`}>
-          Hver bransjepakke har sidene, tekstene og prislisten bransjen trenger. Finner du ikke din, send en melding, så får du hjelp til å finne den som passer best.
+          Hver bransjepakke gir en nettside for bransjen din med sidene, tekstene og prislisten klare. Velg bransjen, så ser du nøyaktig hva som ligger
+          klart. Finner du ikke din, send en melding, så får du hjelp til å finne den som passer best.
         </p>
       </section>
       <section className={`${container} py-10`}>
@@ -728,13 +918,14 @@ function BransjerIndex({ env }: { env: PlatformEnv }) {
           {genres.map((genre) => (
             <div key={genre.key} id={genre.key} className="scroll-mt-28 rounded-xl bg-white p-6 ring-1 ring-[#1b232b]/10">
               <h2 className={`${signType} text-[0.95rem] text-[#173b6c]`}>{genre.label}</h2>
+              <p className={`mt-2 text-sm leading-relaxed ${muted}`}>{genre.description}</p>
               <ul className="mt-3 space-y-1.5">
                 {genre.bransjer
-                  .filter((b) => listed.has(b.pack))
+                  .filter((b) => listed.has(b.pack) || b.pack === "nettbutikk")
                   .map((b) => (
                     <li key={b.pack}>
-                      <Link href={`/bransjer/${b.pack}`} className="underline underline-offset-4 hover:no-underline">
-                        {bransjeLabel(b)}
+                      <Link href={b.pack === "nettbutikk" ? "/nettbutikk" : `/bransjer/${b.pack}`} className="underline underline-offset-4 hover:no-underline">
+                        {b.pack === "nettbutikk" ? "Nettbutikk for alle slags varer" : bransjeLabel(b)}
                       </Link>
                     </li>
                   ))}
@@ -748,70 +939,147 @@ function BransjerIndex({ env }: { env: PlatformEnv }) {
   );
 }
 
-const sectionNames: Record<string, string> = {
-  hero: "toppfelt med bilde",
-  fordeler: "fordeler",
-  tjenester: "tjenester",
-  bildetekst: "om oss med bilde",
-  galleri: "bildegalleri",
-  omtaler: "omtaler",
-  faq: "spørsmål og svar",
-  cta: "kontaktknapp",
-  kontakt: "kontaktskjema",
-  tekst: "tekst",
-  produkter: "varer",
-  kategorikort: "kategorier",
+/** Innebygde bestillingssystemer som passer bransjen (seksjonen «Timebestilling»). */
+const embedExamples: Record<string, string> = {
+  arrangement: "Billettene kan selges gjennom TicketCo eller Hoopla, bygget inn på billettsiden.",
+  idrettslag: "Bruker laget Spond, kan påmeldingen bygges inn på siden.",
+  kurs: "Bruker dere Spond til påmelding, kan den bygges inn på siden.",
 };
 
-/** Bookingsystemer kundene i bransjen ofte har fra før. Knappen kan lenke rett dit. */
-const bookingExamples: Record<string, string> = {
-  "Bestill time": "Timma, Fresha",
-  "Bestill bord": "Resos, DinnerBooking",
+/** Det butikkpakkene har ekstra for bransjen. Bare funksjoner som er bygget. */
+const shopNotes: Record<string, string> = {
+  klaer: "Størrelse og farge legges inn som varianter, med eget lager for hver, så kunden ikke kjøper noe som er utsolgt.",
+  interior: "Varene sorteres i kategorier, og rabattkoder til kampanjer og høytider lager du selv.",
+  lokalmat: "Kundene kan hente på gården og betale ved henting, eller få varene sendt med Bring etter vekt.",
 };
 
-function BransjePage({ route, env }: { route: Extract<PlatformRoute, { kind: "bransje" }>; env: PlatformEnv }) {
+function BransjePage({ route, env, crumbs }: { route: Extract<PlatformRoute, { kind: "bransje" }>; env: PlatformEnv; crumbs: Crumb[] }) {
   const { match } = route;
   const { pack } = match;
   const shop = pack.kind === "nettbutikk";
-  const pages = pack.pages({ name: "Din bedrift", city: "" });
+  const d = bransjeDetails(match);
   const recommended = pack.themes.slice(0, 3);
   const title = bransjeHeading(match);
-  // Plattformen har ingen innebygd booking ennå, så det må stå rett ut hva «Bestill time» gjør.
-  const hero = pages.find((p) => p.path === "/")?.content.sections.find((s) => s.type === "hero");
-  const button = String(hero?.props.knappTekst ?? "");
-  const bookingSystems = hero?.props.knappLenke === "/kontakt" ? bookingExamples[button] : undefined;
   // Bransjens egen butikk i gata. Fargen velges ut fra navnet, så samme bransje alltid får samme fasade.
   const colors = facadeColors[[...pack.key].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % facadeColors.length];
   const facade: Shop = { ...colors, pack: pack.key, theme: recommended[0], name: "Din bedrift", sign: bransjeLabel(match.bransje), lift: 10 };
+  const related = match.genre.bransjer.filter((b) => b.pack !== pack.key).map((b) => b.pack);
+  const extras: string[] = [
+    ...(d.local.team ? [`Ansatte med navn, rolle og bilde («${d.local.team}»)`] : []),
+    ...(d.local.hours ? ["Åpningstider, med egne tider for romjul og påske"] : []),
+    ...(d.local.map ? ["Kart som lastes først når den besøkende trykker, uten sporing"] : []),
+    ...(d.local.menu ? ["Menyen som PDF, som du bytter med én opplasting"] : []),
+    ...(d.local.gallery ? ["Bildegalleri"] : []),
+    ...(d.formFields.length ? [`Kontaktskjema med egne felt: ${d.formFields.map((f) => `«${f}»`).join(" og ")}`] : []),
+  ];
   return (
     <>
       <Hero
         eyebrow={match.genre.label}
+        crumbs={crumbs}
         title={`${title}, ferdig satt opp`}
-        text={`${pack.description} Sidene, tekstene og prislisten er klare, så du bare fyller inn det som er ditt. Du velger blant tolv temaer, og domenet står alltid i ditt navn.`}
+        text={`${title} med sidene, tekstene og prislisten klare fra start. Pakken dekker ${lowerLabel(pack.description.replace(/\.$/, ""))}. Du fyller inn det som er ditt, velger blant tolv temaer, og domenet står alltid i ditt navn.`}
       >
         <div className="gata-street flex justify-center pb-[23px]">
           <Facade shop={facade} index={0} width={420} />
         </div>
       </Hero>
-      <Section eyebrow="Dette får du" title="Sidene som ligger klare" tone="kalk">
+
+      <Section
+        eyebrow="Eksempel"
+        title="Slik ser forsiden ut fra start"
+        intro="Eksempelet er laget for en bedrift i Modum, med teksten rett fra bransjepakken. Firmanavn, sted, bilder og priser bytter du ut med dine egne."
+        tone="kalk"
+      >
+        <figure className="max-w-3xl rounded-2xl bg-white p-7 ring-1 ring-[#1b232b]/10 sm:p-9">
+          <p className={`${heading} text-2xl leading-tight sm:text-3xl`}>{d.hero.overskrift}</p>
+          {d.hero.undertekst && <p className={`mt-3 text-lg leading-relaxed ${muted}`}>{d.hero.undertekst}</p>}
+          {d.hero.knapp && <p className="mt-5 inline-flex rounded-lg bg-[#173b6c] px-5 py-2.5 font-semibold text-white">{d.hero.knapp}</p>}
+          {d.services.length > 0 && (
+            <ul className="mt-8 grid gap-5 border-t border-[#1b232b]/10 pt-6 sm:grid-cols-3">
+              {d.services.map((s) => (
+                <li key={s.navn}>
+                  <p className="font-semibold">{s.navn}</p>
+                  <p className={`mt-1 text-sm leading-relaxed ${muted}`}>{s.beskrivelse}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          <figcaption className={`mt-6 text-sm ${muted}`}>Eksempeltekst fra pakken. Knappen viser hva den sier fra start.</figcaption>
+        </figure>
+        {shop && shopNotes[pack.key] && <p className="mt-8 max-w-3xl text-lg leading-relaxed">{shopNotes[pack.key]}</p>}
+      </Section>
+
+      <Section eyebrow="Dette får du" title="Sidene som ligger klare">
         <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {pages.map((page) => (
-            <li key={page.path} className="rounded-xl bg-white p-6 ring-1 ring-[#1b232b]/10">
+          {d.pages.map((page) => (
+            <li key={page.path} className="rounded-xl bg-white p-6 ring-1 ring-[#1b232b]/15">
               <h3 className={`${heading} text-lg`}>{page.title}</h3>
-              <p className={`mt-1.5 ${muted}`}>
-                {[...new Set(page.content.sections.map((s) => (s.type === "tjenester" && s.variant === "liste" ? "prisliste" : sectionNames[s.type] ?? s.type)))].join(", ")}
-              </p>
+              <p className={`mt-1.5 ${muted}`}>{page.sections.join(", ")}</p>
             </li>
           ))}
         </ul>
-        {bookingSystems && (
+        {shop && (
           <p className={`mt-8 max-w-3xl leading-relaxed ${muted}`}>
-            Knappen «{button}» går til kontaktskjemaet. Bruker du {bookingSystems} eller et annet bookingsystem, kan den gå rett dit i stedet.
-            Du limer bare inn lenken.
+            I tillegg kommer varesidene, handlekurven, kassen og en side for kjøpsvilkår, som du fyller ut fra Forbrukertilsynets mal før kassen åpner.
           </p>
         )}
       </Section>
+
+      {(d.prices.length > 0 || d.questions.length > 0 || extras.length > 0) && (
+        <Section eyebrow="Innholdet" title={`Skrevet for ${shop ? "butikken" : "bransjen"} din`} tone="kalk">
+          <div className="grid gap-10 lg:grid-cols-3">
+            {d.prices.length > 0 && (
+              <div>
+                <h3 className={`${heading} text-xl`}>Prislisten som ligger klar</h3>
+                <ul className="mt-4 space-y-3">
+                  {d.prices.map((p) => (
+                    <li key={p.navn}>
+                      <p className="font-semibold">{p.navn}</p>
+                      <p className={`text-sm leading-relaxed ${muted}`}>{p.beskrivelse}</p>
+                    </li>
+                  ))}
+                </ul>
+                <p className={`mt-4 text-sm ${muted}`}>Prisene setter du selv. Siden kan ikke publiseres før de er fylt inn.</p>
+              </div>
+            )}
+            {d.questions.length > 0 && (
+              <div>
+                <h3 className={`${heading} text-xl`}>Spørsmålene kundene stiller</h3>
+                <ul className="mt-4 list-disc space-y-2 pl-5">
+                  {d.questions.map((q) => (
+                    <li key={q}>{q}</li>
+                  ))}
+                </ul>
+                <p className={`mt-4 text-sm ${muted}`}>Spørsmålene er ferdig formulert. Svarene skriver du, med hint om hva som bør stå.</p>
+              </div>
+            )}
+            {extras.length > 0 && (
+              <div>
+                <h3 className={`${heading} text-xl`}>Også med</h3>
+                <ul className="mt-4 list-disc space-y-2 pl-5">
+                  {extras.map((x) => (
+                    <li key={x}>{x}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          {d.booking === "time" && (
+            <p className="mt-10 max-w-3xl leading-relaxed">
+              <strong>Timebestilling:</strong> legg til seksjonen Timebestilling, så bestiller kundene time rett på nettsiden. Du setter opp tjenestene,
+              varigheten, de ansatte og arbeidstidene, og ser bestillingene i studioet. Bruker du Timma eller Fresha fra før, kan du bygge inn den i stedet.
+            </p>
+          )}
+          {d.booking === "bord" && (
+            <p className="mt-10 max-w-3xl leading-relaxed">
+              <strong>Bordbestilling:</strong> bruker du Resos eller DinnerBooking, kan bestillingen bygges inn på siden. Den lastes først når gjesten trykker.
+            </p>
+          )}
+          {embedExamples[pack.key] && <p className="mt-10 max-w-3xl leading-relaxed">{embedExamples[pack.key]}</p>}
+        </Section>
+      )}
+
       <Section eyebrow="Temaer" title="Temaene som passer best" intro="Du kan bruke alle temaene, men disse er valgt ut for bransjen din. Fargene kan du bytte når du vil.">
         <ul className="grid grid-cols-1 justify-items-center gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {recommended.map((key) => {
@@ -828,61 +1096,86 @@ function BransjePage({ route, env }: { route: Extract<PlatformRoute, { kind: "br
             );
           })}
         </ul>
+        <p className="mt-8 text-center">
+          <Link href="/temaer" className="font-semibold text-[#173b6c] underline underline-offset-4">
+            Se alle {themes.length} temaene
+          </Link>
+        </p>
       </Section>
       <Owner />
-      <Section id="priser" eyebrow="Pris" title={shop ? "399 kr i måneden for nettbutikk" : "199 kr i måneden for nettside"}>
+      <Section id="priser" eyebrow="Pris" title={`${bransjeMonthly(match)} kr i måneden for ${shop ? "nettbutikk" : "nettside"}`}>
         <Pricing shop={shop} />
       </Section>
+      {related.length > 0 && (
+        <Section eyebrow={match.genre.label} title={`Andre bransjer i ${lowerLabel(match.genre.label)}`} tone="kalk">
+          <BransjeLinks packs={related} label={`Andre bransjer i ${lowerLabel(match.genre.label)}`} />
+          <p className="mt-6">
+            <Link href="/bransjer" className="font-semibold text-[#173b6c] underline underline-offset-4">
+              Se alle bransjene
+            </Link>
+          </p>
+        </Section>
+      )}
       <LeadSection env={env} need={shop ? "nettbutikk" : "nettside"} bransje={pack.key} title={`Vil du ha ${shop ? "en nettbutikk" : "en nettside"} som denne?`} />
     </>
   );
 }
 
 /** Personvern, vilkår og databehandleravtale for nettgata.no, fra lib/legal/plattform.ts. */
-function LegalPage({ doc }: { doc: PlattformDokument }) {
+function LegalPage({ doc, crumbs }: { doc: PlattformDokument; crumbs: Crumb[] }) {
   const [first, ...rest] = sideSomTekst(plattformDokument(doc));
   return (
-    <article className={`${container} max-w-3xl py-14`}>
-      <h1 className={`${heading} text-3xl text-balance break-words hyphens-auto sm:text-4xl`}>{first?.overskrift}</h1>
-      <div className={`mt-6 space-y-4 text-lg leading-relaxed ${muted}`}>
-        {first?.avsnitt.map((a, i) => (
-          <p key={i}>{a}</p>
+    <>
+      <Breadcrumbs crumbs={crumbs} />
+      <article className={`${container} max-w-3xl pb-14 pt-8`}>
+        <h1 className={`${heading} text-3xl text-balance break-words hyphens-auto sm:text-4xl`}>{first?.overskrift}</h1>
+        <div className={`mt-6 space-y-4 text-lg leading-relaxed ${muted}`}>
+          {first?.avsnitt.map((a, i) => (
+            <p key={i}>{a}</p>
+          ))}
+        </div>
+        {rest.map((part, i) => (
+          <section key={i} className="mt-10">
+            {part.overskrift && <h2 className={`${heading} text-2xl`}>{part.overskrift}</h2>}
+            <div className="mt-3 space-y-3 leading-relaxed">
+              {part.avsnitt.map((a, j) => (
+                <p key={j} className="whitespace-pre-line">
+                  {a}
+                </p>
+              ))}
+            </div>
+          </section>
         ))}
-      </div>
-      {rest.map((part, i) => (
-        <section key={i} className="mt-10">
-          {part.overskrift && <h2 className={`${heading} text-2xl`}>{part.overskrift}</h2>}
-          <div className="mt-3 space-y-3 leading-relaxed">
-            {part.avsnitt.map((a, j) => (
-              <p key={j} className="whitespace-pre-line">
-                {a}
-              </p>
-            ))}
-          </div>
-        </section>
-      ))}
-    </article>
+      </article>
+    </>
   );
+}
+
+/** Spørsmålene som står synlig på siden, og som derfor kan stå i de strukturerte dataene. */
+export function visibleFaq(route: PlatformRoute): [string, string][] {
+  return route.kind === "landing" ? landingFaq : route.kind === "nettbutikk" ? shopFaq : [];
 }
 
 /** Siden for en plattformrute, eller null når ruten ikke finnes (gir 404). */
 export function renderPlatformPage(route: PlatformRoute, env: PlatformEnv): ReactNode | null {
+  const crumbs = platformBreadcrumbs(route);
   const body =
     route.kind === "landing" ? (
       <Landing env={env} />
     ) : route.kind === "nettbutikk" ? (
-      <ShopLanding env={env} />
+      <ShopLanding env={env} crumbs={crumbs} />
     ) : route.kind === "temaer" ? (
-      <ThemesPage env={env} />
+      <ThemesPage env={env} crumbs={crumbs} />
     ) : route.kind === "bransjer" ? (
-      <BransjerIndex env={env} />
+      <BransjerIndex env={env} crumbs={crumbs} />
     ) : route.kind === "bransje" ? (
-      <BransjePage route={route} env={env} />
+      <BransjePage route={route} env={env} crumbs={crumbs} />
     ) : route.kind === "juridisk" ? (
-      <LegalPage doc={route.doc} />
+      <LegalPage doc={route.doc} crumbs={crumbs} />
     ) : null;
   return body ? (
     <PlatformChrome env={env} leadHref={route.kind === "juridisk" ? "/#kom-i-gang" : "#kom-i-gang"}>
+      <JsonLd data={platformJsonLd(route, platformOrigin(PLATFORM_DEFAULT_ORIGIN), visibleFaq(route))} />
       {body}
     </PlatformChrome>
   ) : null;

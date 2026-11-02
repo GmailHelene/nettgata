@@ -5,7 +5,21 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { cache } from "react";
 import { PageRenderer, SiteChrome, siteHref } from "@/components/sections";
 import { ProductPage, ProductsPage, OrderPage, CartPage, shopMeta, type ShopRoute } from "@/components/shop/pages";
-import { effectiveTitle, firstContentImage, shareImageSrc } from "@/lib/content/seo";
+import { firstContentImage, pageSeo, shareImageSrc } from "@/lib/content/seo";
+import { bransjeKeyword, parseServiceArea, primaryPlace } from "@/lib/seo/auto";
+import {
+  articleJsonLd,
+  breadcrumbItems,
+  breadcrumbJsonLd,
+  faqJsonLd,
+  jsonLdScript,
+  localBusinessJsonLd,
+  priceRange,
+  servicesJsonLd,
+  websiteJsonLd,
+} from "@/lib/seo/schema";
+import { readSiteInfo } from "@/lib/site-info";
+import { readSiteLayout } from "@/lib/site-layout";
 import { getDb } from "@/db";
 import { productCategories, sites } from "@/db/schema";
 import { isPlatformHost, resolveHost } from "@/lib/hosts";
@@ -14,10 +28,14 @@ import { embeddedBookingHosts } from "@/lib/booking";
 import { CANCEL_PATH } from "@/lib/egen-booking/notify";
 import { usesOwnBooking } from "@/lib/egen-booking/store";
 import { BookingCancelPage } from "@/components/site/booking-cancel";
+import { NewsletterConfirmPage, NewsletterUnsubscribePage } from "@/components/site/newsletter-pages";
+import { NEWSLETTER_CONFIRM_PATH, NEWSLETTER_UNSUBSCRIBE_PATH, usesNewsletter } from "@/lib/nyhetsbrev/subscribers";
 import { buildRenderContext } from "@/lib/render";
 import { listCatalog } from "@/lib/shop/catalog";
 import { readShopSettings } from "@/lib/shop/settings";
-import { parseBrowseQuery } from "@/lib/shop/browse";
+import { browse, isRefinedQuery, parseBrowseQuery, resultSummary } from "@/lib/shop/browse";
+import { embeddedServices } from "@/lib/embeds";
+import { siteIcons } from "@/lib/favicon";
 import { findRedirect } from "@/lib/redirects";
 import { GENERATED_PATHS, generatedLegalPage } from "@/lib/legal/kundesider";
 import type { PageContent } from "@/lib/content/types";
@@ -42,6 +60,21 @@ const loadSite = cache(async (kind: Target["kind"], key: string) => {
   const [site] = await db.select().from(sites).where(eq(sites.slug, key)).limit(1);
   return site ? { db, site, basePath: `/vis/${site.slug}`, redirectHost: null } : null;
 });
+
+/** Varene og kategoriene til varelisten. Delt mellom metadata (antall treff i tittelen) og selve siden. */
+const loadProducts = cache(async (siteId: string, categorySlug: string | null) => {
+  const db = await getDb();
+  const categories = await db
+    .select()
+    .from(productCategories)
+    .where(eq(productCategories.siteId, siteId))
+    .orderBy(asc(productCategories.sortOrder), asc(productCategories.name));
+  const active = categories.find((c) => c.slug === categorySlug);
+  const items = await listCatalog(db, siteId, active ? { categoryId: active.id } : {});
+  return { categories, active, items };
+});
+
+const firstValue = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? null;
 
 /** Sender besøket videre til hovedadressen med samme sti og spørring (308, permanent). */
 async function redirectToPrimary(host: string, props: Props): Promise<never> {
@@ -88,7 +121,74 @@ async function currentRequest({ params }: Props) {
 
 const keyOf = (t: Target) => (t.kind === "host" ? t.host : t.slug);
 
+/** Det de automatiske titlene bygger på: navn, bransjeord og sted. */
+function seoContext(site: typeof sites.$inferSelect) {
+  return {
+    siteName: site.name,
+    keyword: bransjeKeyword(site.industryPack),
+    place: primaryPlace(readSiteInfo(site.info)),
+    shop: site.kind === "nettbutikk",
+  };
+}
+
+/**
+ * Strukturerte data for en publisert side: bedriften (riktig type per bransje) på alle sider, nettstedet på forsiden,
+ * brødsmuler på undersider, spørsmål og svar, tjenester med pris og blogginnlegg. Bare på eget domene og gratisadressen.
+ */
+function pageJsonLd(
+  site: typeof sites.$inferSelect,
+  origin: string,
+  page: { title: string; content: PageContent; createdAt: Date; publishedAt: Date },
+  at: string,
+  nav: { path: string; title: string }[],
+  schemaType: string,
+): string | null {
+  const siteUrl = `${origin}/`;
+  const pageUrl = `${origin}${at}`;
+  const info = readSiteInfo(site.info);
+  const image = page.content.seo?.image ?? firstContentImage(page.content);
+  const imageUrl = image ? new URL(shareImageSrc(image.src), siteUrl).toString() : undefined;
+  const business = localBusinessJsonLd({
+    name: site.name,
+    schemaType,
+    url: siteUrl,
+    info,
+    layout: readSiteLayout(site.layout),
+    ...(at === "/" && { image: imageUrl, priceRange: priceRange([page.content]) }),
+  });
+  return jsonLdScript([
+    business,
+    at === "/" ? websiteJsonLd(siteUrl, site.name) : null,
+    breadcrumbJsonLd(breadcrumbItems(at, page.title, nav), siteUrl),
+    faqJsonLd(page.content, pageUrl),
+    ...servicesJsonLd(page.content, siteUrl, parseServiceArea(info.serviceArea)),
+    at.startsWith("/blogg/")
+      ? articleJsonLd({
+          url: pageUrl,
+          siteUrl,
+          siteName: site.name,
+          title: page.title,
+          published: page.createdAt,
+          modified: page.publishedAt,
+          image: imageUrl,
+          description: pageSeo({ ...seoContext(site), pageTitle: page.title, content: page.content, path: at }).description,
+        })
+      : null,
+  ]);
+}
+
+/** Ikonet i fanen (lib/favicon.ts) legges på alle sidene til kundenettstedene. */
 export async function generateMetadata(props: Props): Promise<Metadata> {
+  const meta = await pageMetadata(props);
+  const { target } = await currentRequest(props);
+  const loaded = target ? await loadSite(target.kind, keyOf(target)) : null;
+  if (!loaded) return meta;
+  // «Koble til Google Search Console»: koden kunden har limt inn under Innstillinger. Bare på eget domene og gratisadressen.
+  const google = target?.kind === "host" ? readSiteInfo(loaded.site.info).googleVerification : "";
+  return { ...meta, icons: siteIcons(loaded.site), ...(google && { verification: { google } }) };
+}
+
+async function pageMetadata(props: Props): Promise<Metadata> {
   const { target, platform, origin } = await currentRequest(props);
   if (!target) return platform ? platformMetadata(platform, origin) : { title: "Nettgata" };
   const loaded = await loadSite(target.kind, keyOf(target));
@@ -101,13 +201,20 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
     target.kind === "host" ? { alternates: { canonical: `${origin}${normalizePath(path)}` } } : { robots: { index: false, follow: false } };
 
   /** Tittel, beskrivelse og bilde også når siden deles på Facebook, LinkedIn og i meldinger. */
-  const sharing = (title: string, description: string | undefined, image: { src: string; alt: string } | null | undefined): Metadata => ({
+  const sharing = (
+    title: string,
+    description: string | undefined,
+    image: { src: string; alt: string } | null | undefined,
+    type: "website" | "article" | "product" = "website",
+  ): Metadata => ({
     title,
     description,
+    // Next kjenner ikke og:type «product». Da settes den som egen tagg.
+    ...(type === "product" && { other: { "og:type": "product" } }),
     openGraph: {
       siteName: site.name,
       locale: "nb_NO",
-      type: "website",
+      ...(type !== "product" && { type }),
       title,
       description,
       ...(image && { images: [{ url: `${origin}${shareImageSrc(image.src)}`, ...(image.alt && { alt: image.alt }) }] }),
@@ -117,14 +224,35 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
 
   // Avbestillingslenken fra timebestillingen. Nøkkelen står i adressen, så den skal aldri i søkemotorer eller videre i Referer.
   if (normalizePath(path) === CANCEL_PATH) return { title: `Avbestill time | ${site.name}`, robots: { index: false, follow: false }, referrer: "no-referrer" };
+  // Lenkene fra nyhetsbrevet har også nøkkelen i adressen.
+  if (normalizePath(path) === NEWSLETTER_CONFIRM_PATH) return { title: `Bekreft påmeldingen | ${site.name}`, robots: { index: false, follow: false }, referrer: "no-referrer" };
+  if (normalizePath(path) === NEWSLETTER_UNSUBSCRIBE_PATH) return { title: `Meld deg av | ${site.name}`, robots: { index: false, follow: false }, referrer: "no-referrer" };
 
   const route = site.kind === "nettbutikk" ? shopRoute(target.segments) : null;
   if (route) {
     const meta = await shopMeta(db, site, route);
     // Handlekurv og ordre skal aldri i søkemotorer.
     const noindex = route.kind === "cart" || route.kind === "order";
+    if (route.kind === "products") {
+      // Søk, filter og sortering er varianter av varelisten og skal ikke i søkemotorer. Lenkene kan fortsatt følges.
+      const params = await props.searchParams;
+      const query = parseBrowseQuery(params);
+      const { categories, items, active } = await loadProducts(site.id, firstValue(params.kategori));
+      if (isRefinedQuery(query)) {
+        const count = browse(items, query, Object.fromEntries(categories.map((c) => [c.id, c.name]))).length;
+        // Siden lastes på nytt ved søk, så skjermlesere leser antallet her først.
+        const title = query.search ? `${resultSummary(count, query.search)} | ${site.name}` : `${meta.title}, ${resultSummary(count)} | ${site.name}`;
+        return { title, robots: { index: false, follow: true } };
+      }
+      // En kategori er en egen side for Google, med kategorinavnet i tittelen og sin egen kanoniske adresse.
+      if (active) {
+        const canonical =
+          target.kind === "host" ? { alternates: { canonical: `${origin}/produkter?kategori=${encodeURIComponent(active.slug)}` } } : indexing;
+        return { ...sharing(`${active.name} | ${site.name}`, meta.description, meta.image), ...canonical };
+      }
+    }
     return {
-      ...sharing(`${meta.title} | ${site.name}`, meta.description, meta.image),
+      ...sharing(meta.seoTitle ?? `${meta.title} | ${site.name}`, meta.description, meta.image, route.kind === "product" ? "product" : "website"),
       ...(noindex ? { robots: { index: false, follow: false } } : indexing),
     };
   }
@@ -134,12 +262,11 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   if (generated) return { title: generated.seo.title, description: generated.seo.description, ...indexing };
   if (!page) return normalizePath(path) === "/" ? { title: site.name, robots: { index: false, follow: false } } : {};
   const seo = page.content.seo ?? {};
+  // Kundens egen tittel og beskrivelse vinner. Ellers lages de av navn, bransje, sted og teksten på siden.
+  const at = normalizePath(path);
+  const auto = pageSeo({ ...seoContext(site), pageTitle: page.title, content: page.content, path: at });
   return {
-    ...sharing(
-      effectiveTitle(seo.title, page.title, site.name),
-      seo.description?.trim() || undefined,
-      seo.image ?? firstContentImage(page.content),
-    ),
+    ...sharing(auto.title, auto.description, seo.image ?? firstContentImage(page.content), at.startsWith("/blogg/") ? "article" : "website"),
     ...indexing,
   };
 }
@@ -181,6 +308,21 @@ export default async function PublicPage(props: Props) {
     );
   }
 
+  if (normalizePath(path) === NEWSLETTER_CONFIRM_PATH || normalizePath(path) === NEWSLETTER_UNSUBSCRIBE_PATH) {
+    const query = await props.searchParams;
+    const token = typeof query.t === "string" ? query.t : "";
+    const ctx = await buildRenderContext(db, site, normalizePath(path), false, basePath);
+    return (
+      <SiteChrome theme={site.theme} ctx={ctx}>
+        {normalizePath(path) === NEWSLETTER_CONFIRM_PATH ? (
+          <NewsletterConfirmPage siteId={site.id} siteName={site.name} token={token} />
+        ) : (
+          <NewsletterUnsubscribePage db={db} siteId={site.id} siteName={site.name} token={token} />
+        )}
+      </SiteChrome>
+    );
+  }
+
   const route = site.kind === "nettbutikk" ? shopRoute(target.segments) : null;
   if (route) {
     const ctx = await buildRenderContext(db, site, normalizePath(path), false, basePath);
@@ -188,13 +330,7 @@ export default async function PublicPage(props: Props) {
     switch (route.kind) {
       case "products": {
         const query = await props.searchParams;
-        const categories = await db
-          .select()
-          .from(productCategories)
-          .where(eq(productCategories.siteId, site.id))
-          .orderBy(asc(productCategories.sortOrder), asc(productCategories.name));
-        const active = categories.find((c) => c.slug === query.kategori);
-        const items = await listCatalog(db, site.id, active ? { categoryId: active.id } : {});
+        const { categories, active, items } = await loadProducts(site.id, firstValue(query.kategori));
         body = (
           <ProductsPage products={items} categories={categories} activeSlug={active?.slug ?? null} basePath={basePath} query={parseBrowseQuery(query)} />
         );
@@ -245,13 +381,25 @@ export default async function PublicPage(props: Props) {
     const published = at === GENERATED_PATHS.personvern ? await getPublishedContents(db, site.id) : [];
     const bookingHosts = embeddedBookingHosts(published);
     const ownBooking = at === GENERATED_PATHS.personvern && (await usesOwnBooking(db, site.id, published));
-    const generated = generatedLegalPage(site, at, { bookingHosts, ownBooking }) ?? (at === "/" ? comingSoonPage(site.name) : null);
+    const newsletter = at === GENERATED_PATHS.personvern && (await usesNewsletter(db, site.id, published));
+    // Kart og video fra Google nevnes bare når de er i bruk.
+    const embeds = embeddedServices(published);
+    const generated = generatedLegalPage(site, at, { bookingHosts, ownBooking, newsletter, embeds }) ?? (at === "/" ? comingSoonPage(site.name) : null);
     if (!generated) notFound();
     const legalCtx = await buildRenderContext(db, site, at, false, basePath);
     return <PageRenderer content={generated} theme={site.theme} ctx={legalCtx} />;
   }
-  const ctx = await buildRenderContext(db, site, normalizePath(path), false, basePath, {
-    posts: page.content.sections.some((s) => s.type === "blogg"),
+  const at = normalizePath(path);
+  const ctx = await buildRenderContext(db, site, at, false, basePath, {
+    // Blogginnleggene trengs i bloggseksjonen og i «Flere innlegg» under et innlegg.
+    posts: page.content.sections.some((s) => s.type === "blogg") || at.startsWith("/blogg/"),
   });
-  return <PageRenderer content={page.content} theme={site.theme} ctx={ctx} canonicalUrl={`${origin}/`} />;
+  // Kopien via plattformens adresse er noindex og får ingen strukturerte data.
+  const jsonLd = basePath ? null : pageJsonLd(site, origin, page, at, ctx.nav, ctx.site.schemaType);
+  return (
+    <>
+      {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />}
+      <PageRenderer content={page.content} theme={site.theme} ctx={ctx} canonicalUrl={`${origin}/`} pageTitle={page.title} />
+    </>
+  );
 }

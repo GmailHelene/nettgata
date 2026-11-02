@@ -76,4 +76,5 @@ export const demoInfo: SiteInfo = {
     { day: "Mandag til fredag", time: "07.00 - 16.00" },
     { day: "Lørdag og søndag", time: "Kun akutt" },
   ],
+  specialHours: [],
 };

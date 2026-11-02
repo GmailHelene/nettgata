@@ -7,7 +7,7 @@ Grunnlag: markedsanalysen (funksjonskart, funksjonsrevisjon og MVP-liste), produ
 
 **Lag:** N = synlig for nybegynneren. A = avansert lag. U = utviklerlaget. S = skjult automatikk som bare virker.
 
-Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske tekster godkjent, Vipps og Klarna, abonnement med Stripe, sikkerhetskopi, blogg, invitasjoner og omdirigeringer, timebestilling, Bring, Fiken for plattformadmin, funn fra test med kundegrupper, AI-teamet).
+Sist oppdatert 02.11.2026 (hjelp i studioet og kunnskapsbase, «Last ned alt»; SEO som lager seg selv: titler, beskrivelser, strukturerte data, IndexNow og Search Console; publisering sperret før betaling, søk i nettbutikken, favicon, dupliser side, import fra sitemap, kart og video i personvernerklæringen, PDF-filer i biblioteket; temaer og sjangre, salgssiden nettgata.no, juridiske tekster godkjent, Vipps og Klarna, abonnement med Stripe, sikkerhetskopi, blogg, invitasjoner og omdirigeringer, timebestilling, Bring, Fiken for plattformadmin, funn fra test med kundegrupper, AI-teamet).
 
 ---
 
@@ -30,7 +30,7 @@ Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske 
 | Publiser alle sider samtidig | N | Ferdig |
 | Lag, slett, flytt sider, velg hva som vises i menyen | N | Ferdig |
 | Lag kopi av en seksjon | N | Bygget |
-| Dupliser side | N | MVP |
+| Dupliser side: kopi av kladden med alle seksjonene på «-kopi», ikke publisert og ikke i menyen | N | Bygget |
 | Kvalitetsport før publisering: det som mangler vises på seksjonen, eksempeltekst og eksempelbilder stopper eller varsler | S | Bygget (lenkesjekk, kontrast og mobil: MVP) |
 | «Skriv ...»-tekst fra bransjepakken stopper publisering. «Publiser alle» publiserer det som er klart og sier hvilke sider som mangler tekst | S | Bygget |
 | Forsiden viser «Nettstedet er snart klart» (uten indeksering) til den er publisert, i stedet for «Fant ikke siden» | S | Bygget |
@@ -55,7 +55,8 @@ Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske 
 | 14 fontpar, selvhostet (ingen kall til Google), valg av hjørner | N | Bygget |
 | Bakgrunn per seksjon (vanlig, flate, fargerik) med kontrast i behold | N | Ferdig |
 | Egendefinert palett innenfor kontrastkravene | A | Bygget (Design, Tilpass) |
-| Opplasting av logo | N | Ferdig (favicon: MVP) |
+| Opplasting av logo | N | Ferdig |
+| Ikon i nettleserfanen (favicon): PNG, WebP, ICO eller JPEG fra Innstillinger, gjort om til 180 og 48 px, /favicon.ico og /apple-touch-icon.png per domene, ellers forbokstaven i temafargene | N | Bygget |
 | Mørk modus for nettstedet | A | Senere |
 | Egen sidemalbygger (lagre egne seksjoner som maler) | A | Senere |
 
@@ -70,12 +71,14 @@ Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske 
 | Tekst, bilde og tekst, tjenester og priser, kontakt, oppfordring | N | Ferdig |
 | Bildegalleri, kundeomtaler, spørsmål og svar | N | Ferdig |
 | Trygghetspunkter, varekarusell (nyeste, salg, på lager), kategorikort | N | Ferdig |
-| Ansatte og team | N | MVP |
-| Åpningstider som egen seksjon | N | MVP |
-| Kart (uten sporing før samtykke) | N | MVP |
-| Video (YouTube uten informasjonskapsler, eller opplastet) | N | MVP |
+| Ansatte og team (navn, rolle, bilde med alt-tekst, kort tekst, e-post og telefon) | N | Bygget |
+| Åpningstider som egen seksjon, fra samme kilde som kontakt og Google | N | Bygget |
+| Avvikende åpningstider (romjul, påske) under Innstillinger, passerte dager skjules av seg selv | N | Bygget |
+| Slå en seksjon av og på uten å slette den (avslått seksjon stopper ikke publisering) | N | Bygget |
+| Kart (uten sporing før samtykke) | N | Bygget: adresse og lenker til Google Maps og OpenStreetMap, kartet lastes først ved trykk på «Vis kart». Personvernerklæringen får avsnittet «Kart og video» når kart eller video er i bruk (teksten venter på Helenes godkjenning) |
+| Video (YouTube uten informasjonskapsler, eller opplastet) | N | Bygget for YouTube (youtube-nocookie, lastes ved trykk). Opplastet video: Senere |
 | Tabell, prisplaner, logoer fra samarbeidspartnere | N | MVP |
-| Nedlastbare filer (PDF-meny, brosjyre) | N | MVP |
+| Nedlastbare filer (PDF-meny, brosjyre) | N | Bygget: PDF sjekkes fra innholdet, maks 10 MB, byttes med én opplasting |
 | Bransjeseksjoner: meny med allergener, timeplan, prosjektgalleri, sertifiseringer | N | MVP (per pakke) |
 | Egendefinerte felt og datatyper (f.eks. «Prosjekter» med egne felt) | U | Senere |
 
@@ -96,24 +99,34 @@ Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske 
 | Responsive bildestørrelser: 640, 1280 og 2000 px, mobilen henter den minste som holder | S | Bygget (bilder fra før har bare originalen) |
 | Alt-tekst-forslag fra AI, som kunden godkjenner | N | MVP |
 | Bildebank med lisensfrie bilder | N | Senere |
+| PDF-filer i biblioteket: «Filer» under Bilder med størrelse og hvor de brukes, sletting når de ikke er i bruk, og tilbud om å slette den gamle når en PDF byttes | N | Bygget |
 | Sletting av ubrukte bilder | S | Senere |
 
 ## 5. SEO og synlighet
 
 | Funksjon | Lag | Status |
 |---|---|---|
-| Server-rendrede sider, kanonisk lenke | S | Ferdig |
+| Server-rendrede sider, kanonisk lenke | S | Ferdig. Kanonisk lenke er alltid hovedadressen: eget domene vinner når det er koblet til (gratisadressen og ekstra domener sendes videre med 308). Kategorisider i nettbutikken har egen kanonisk adresse og kategorinavnet i tittelen (bygget) |
 | Én H1 på hver side: den første overskriften blir H1 også når siden ikke starter med en toppseksjon | S | Bygget |
-| Sitemap og robots per domene | S | Ferdig |
-| Strukturerte data (schema.org per bransje) | S | Ferdig |
+| Sitemap og robots per domene | S | Ferdig. lastmod er publiseringstidspunktet, varene har bildene med (bygget) |
+| IndexNow: Bing og andre søkemotorer får beskjed når sider publiseres (Google bruker sitemap) | S | Bygget: egen nøkkel per domene på /<nøkkel>.txt, sendes etter svaret, feil ignoreres, aldri for visningen via plattformen |
+| Koble til Google Search Console: lim inn taggen eller koden, kort veiledning | N | Bygget (Innstillinger, koden sjekkes og legges i head) |
+| Strukturerte data (schema.org per bransje) | S | Ferdig. Nå på alle sider, med riktig undertype per pakke (Plumber, HairSalon, Restaurant, Dentist osv.), område vi dekker, sosiale lenker, logo og prisspenn fra prislisten. Aldri stjerner eller koordinater vi ikke har (bygget) |
+| Område vi dekker (stedene bedriften jobber i) | N | Bygget: ett felt i Innstillinger, brukes i titlene, i strukturerte data og i kontaktseksjonen |
+| Åpningstider og avvikende dager i strukturerte data (tider som ikke kan tolkes, utelates) | S | Bygget |
 | SEO-tittel og beskrivelse per side, med forhåndsvisning av Google-treffet | N | Bygget (feltene ble brukt, men kunne ikke redigeres i studioet før nå) |
+| Tittel og beskrivelse lager seg selv når feltene står tomme: «Rørlegger i Drammen \| Hansen Rør AS» på forsiden, sidetittel, bransje, sted og navn på undersider, beskrivelse fra teksten på siden (maks 155 tegn, hele ord). Varesider: navn, egenskap, pris og butikk. Det kunden skriver selv, vinner. Vises som forslag i feltene | S | Bygget |
 | Visning via plattformen er merket noindex | S | Ferdig |
-| 301-omdirigeringer og importkart ved flytting | A | Bygget: liste med gammel og ny adresse, også WordPress-adresser med ?page_id (import fra gammel sitemap: MVP) |
-| Open Graph-bilde per side (deling i sosiale medier), ellers første bilde på siden, varebilde på varesider | N | Bygget |
-| Én linje «fiks nå» i stedet for SEO-poeng (mangler beskrivelse, for lang tittel, mangler H1, mangler bilde) | N | Bygget |
+| 301-omdirigeringer og importkart ved flytting | A | Bygget: liste med gammel og ny adresse, også WordPress-adresser med ?page_id og import fra gammel sitemap (adresse eller opplastet fil, forslag til ny side, kunden bekrefter, sperre mot interne adresser) |
+| Open Graph-bilde per side (deling i sosiale medier), ellers første bilde på siden, varebilde på varesider | N | Bygget. og:locale nb_NO, article på blogginnlegg, product på varesider |
+| Brødsmuler: synlige på sider under en annen side (blogginnlegg, varer), BreadcrumbList på alle undersider | S | Bygget |
+| Interne lenker: «Flere innlegg» under blogginnlegg, bunnteksten lenker til sidene i menyen når kunden ikke har egne kolonner | S | Bygget |
+| Første bilde i toppseksjonen og på varesiden hentes først (fetchpriority), resten lastes når de trengs. Fonter fra eget domene med display swap | S | Bygget |
+| Én linje «fiks nå» i stedet for SEO-poeng (mangler beskrivelse, for lang tittel, mangler H1, mangler bilde) | N | Bygget. Nå også under 50 ord, bilde uten alt-tekst, adresse med æ, ø, å, og etter publisering: samme tittel som en annen side, kontaktside uten lenke. Råd, stopper aldri publisering |
 | Google Bedriftsprofil: veiviser og synk av åpningstider | N | MVP |
-| Strukturerte data for produkter (pris, lager, fulle bildeadresser) | S | Bygget |
-| Strukturerte data for arrangementer og spørsmål | S | MVP |
+| Strukturerte data for produkter (pris, lager, fulle bildeadresser) | S | Bygget. Nå også frakt (billigste sending) og returregler (14 dagers angrerett) |
+| Strukturerte data for spørsmål og svar, tjenester med pris og blogginnlegg (datoer og forfatter) | S | Bygget |
+| Strukturerte data for arrangementer | S | MVP (venter på en arrangementsseksjon) |
 | AI-synlighetsrapport (hva sier ChatGPT og Google om bedriften) | N | Senere |
 | Flere språk med hreflang, nynorsk som fullverdig språk | A | Senere |
 
@@ -121,7 +134,7 @@ Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske 
 
 | Funksjon | Lag | Status |
 |---|---|---|
-| Cookiefri statistikk som standard, ingen banner nødvendig | S | MVP |
+| Cookiefri statistikk som standard, ingen banner nødvendig | S | Bygget |
 | Personvernerklæring generert fra nettstedsinfo (sjekkes mot regelverksradaren) | S | Bygget (utkast til Helene har godkjent tekstene) |
 | Samtykkebanner bare når kunden slår på sporing (GA4, piksler) | A | MVP |
 | WCAG 2.0 A/AA i alle seksjoner, «Hopp til innhold», tastaturnavigasjon | S | Ferdig (grunnlag), sjekk ved publisering MVP |
@@ -145,7 +158,7 @@ Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske 
 | Brannmur og botvern (Cloudflare) | S | MVP |
 | Oppetid og helsesjekk av synlig tekst og kjøpsflyt | S | Delvis: /api/helse for oppetidsvarsling er bygget, overvåkingen settes opp hos en ekstern tjeneste |
 | Automatisk testkjøp hver måned som beviser at kassen virker | S | Senere |
-| Full eksport (HTML, innhold som JSON, ordre som CSV), exit-garanti | N | MVP |
+| Full eksport, exit-garanti: «Last ned alt» i Innstillinger gir én ZIP med de publiserte sidene som statisk HTML med CSS og bilder, alt innhold som JSON, bildene og PDF-ene, varer, ordre, ordrelinjer, kunder, henvendelser, abonnenter og bookinger som CSV, og LES-MEG.txt. Bygges i biter i bakgrunnen (R2, hvert tiende minutt), e-post med lenke som virker i 7 dager. Bare eieren, tre per døgn, revisjonslogg | N | Bygget (statisk HTML hentes via WORKER_SELF_REFERENCE, må prøves i produksjon) |
 
 ## 8. Domene, hosting og e-post
 
@@ -171,8 +184,8 @@ Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske 
 | Honningkrukke og rate limiting mot spam | S | Ferdig |
 | Feltene beholdes ved feilmelding | S | Ferdig |
 | E-postvarsel til bedriften ved ny henvendelse (Brevo) | S | MVP |
-| Tilbudsforespørsel med bildeopplasting (håndverker) | N | MVP |
-| Egne skjema med valgfrie felt | A | Senere |
+| Tilbudsforespørsel med bildeopplasting (håndverker) | N | MVP (håndverkerpakkene har fått felt for adresse og oppstartsdato, bildeopplasting gjenstår) |
+| Egne felt i kontaktskjemaet (tekst, lang tekst, valgliste, avkrysning, dato, telefon, e-post), påkrevd eller valgfritt, i valgfri rekkefølge | N | Bygget (svarene lagres i egen kolonne og vises som liste i innboksen og i e-posten) |
 | Kundeliste med ordrehistorikk, hvor mye hver har handlet for, søk, internt notat og CSV | A | Ferdig (segmenter og samtykke til nyhetsbrev: Senere) |
 
 ## 10. Nettbutikk (Magento- og Shopify-nivå)
@@ -203,13 +216,13 @@ Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske 
 | Ordrebekreftelse til kunden, varsel om ny ordre og «pakken er på vei» med sporing (Brevo) | S | Bygget, sendes når Brevo er koblet til |
 | E-postlogg på ordren, så butikken ser om kunden fikk bekreftelsen | S | Ferdig |
 | Kansellering og refusjon som status, varene legges tilbake på lager | N | Ferdig |
-| Kreditnota | A | MVP |
+| Kreditnota: lages av seg selv når en betalt ordre kanselleres eller refunderes. Egen nummerserie per nettsted fra 1, uten hull og trygg ved samtidighet, med henvisning til ordren, negative linjer og MVA per sats som på ordren. Kan skrives ut eller lagres som PDF, står på ordren, trekkes fra i salgs- og MVA-rapporten i perioden den ble laget og er med i CSV-en. Kan aldri endres (trigger i databasen). Hele ordren krediteres, fordi refusjon alltid gir hele beløpet tilbake | A | Bygget |
 | Rabattkoder: prosent, beløp eller fri frakt, minstebeløp, periode og bruksgrense | N | Ferdig (automatiske kampanjer: MVP) |
 | Salgs- og MVA-rapport per måned, termin, år eller egen periode, med MVA per sats og CSV | A | Ferdig |
 | Fiken-eksport (betalte ordre sendes til butikkens egen Fiken som salg, én linje per MVA-sats) og ordreeksport som stemmer mot Vipps-oppgjør | A | Fiken: Bygget, men bare åpent for plattformadmin (`fikenAvailableTo`). Ikke prøvd mot ekte Fiken, og den personlige API-nøkkelen må byttes til OAuth2 før butikkene får den, se docs/FIKEN.md. Vipps-oppgjør: MVP |
 | Produktfeed til Google og Meta | S | Bygget (/produktfeed.xml på butikkens domene) |
 | Sortering (pris, nyeste) og filtre på valg og lager | N | Ferdig |
-| Søk i varer for kunden | N | MVP |
+| Søk i varer for kunden: navn, beskrivelse, kategori og varianter, antall treff leses opp, søkesider er noindex | N | Bygget |
 | Eksport av varer og ordre som CSV (norsk Excel) | A | Ferdig |
 | Import av varer fra CSV med forhåndsvisning, nye varer og endring av pris, lager, status og kategori | A | Ferdig (bilder via import: Senere) |
 | Kundekonto med ordrehistorikk | N | Senere |
@@ -239,8 +252,8 @@ Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske 
 | Funksjon | Lag | Status |
 |---|---|---|
 | Blogg med kategorier og egne SEO-sider | N | Bygget: innlegg under /blogg og seksjon med siste innlegg (kategorier: MVP) |
-| Nyhetsbrev: innsamling med samtykke og dobbel opt-in | N | MVP |
-| Nyhetsbrev: utkast i kundens design, sending via Brevo | N | MVP |
+| Nyhetsbrev: innsamling med samtykke og dobbel opt-in. Seksjonen «Nyhetsbrev» med e-post, valgfritt navn, samtykkesetning og lenke til personvern, honningkrukke og grenser per IP, nettsted og adresse. Bekreftelse på e-post med signert lenke (30 dager), bare bekreftede får nyhetsbrev. Samtykketekst, tidspunkt for påmelding og bekreftelse og kildeside lagres. Avmelding med ett klikk i hvert nyhetsbrev og List-Unsubscribe, avmeldte står som sperre. Ubekreftede slettes etter 30 dager. Abonnentliste med søk, status, CSV og sletting. Personvernerklæringen tar med nyhetsbrevet automatisk | N | Bygget |
+| Nyhetsbrev: utkast i kundens design, sending via Brevo. Emne, forhåndsvisningstekst og blokker (overskrift, tekst, bilde fra bildene, knapp med lenke) i nettstedets farger, med navn, adresse, org.nr. og avmelding nederst. Kladd, testutgave til meg selv, «Send til X abonnenter» med bekreftelse. Én e-post per mottaker, sendt i porsjoner av bakgrunnsjobben hvert tiende minutt (maks 150 per kjøring), status per mottaker og historikk med antall. Mottakerlisten slettes tolv måneder etter sending, nyhetsbrevet med tallene beholdes | N | Bygget |
 | Innholdskalender for nyhetsbrev og sosiale medier | N | Senere |
 | Facebook og Instagram: «Publiser nå» fra kalenderen | N | Senere |
 | Egen Meta-app med planlagt publisering | S | Senere (krever avklaring med Meta) |
@@ -250,7 +263,7 @@ Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske 
 
 | Funksjon | Lag | Status |
 |---|---|---|
-| Ukentlig rapport med forslag og Godkjenn | N | MVP |
+| Ukentlig rapport med forslag og Godkjenn: for publiserte nettsteder med betalt abonnement uten tillegget. Høyst tre forslag om SEO og innhold i uka, Claude Opus 5.5 med lav innsats via Batch API, eget kostnadstak på 8 kr per nettsted per måned, e-post «X nye forslag», se docs/AI-TEAMET.md | N | Bygget, ikke deployet |
 | Faste roller: SEO, innhold og markedsføring, butikk og drift, sikkerhet | N | Bygget for tillegget: SEO, innhold og butikk (sikkerhet: Senere) |
 | Alt som foreslås kan forhåndsvises og angres | S | Bygget: før og etter i kortet, Godkjenn skriver bare i kladden, angres med versjonene |
 | Effektmåling i neste rapport | N | Senere |
@@ -260,9 +273,9 @@ Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske 
 
 | Funksjon | Lag | Status |
 |---|---|---|
-| Besøk, kilder og mest leste sider, uten informasjonskapsler | N | MVP |
-| Henvendelser og salg per måned | N | MVP |
-| Månedsrapport på e-post | N | MVP |
+| Besøk, kilder og mest leste sider, uten informasjonskapsler | N | Bygget |
+| Henvendelser og salg per måned | N | Bygget |
+| Månedsrapport på e-post: den 1. i måneden til eieren (og redaktører som vil), med besøkende og sidevisninger mot måneden før, tre mest leste sider, tre største kilder, henvendelser, ordre og omsetning for nettbutikker og opptil to «fiks nå» fra SEO-sjekken. Kan slås av per bruker under Innstillinger. Sendes i porsjoner og aldri to ganger | N | Bygget, sendes når Brevo er koblet til |
 | Google Search Console-kobling | A | Senere |
 
 ## 15. Brukere, roller og partnere
@@ -297,7 +310,7 @@ Sist oppdatert 01.11.2026 (temaer og sjangre, salgssiden nettgata.no, juridiske 
 | Prisene sjekkes mot vedtatte priser før betaling, feil pris stopper betalingen | S | Bygget |
 | Varsel 30 dager før fornyelse | S | Bygget (e-post fra Stripe, slås på i Stripe) |
 | Tillegget AI-team og sosiale medier 249 kr | S | Bygget: i Checkout, og kan legges til eller fjernes på et abonnement som løper. Prisene finnes i Stripe live (01.11.2026) |
-| Publisering sperret til oppstarten er betalt | S | MVP |
+| Publisering sperret til abonnementet er betalt (eller «Fakturert utenom Stripe»), sjekket på serveren. Plattformadmin er unntatt, forhåndsvisning virker, og sider som alt er publisert blir liggende | S | Bygget |
 | Vipps Recurring | N | Senere |
 
 ## 18. Bransjepakker
@@ -308,8 +321,8 @@ Bygget: 45 bransjepakker i 11 sjangre (håndverk 7, skjønnhet 3, helse 4, mat 4
 
 | Funksjon | Lag | Status |
 |---|---|---|
-| Hjelpetekster der funksjonen brukes | N | MVP |
-| Kunnskapsbase | N | MVP |
+| Hjelpetekster der funksjonen brukes: én linje under overskriften, hint på felt og «Slik gjør du» med «Les mer» til kunnskapsbasen (components/studio/help.tsx) | N | Bygget |
+| Kunnskapsbase: «Hjelp» i studioet (/studio/hjelp), 30 artikler med steg i lib/hjelp/artikler.ts, søk og kategorier, «Fant du ikke svaret?» til e-post | N | Bygget |
 | AI-førstelinje som svarer fra kunnskapsbasen, overlevering til Helene | N | Senere |
 
 ## 20. Nettgata.no: salg, juridisk og drift

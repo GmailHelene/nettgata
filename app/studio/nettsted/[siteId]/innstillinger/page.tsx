@@ -19,6 +19,11 @@ import { readSiteLayout } from "@/lib/site-layout";
 import { listAccess } from "@/lib/invitations";
 import { AccessForm } from "./access-form";
 import { RedirectsForm } from "./redirects-form";
+import { FaviconForm } from "./favicon-form";
+import { letterIconSvg } from "@/lib/favicon";
+import { canChooseReports, readPrefs } from "@/lib/rapport/mottakere";
+import { ReportForm } from "./report-form";
+import { ExportPanel } from "./export-panel";
 
 export default async function SettingsPage({ params }: { params: Promise<{ siteId: string }> }) {
   const { siteId } = await params;
@@ -60,6 +65,12 @@ export default async function SettingsPage({ params }: { params: Promise<{ siteI
       </section>
       <SettingsForm siteId={site.id} name={site.name} info={readSiteInfo(site.info)} />
       <AppearanceForm siteId={site.id} initial={readSiteLayout(site.layout)} />
+      <FaviconForm
+        siteId={site.id}
+        current={readSiteLayout(site.layout).favicon?.src ?? null}
+        fallback={`data:image/svg+xml,${encodeURIComponent(letterIconSvg(site.name, site.theme))}`}
+      />
+      {canChooseReports(role) && <ReportForm siteId={site.id} initial={await readPrefs(await getDb(), site.id, user.id, role)} email={user.email} />}
       <AccessForm
         siteId={site.id}
         canManage={role === "owner"}
@@ -96,6 +107,8 @@ export default async function SettingsPage({ params }: { params: Promise<{ siteI
         </p>
       )}
       {site.kind === "nettbutikk" && <BringLink siteId={site.id} shop={site.shop} />}
+      {/* Filen har alle personopplysningene til nettstedet, så bare eieren får lage og laste den ned. */}
+      {role === "owner" && <ExportPanel siteId={site.id} />}
     </main>
   );
 }

@@ -223,7 +223,7 @@ export function plattformDatabehandleravtale(o: Valg = {}): PageContent {
     ]),
 
     tekstSeksjon("dba-hva", "Hva jeg gjør med opplysningene", [
-      "Jeg lagrer og viser nettstedet ditt, tar imot skjemaer og bestillinger, sender e-post på dine vegne, tar sikkerhetskopi og gir deg brukerstøtte. Jeg behandler opplysningene bare for å levere Nettgata til deg.",
+      "Jeg lagrer og viser nettstedet ditt, teller besøk uten informasjonskapsler, tar imot skjemaer og bestillinger, sender e-post på dine vegne, tar sikkerhetskopi og gir deg brukerstøtte. Jeg behandler opplysningene bare for å levere Nettgata til deg.",
       "Opplysningene gjelder besøkende på nettstedet ditt, folk som sender deg meldinger eller forespørsler, kundene i nettbutikken, de som melder seg på nyhetsbrevet ditt, og brukerne du gir tilgang til studioet.",
       "Det kan være navn, e-postadresse, telefonnummer og adresse, meldinger, ordre og hva som er kjøpt, betalingsmåte og betalingsstatus, påmeldinger til nyhetsbrev, IP-adresser og tekniske logger, og innloggings- og endringslogger for brukerne dine.",
       "Nettgata er ikke laget for helseopplysninger eller andre særlige kategorier av personopplysninger. Du skal ikke be om slike opplysninger i skjemaene uten at vi har avtalt det først.",

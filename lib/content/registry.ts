@@ -1,5 +1,6 @@
 import type { ZodType } from "zod";
 import { fieldsToZod, type Field, type ValidationMode } from "./fields";
+import { formFieldProblems, formFieldsField } from "./form-fields";
 import { pageContentSchema, type PageContent, type Section, type SectionType } from "./types";
 
 export type SectionDefinition = {
@@ -10,6 +11,8 @@ export type SectionDefinition = {
   hint?: string;
   variants: { key: string; label: string }[];
   fields: Field[];
+  /** Sjekker som går på tvers av feltene. Gjelder bare ved publisering, så kladden kan lagres uferdig. */
+  check?: (props: Record<string, unknown>) => string[];
 };
 
 export const sectionRegistry: Record<SectionType, SectionDefinition> = {
@@ -246,6 +249,93 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
     fields: [
       { key: "overskrift", label: "Overskrift", type: "text" },
       { key: "tekst", label: "Tekst over skjemaet", type: "textarea", max: 600, optional: true },
+      formFieldsField,
+    ],
+    check: formFieldProblems,
+  },
+  ansatte: {
+    label: "Ansatte og team",
+    description: "Folkene bak bedriften, med bilde, rolle og gjerne direkte kontakt.",
+    hint: "Spør de ansatte før du legger ut bilde, e-post og telefon. Alt utenom navnet er valgfritt.",
+    variants: [
+      { key: "kort", label: "Kort med bilde" },
+      { key: "liste", label: "Liste uten bilder" },
+    ],
+    fields: [
+      { key: "overskrift", label: "Overskrift", type: "text" },
+      { key: "tekst", label: "Tekst under overskriften", type: "textarea", max: 400, optional: true },
+      {
+        key: "personer",
+        label: "Personer",
+        type: "list",
+        itemLabel: "Person",
+        max: 24,
+        fields: [
+          { key: "navn", label: "Navn", type: "text", max: 80 },
+          { key: "rolle", label: "Rolle", type: "text", max: 80, optional: true },
+          { key: "bilde", label: "Bilde", type: "image", optional: true },
+          { key: "tekst", label: "Kort tekst", type: "textarea", max: 400, optional: true },
+          { key: "epost", label: "E-post", type: "text", max: 120, optional: true, format: "email" },
+          { key: "telefon", label: "Telefon", type: "text", max: 30, optional: true, format: "phone" },
+        ],
+      },
+    ],
+  },
+  apningstider: {
+    // Tidene hentes fra nettstedets innstillinger, samme kilde som kontaktseksjonen og Google.
+    label: "Åpningstider",
+    description: "Åpningstidene, og dager med andre tider, som romjul og påske.",
+    hint: "Åpningstidene og avvikende dager endres under Innstillinger, så de alltid er like på hele nettstedet og hos Google.",
+    variants: [{ key: "standard", label: "Standard" }],
+    fields: [
+      { key: "overskrift", label: "Overskrift", type: "text" },
+      { key: "tekst", label: "Tekst under tidene", type: "textarea", max: 400, optional: true },
+    ],
+  },
+  kart: {
+    label: "Kart og veibeskrivelse",
+    description: "Adressen med lenke til kart. Kartet lastes først når den besøkende ber om det.",
+    hint: "Adressen hentes fra Innstillinger. Kartet kommer fra Google Maps og lastes først når den besøkende trykker «Vis kart», så ingen spores før det.",
+    variants: [
+      { key: "kart", label: "Med «Vis kart»-knapp" },
+      { key: "lenker", label: "Bare lenker til kart" },
+    ],
+    fields: [
+      { key: "overskrift", label: "Overskrift", type: "text" },
+      { key: "tekst", label: "Veibeskrivelse og parkering", type: "textarea", max: 600, optional: true },
+    ],
+  },
+  video: {
+    label: "Video",
+    description: "En video fra YouTube. Den lastes først når den besøkende trykker på spill av.",
+    hint: "Videoen hentes fra youtube-nocookie.com og lastes først når den besøkende trykker. Navnet på videoen leses opp av skjermlesere.",
+    variants: [{ key: "standard", label: "Standard" }],
+    fields: [
+      { key: "overskrift", label: "Overskrift", type: "text", optional: true },
+      { key: "lenke", label: "Lenke til videoen på YouTube", type: "text", max: 300, format: "youtube" },
+      { key: "tittel", label: "Hva videoen viser (for skjermlesere)", type: "text", max: 120 },
+      { key: "tekst", label: "Tekst under videoen", type: "textarea", max: 600, optional: true },
+    ],
+  },
+  filer: {
+    label: "Filer og PDF-meny",
+    description: "Meny, prisliste eller brosjyre som PDF, som folk kan åpne og laste ned.",
+    hint: "Last opp en ny PDF med «Bytt fil» når menyen endres. Lenken på nettstedet oppdateres når du publiserer. Bare PDF, maks 10 MB.",
+    variants: [{ key: "standard", label: "Standard" }],
+    fields: [
+      { key: "overskrift", label: "Overskrift", type: "text" },
+      { key: "tekst", label: "Tekst", type: "textarea", max: 400, optional: true },
+      {
+        key: "filer",
+        label: "Filer",
+        type: "list",
+        itemLabel: "Fil",
+        max: 10,
+        fields: [
+          { key: "tittel", label: "Navn på lenken, for eksempel Meny", type: "text", max: 80 },
+          { key: "fil", label: "PDF-fil", type: "file" },
+        ],
+      },
     ],
   },
   bestill: {
@@ -263,6 +353,18 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
       { key: "tekst", label: "Tekst", type: "textarea", max: 400, optional: true },
       { key: "knappTekst", label: "Knappetekst", type: "text", max: 40, variants: ["knapp", "innebygd"] },
       { key: "lenke", label: "Lenke til bestillingssiden", type: "link", variants: ["knapp", "innebygd"] },
+    ],
+  },
+  nyhetsbrev: {
+    // Samtykkesetningen og lenken til personvernerklæringen legges til av seksjonen selv, så de ikke kan fjernes.
+    label: "Nyhetsbrev",
+    description: "Påmelding til nyhetsbrevet på e-post. Den som melder seg på, bekrefter først på e-post.",
+    hint: "Den som melder seg på, får en e-post og må bekrefte før det kommer noe nyhetsbrev. Setningen om samtykke og lenken til personvernerklæringen kommer automatisk. Nyhetsbrevet skriver og sender du under Nyhetsbrev i studioet.",
+    variants: [{ key: "standard", label: "Standard" }],
+    fields: [
+      { key: "overskrift", label: "Overskrift", type: "text", max: 90 },
+      { key: "tekst", label: "Hva får de, og hvor ofte?", type: "textarea", max: 400, optional: true },
+      { key: "knappTekst", label: "Knappetekst", type: "text", max: 40, optional: true },
     ],
   },
   cta: {
@@ -288,7 +390,14 @@ function propsSchema(type: SectionType, mode: ValidationMode, variant: string): 
   const key = `${type}:${mode}:${variant}`;
   let schema = propsSchemas.get(key);
   if (!schema) {
-    schema = fieldsToZod(sectionRegistry[type].fields, mode, variant);
+    const { fields, check } = sectionRegistry[type];
+    const base = fieldsToZod(fields, mode, variant);
+    schema =
+      check && mode === "publish"
+        ? base.superRefine((props, ctx) => {
+            for (const message of check(props)) ctx.addIssue({ code: "custom", message });
+          })
+        : base;
     propsSchemas.set(key, schema);
   }
   return schema;
@@ -296,7 +405,7 @@ function propsSchema(type: SectionType, mode: ValidationMode, variant: string): 
 
 /** Det som må rettes i én seksjon, uten seksjonsnavnet foran. Vises på seksjonen i redigereren. */
 export function sectionProblems(section: Section, mode: ValidationMode = "publish"): string[] {
-  const result = propsSchema(section.type, mode, section.variant).safeParse(section.props);
+  const result = propsSchema(section.type, section.hidden ? "draft" : mode, section.variant).safeParse(section.props);
   return result.success ? [] : result.error.issues.map((i) => i.message);
 }
 
@@ -316,7 +425,8 @@ export function validatePageContent(input: unknown, mode: ValidationMode = "publ
     ids.add(section.id);
     const def = sectionRegistry[section.type];
     const variant = def.variants.some((v) => v.key === section.variant) ? section.variant : def.variants[0].key;
-    const props = propsSchema(section.type, mode, variant).safeParse(section.props);
+    // En avslått seksjon vises ikke, så den kan være uferdig. Den kan likevel aldri være ugyldig.
+    const props = propsSchema(section.type, section.hidden ? "draft" : mode, variant).safeParse(section.props);
     if (!props.success) {
       for (const issue of props.error.issues) {
         errors.push({ sectionId: section.id, message: `${def.label}: ${issue.message}` });

@@ -171,8 +171,9 @@ export function SectionList({
                     {def.variants.length > 1 && variantLabel && <span className="font-normal text-neutral-600"> · {variantLabel}</span>}
                   </span>
                   {text && !open && <span className="block truncate text-sm text-neutral-600">{text}</span>}
-                  {(issues.length > 0 || example) && (
+                  {(issues.length > 0 || example || section.hidden) && (
                     <span className="mt-1 flex flex-wrap gap-2 text-xs font-medium">
+                      {section.hidden && <span className="rounded bg-neutral-200 px-1.5 py-0.5 text-neutral-800">Slått av, vises ikke</span>}
                       {issues.length > 0 && (
                         <span className="rounded bg-red-100 px-1.5 py-0.5 text-red-900">
                           {issues.length === 1 ? "1 ting mangler" : `${issues.length} ting mangler`}
@@ -182,6 +183,24 @@ export function SectionList({
                     </span>
                   )}
                 </button>
+                {/* Av og på uten å slette innholdet. Avslåtte seksjoner stopper ikke publisering. */}
+                <label className="flex shrink-0 cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-neutral-50 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-blue-700">
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    className="size-4 accent-[#173b6c]"
+                    checked={!section.hidden}
+                    aria-label={`Vis ${def.label} på nettstedet`}
+                    onChange={(e) => {
+                      const next = { ...section };
+                      if (e.target.checked) delete next.hidden;
+                      else next.hidden = true;
+                      onChange(i, next, false);
+                      setAnnouncement(`${def.label} ${e.target.checked ? "vises nå" : "er slått av og vises ikke"} på nettstedet når siden publiseres.`);
+                    }}
+                  />
+                  <span aria-hidden="true">Vis</span>
+                </label>
                 <button
                   type="button"
                   aria-label={`Flytt ${def.label} opp`}

@@ -5,6 +5,7 @@ import { notifyAddress, readNotificationSettings } from "@/lib/notifications";
 import { readShopSettings } from "@/lib/shop/settings";
 import { trackingUrl } from "@/lib/shop/tracking";
 import { readSiteInfo } from "@/lib/site-info";
+import { readAnswers } from "@/lib/content/form-fields";
 import { ordrebekreftelseTekster } from "@/lib/legal/angrerett";
 import { platformUrl, publicSiteUrl } from "@/lib/site-url";
 import { deliver, type EmailProvider } from "./send";
@@ -138,7 +139,7 @@ export async function notifyInquiry(db: Db, provider: EmailProvider, inquiryId: 
   if (!settings.newInquiry || !owner) return;
   const email = newInquiryEmail({
     shop,
-    inquiry: { name: inquiry.name, email: inquiry.email, phone: inquiry.phone, message: inquiry.message, pagePath: inquiry.pagePath },
+    inquiry: { name: inquiry.name, email: inquiry.email, phone: inquiry.phone, message: inquiry.message, pagePath: inquiry.pagePath, answers: readAnswers(inquiry.answers) },
     siteUrl: await publicSiteUrl(db, site),
     studioUrl: `${platformUrl()}/studio/nettsted/${site.id}/henvendelser`,
   });

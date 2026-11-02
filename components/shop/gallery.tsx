@@ -30,6 +30,8 @@ export function Gallery({ images }: { images: ProductImage[] }) {
               sizes={sizes.mobile}
               alt={img.decorative ? "" : img.alt}
               loading={i === 0 ? "eager" : "lazy"}
+              // Det første varebildet er det største på skjermen (LCP) og hentes før alt annet.
+              fetchPriority={i === 0 ? "high" : undefined}
               style={focusStyle(img.focus)}
               className="aspect-square w-full rounded-[var(--radius)] object-cover"
             />
@@ -46,6 +48,7 @@ export function Gallery({ images }: { images: ProductImage[] }) {
           srcSet={mediaSrcSet(current.src)}
           sizes={sizes.main}
           alt={current.decorative ? "" : current.alt}
+          fetchPriority="high"
           style={focusStyle(current.focus)}
           className="aspect-square w-full rounded-[var(--radius)] object-cover"
         />

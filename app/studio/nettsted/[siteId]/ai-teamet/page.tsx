@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { ui } from "@/components/studio/ui";
 import { getDb } from "@/db";
 import { pages } from "@/db/schema";
-import { aiTeamActive } from "@/lib/ai/access";
+import { aiTeamActive, weeklyAiActive } from "@/lib/ai/access";
 import { getAiClient } from "@/lib/ai/client";
-import { MONTHLY_CAP_ORE } from "@/lib/ai/config";
+import { MONTHLY_CAP_ORE, WEEKLY_CAP_ORE, WEEKLY_MAX_SUGGESTIONS } from "@/lib/ai/config";
 import { CAP_REACHED, spentThisMonth, underCap } from "@/lib/ai/runs";
 import { listSuggestions, type Suggestion } from "@/lib/ai/suggestions";
 import { ADDON } from "@/lib/billing/plans";
@@ -46,9 +46,16 @@ export default async function AiTeamPage({ params }: { params: Promise<{ siteId:
   const { site, user, role } = await requireSiteAccess(siteId);
   const db = await getDb();
   const active = aiTeamActive(site.billing);
+  // Uten tillegget: den ukentlige AI-rapporten, som er med i grunnprisen når abonnementet er betalt.
+  const weekly = !active && weeklyAiActive(site.billing);
+  const [published] = await db
+    .select({ id: pages.id })
+    .from(pages)
+    .where(and(eq(pages.siteId, site.id), isNotNull(pages.publishedVersionId)))
+    .limit(1);
   const ready = Boolean(await getAiClient());
   const { open, decided } = await listSuggestions(db, site.id);
-  const capOk = active ? await underCap(db, site.id) : true;
+  const capOk = active ? await underCap(db, site.id) : weekly ? await underCap(db, site.id, new Date(), "ukentlig") : true;
   const spent = user.isPlatformAdmin ? await spentThisMonth(db, site.id) : 0;
 
   const pageRows = await db.select({ id: pages.id, title: pages.title, draft: pages.draft }).from(pages).where(eq(pages.siteId, site.id));
@@ -86,18 +93,60 @@ export default async function AiTeamPage({ params }: { params: Promise<{ siteId:
           AI-teamet
         </h2>
         <p className={`mt-2 ${ui.muted}`}>
-          Hver natt ser AI-teamet gjennom nettstedet og foreslår bedre tekst, titler for Google, blogginnlegg og innlegg til sosiale medier.
+          {active
+            ? "Hver natt ser AI-teamet gjennom nettstedet og foreslår bedre tekst, titler for Google, blogginnlegg og innlegg til sosiale medier."
+            : `Én gang i uka ser AI-teamet gjennom nettstedet og gir deg opptil ${WEEKLY_MAX_SUGGESTIONS} forslag til bedre tekst, titler for Google og blogginnlegg. Det er med i abonnementet.`}{" "}
           Ingenting endres før du trykker Godkjenn, og da bare i kladden. Du publiserer selv.
         </p>
       </section>
 
+      {!active && !weekly && (
+        <p role="status" className={`${ui.card} mb-6 p-5`}>
+          Den ukentlige AI-rapporten starter når abonnementet er betalt og nettstedet er publisert.
+        </p>
+      )}
+
+      {weekly && (
+        <>
+          {!ready && <p className={`${ui.error} mb-6`}>AI-teamet er ikke slått på hos oss ennå. Forslagene kommer så snart det er klart.</p>}
+          {!published && (
+            <p role="status" className={`${ui.card} mb-6 p-5`}>
+              Den ukentlige rapporten starter når nettstedet er publisert.
+            </p>
+          )}
+          {!capOk && (
+            <p role="status" className={`${ui.success} mb-6`}>
+              {CAP_REACHED}
+            </p>
+          )}
+          <section aria-labelledby="nye-forslag" className="mb-10">
+            <h3 id="nye-forslag" className="mb-4 text-lg font-semibold">
+              {cards.length ? `Forslag som venter på deg (${cards.length})` : "Ingen forslag venter"}
+            </h3>
+            {cards.length === 0 ? (
+              <p className={ui.muted}>Nye forslag kommer én gang i uka. Du får en e-post når de er klare.</p>
+            ) : (
+              <div className="space-y-5">
+                {cards.map((c) => (
+                  <SuggestionCard key={c.id} siteId={site.id} s={c} />
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
+
       {!active ? (
         <section aria-labelledby="ikke-aktiv" className={`${ui.card} p-5`}>
           <h3 id="ikke-aktiv" className="font-semibold">
-            AI-teamet er et tillegg til abonnementet
+            Vil du ha forslag hver dag?
           </h3>
           <p className="mt-2">
             {ADDON.includes} Det koster {formatNok(ADDON.monthOre)} pluss mva i måneden.
+          </p>
+          <p className={`mt-2 text-sm ${ui.muted}`}>
+            Med tillegget får du opptil åtte forslag hver natt i stedet for tre i uka, innlegg til Facebook og Instagram, tips til butikken og
+            knappen «Lag nye forslag nå». Den ukentlige rapporten er med uansett.
           </p>
           {role === "owner" ? (
             <p className="mt-4">
@@ -155,9 +204,10 @@ export default async function AiTeamPage({ params }: { params: Promise<{ siteId:
         </details>
       )}
 
-      {user.isPlatformAdmin && active && (
+      {user.isPlatformAdmin && (active || weekly) && (
         <p className={`mt-10 text-sm ${ui.muted}`}>
-          For plattformadmin: brukt {formatNok(spent)} av {formatNok(MONTHLY_CAP_ORE)} denne måneden (kjøringer som venter, er regnet med antatt pris).
+          For plattformadmin: brukt {formatNok(spent)} av {formatNok(active ? MONTHLY_CAP_ORE : WEEKLY_CAP_ORE)} denne måneden
+          {active ? "" : " (ukentlig rapport)"} (kjøringer som venter, er regnet med antatt pris).
         </p>
       )}
     </main>

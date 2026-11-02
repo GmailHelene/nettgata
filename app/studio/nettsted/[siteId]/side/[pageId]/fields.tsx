@@ -1,13 +1,17 @@
 "use client";
 
+import { FileInput } from "@/components/studio/file-input";
 import { ImageInput } from "@/components/studio/image-input";
-import type { Field, ImageValue } from "@/lib/content/fields";
+import type { Field, FileValue, ImageValue, TextFormat } from "@/lib/content/fields";
 
 export type Value = Record<string, unknown>;
 
+/** Riktig tastatur på mobil for felt med fast form. */
+const inputTypes: Record<TextFormat, string> = { email: "email", phone: "tel", youtube: "url" };
+
 export function emptyValue(fields: Field[]): Value {
   return Object.fromEntries(
-    fields.map((f) => [f.key, f.type === "list" ? [] : f.type === "image" ? null : f.type === "select" ? f.options[0].value : ""]),
+    fields.map((f) => [f.key, f.type === "list" ? [] : f.type === "image" || f.type === "file" ? null : f.type === "select" ? f.options[0].value : ""]),
   );
 }
 
@@ -31,10 +35,20 @@ function FieldInput({ field, value, onChange }: { field: Field; value: unknown; 
   if (field.type === "image") {
     return <ImageInput label={field.label} optional={field.optional} withFocus value={value as ImageValue | null} onChange={onChange} />;
   }
+  if (field.type === "file") {
+    return <FileInput label={field.label} optional={field.optional} value={value as FileValue | null} onChange={onChange} />;
+  }
   if (field.type === "list") {
     const items = Array.isArray(value) ? (value as Value[]) : [];
     const update = (next: Value[]) => onChange(next);
     const full = items.length >= (field.max ?? 30);
+    // Bytter plass på to elementer. Rekkefølgen i listen er rekkefølgen på nettstedet og i skjemaet.
+    const swap = (i: number, j: number) => {
+      if (j < 0 || j >= items.length) return;
+      const next = [...items];
+      [next[i], next[j]] = [next[j], next[i]];
+      update(next);
+    };
     return (
       <fieldset className="rounded-md border border-neutral-300 p-3">
         <legend className="px-1 text-sm font-medium">{field.label}</legend>
@@ -42,12 +56,32 @@ function FieldInput({ field, value, onChange }: { field: Field; value: unknown; 
           {items.map((item, i) => (
             <li key={i} className="rounded-md bg-neutral-100 p-3">
               <div className="mb-2 flex items-center justify-between text-sm">
-                <span className="font-medium">
+                <span className="mr-auto font-medium">
                   {field.itemLabel} {i + 1}
                 </span>
-                <button type="button" className="underline" onClick={() => update(items.filter((_, j) => j !== i))}>
-                  Fjern
-                </button>
+                <span className="flex gap-3">
+                  <button
+                    type="button"
+                    className="underline disabled:no-underline disabled:opacity-40"
+                    disabled={i === 0}
+                    aria-label={`Flytt ${field.itemLabel.toLowerCase()} ${i + 1} opp`}
+                    onClick={() => swap(i, i - 1)}
+                  >
+                    Opp
+                  </button>
+                  <button
+                    type="button"
+                    className="underline disabled:no-underline disabled:opacity-40"
+                    disabled={i === items.length - 1}
+                    aria-label={`Flytt ${field.itemLabel.toLowerCase()} ${i + 1} ned`}
+                    onClick={() => swap(i, i + 1)}
+                  >
+                    Ned
+                  </button>
+                  <button type="button" className="underline" onClick={() => update(items.filter((_, j) => j !== i))}>
+                    Fjern
+                  </button>
+                </span>
               </div>
               <FieldGroup fields={field.fields} value={item} onChange={(v) => update(items.map((it, j) => (j === i ? v : it)))} />
             </li>
@@ -71,7 +105,12 @@ function FieldInput({ field, value, onChange }: { field: Field; value: unknown; 
       {field.type === "textarea" ? (
         <textarea className={inputClass} rows={4} value={str} onChange={(e) => onChange(e.target.value)} />
       ) : (
-        <input className={inputClass} value={str} onChange={(e) => onChange(e.target.value)} />
+        <input
+          className={inputClass}
+          type={field.type === "text" && field.format ? inputTypes[field.format] : "text"}
+          value={str}
+          onChange={(e) => onChange(e.target.value)}
+        />
       )}
     </label>
   );

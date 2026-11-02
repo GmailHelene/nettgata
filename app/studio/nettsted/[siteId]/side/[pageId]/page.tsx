@@ -4,13 +4,14 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { pages } from "@/db/schema";
 import { listVersions } from "@/lib/publishing";
+import { canPublish } from "@/lib/billing/state";
 import { buildRenderContext } from "@/lib/render";
 import { requireSiteAccess } from "@/lib/session";
 import { PageEditor } from "./page-editor";
 
 export default async function EditPage({ params }: { params: Promise<{ siteId: string; pageId: string }> }) {
   const { siteId, pageId } = await params;
-  const { site } = await requireSiteAccess(siteId);
+  const { site, user } = await requireSiteAccess(siteId);
   const db = await getDb();
   const [page] = await db
     .select()
@@ -34,6 +35,7 @@ export default async function EditPage({ params }: { params: Promise<{ siteId: s
         initialTitle={page.title}
         initialContent={page.draft}
         publishedNumber={publishedNumber}
+        publishLocked={!canPublish(site.billing, user.isPlatformAdmin)}
         versions={versions.map((v) => ({ id: v.id, number: v.number, createdAt: v.createdAt.toISOString() }))}
       />
     </main>

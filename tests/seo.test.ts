@@ -16,6 +16,8 @@ const src = "/media/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222
 const other = src.replace("2222-2222-4222-8222-222222222222", "3333-3333-4333-8333-333333333333");
 const hero = (bilde: unknown = null): Section => ({ id: "h", type: "hero", variant: "bilde", props: { overskrift: "Rørlegger i Modum", bilde } });
 const text: Section = { id: "t", type: "tekst", variant: "standard", props: { brodtekst: "Hei" } };
+/** Nok tekst til at siden ikke får råd om å skrive mer (minst 50 ord). */
+const enough: Section = { id: "nok", type: "tekst", variant: "standard", props: { brodtekst: "Vi tar bad, varme og lekkasjer. ".repeat(10) } };
 const page = (sections: Section[], seo: PageContent["seo"] = {}): PageContent => ({ seo, sections });
 const hints = (content: PageContent, pageTitle = "Forside") => seoHints({ pageTitle, siteName: "Demo Rør AS", content });
 
@@ -47,14 +49,14 @@ describe("tittel og bilde for Google og deling", () => {
 
 describe("«Fiks nå»", () => {
   it("en god side har ingenting å fikse", () => {
-    expect(hints(page([hero({ src, alt: "Rørlegger på jobb" })], { description: "Rørlegger i Modum og Åmot. Bad, varme og lekkasjer, med fast pris." }))).toEqual([]);
+    expect(hints(page([hero({ src, alt: "Rørlegger på jobb" }), enough], { description: "Rørlegger i Modum og Åmot. Bad, varme og lekkasjer, med fast pris." }))).toEqual([]);
   });
 
   it("sier fra når siden mangler hovedoverskrift, men ikke når første seksjon har en", () => {
     expect(hints(page([text], { description: "Noe" }))[0]).toMatch(/hovedoverskrift \(H1\)/);
     expect(hints(page([], { description: "Noe" }))[0]).toMatch(/hovedoverskrift/);
     const withHeading: Section = { ...text, props: { overskrift: "Om oss", brodtekst: "Hei" } };
-    expect(hints(page([withHeading, hero({ src, alt: "x" })], { description: "Noe" }))).toEqual([]);
+    expect(hints(page([withHeading, hero({ src, alt: "x" }), enough], { description: "Noe" }))).toEqual([]);
   });
 
   it("den første overskriften blir H1, uten å endre utseendet", () => {
@@ -69,8 +71,12 @@ describe("«Fiks nå»", () => {
   it("sier fra om manglende og for lang beskrivelse, og for lang tittel", () => {
     expect(hints(page([hero({ src, alt: "x" })])).join(" ")).toMatch(/Skriv en beskrivelse/);
     expect(hints(page([hero({ src, alt: "x" })], { description: "a".repeat(165) })).join(" ")).toMatch(/165 tegn/);
-    const long = hints(page([hero({ src, alt: "x" })], { description: "Kort" }), "En svært lang sidetittel som ingen får plass til i Google");
-    expect(long.join(" ")).toMatch(/Tittelen er \d+ tegn/);
+    // Tittelen vi lager selv, kortes ned til den får plass. Bare en egen tittel kan bli for lang.
+    const own = { description: "Kort", title: "En svært lang egen tittel som ingen får plass til i Google, dessverre" };
+    expect(hints(page([hero({ src, alt: "x" })], own)).join(" ")).toMatch(/Tittelen er \d+ tegn/);
+    expect(hints(page([hero({ src, alt: "x" })], { description: "Kort" }), "En svært lang sidetittel som ingen får plass til i Google").join(" ")).not.toMatch(
+      /Tittelen er/,
+    );
   });
 
   it("ber om delingsbilde bare når siden ikke har noen bilder", () => {

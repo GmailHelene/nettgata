@@ -104,6 +104,38 @@ export async function createPost(db: Db, siteId: string, input: { title: string 
   return page;
 }
 
+/**
+ * Ledig adresse for en kopi: /om-oss blir /om-oss-kopi, så /om-oss-kopi-2 osv. Forsiden blir /forside-kopi.
+ * Kopien av et blogginnlegg blir liggende under /blogg.
+ */
+export function copyPath(path: string, taken: Set<string>): string {
+  const base = path === "/" ? "/forside" : path;
+  let candidate = `${base}-kopi`;
+  for (let i = 2; taken.has(candidate); i++) candidate = `${base}-kopi-${i}`;
+  return candidate;
+}
+
+/**
+ * Lager en kopi av en side: kladden med alle seksjonene og SEO-feltene. Kopien er ikke publisert og ligger ikke
+ * i menyen, så den ikke dukker opp for besøkende før kunden har gjort den ferdig. Versjonshistorikken følger ikke med.
+ */
+export async function duplicatePage(db: Db, siteId: string, pageId: string, userId: string) {
+  const [source] = await db.select().from(pages).where(and(eq(pages.id, pageId), eq(pages.siteId, siteId))).limit(1);
+  if (!source) throw new PublishingError("Fant ikke siden");
+  const existing = await db.select({ path: pages.path, sortOrder: pages.sortOrder }).from(pages).where(eq(pages.siteId, siteId));
+  const path = copyPath(source.path, new Set(existing.map((p) => p.path)));
+  if (!isValidPagePath(path)) throw new PublishingError("Klarte ikke å lage en ledig adresse til kopien");
+  const suffix = " (kopi)";
+  const title = `${source.title.slice(0, 120 - suffix.length)}${suffix}`;
+  const sortOrder = Math.max(-1, ...existing.map((p) => p.sortOrder)) + 1;
+  const [page] = await db
+    .insert(pages)
+    .values({ siteId, path, title, sortOrder, showInMenu: false, draft: structuredClone(source.draft) })
+    .returning();
+  await db.insert(auditLog).values({ siteId, userId, action: "page.duplicated", detail: { pageId: page.id, from: source.id, path } });
+  return page;
+}
+
 /** Forsiden kan ikke slettes; uten den har nettstedet ingen inngang. */
 export async function deletePage(db: Db, siteId: string, pageId: string, userId: string) {
   const [page] = await db.select().from(pages).where(and(eq(pages.id, pageId), eq(pages.siteId, siteId))).limit(1);

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { heading } from "@/components/brand";
 import { ui } from "@/components/studio/ui";
+import { PageIntro } from "@/components/studio/help";
 import { getDb } from "@/db";
 import { listBookings, loadStudioBooking } from "@/lib/egen-booking/admin";
 import { isoWeekday, minuteLabel } from "@/lib/egen-booking/availability";
@@ -61,6 +62,7 @@ export default async function BookingPage({
   return (
     <main className="mx-auto max-w-4xl px-5 py-12">
       <SiteNav siteId={site.id} name={site.name} shop={site.kind === "nettbutikk"} active="booking" />
+      <PageIntro article="booking">Kundene bestiller time selv på nettstedet. Tjenestene, de ansatte og arbeidstidene bestemmer hvilke tider som er ledige.</PageIntro>
 
       {!canEdit && <p className={`${ui.success} mb-6`}>Du kan se timebestillingen, men bare eier og redaktør kan endre den.</p>}
       {!ready && (

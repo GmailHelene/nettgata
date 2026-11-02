@@ -2,9 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { FormStatus } from "@/components/studio/form-status";
+import { FieldHint, HelpLink } from "@/components/studio/help";
 import type { ActionState } from "@/app/studio/actions";
 import { saveRedirectsAction } from "@/app/studio/site-actions";
 import type { Redirect } from "@/lib/redirects";
+import { SitemapImport } from "./sitemap-import";
 
 /**
  * Flytting fra en gammel nettside: gamle adresser sendes videre til de nye med 301, så lenker og plassering i Google
@@ -21,9 +23,17 @@ export function RedirectsForm({ siteId, initial }: { siteId: string; initial: Re
         <h2 className="font-semibold">Flytter du fra en gammel nettside?</h2>
         <p className="text-sm text-neutral-600">
           Skriv gammel adresse og ny adresse på hver linje. Besøkende og Google sendes da videre, så du ikke mister plasseringen i søk. Hele
-          adresser fra den gamle nettsiden går fint.
+          adresser fra den gamle nettsiden går fint. <HelpLink slug="omdirigeringer" />
         </p>
       </div>
+      <SitemapImport
+        siteId={siteId}
+        currentText={text}
+        onSaved={(next) => {
+          setText(next);
+          setState(null);
+        }}
+      />
       <label className="block">
         <span className="mb-1 block text-sm font-medium">Omdirigeringer</span>
         <textarea
@@ -32,8 +42,10 @@ export function RedirectsForm({ siteId, initial }: { siteId: string; initial: Re
           rows={8}
           spellCheck={false}
           placeholder={"/om-oss.html /om-oss\nhttps://gammelside.no/?page_id=12 /tjenester"}
+          aria-describedby="omdirigering-hjelp"
           className="w-full rounded-md border border-neutral-300 px-3 py-2 font-mono text-sm"
         />
+        <FieldHint id="omdirigering-hjelp">Én per linje: gammel adresse, mellomrom, ny adresse. For eksempel /om-oss.html /om-oss</FieldHint>
       </label>
       <FormStatus state={state} />
       <button

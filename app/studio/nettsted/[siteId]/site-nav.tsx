@@ -15,9 +15,11 @@ const tabs = [
   { key: "kunder", label: "Kunder", href: "/kunder", shopOnly: true },
   { key: "rabatter", label: "Rabatter", href: "/rabatter", shopOnly: true },
   { key: "rapporter", label: "Rapporter", href: "/rapporter", shopOnly: true },
+  { key: "statistikk", label: "Statistikk", href: "/statistikk", shopOnly: false },
   { key: "betaling", label: "Betaling", href: "/betaling", shopOnly: true },
   { key: "henvendelser", label: "Henvendelser", href: "/henvendelser", shopOnly: false },
   { key: "booking", label: "Booking", href: "/booking", shopOnly: false },
+  { key: "nyhetsbrev", label: "Nyhetsbrev", href: "/nyhetsbrev", shopOnly: false },
   { key: "ai-teamet", label: "AI-teamet", href: "/ai-teamet", shopOnly: false },
   { key: "innstillinger", label: "Innstillinger", href: "/innstillinger", shopOnly: false },
   { key: "abonnement", label: "Abonnement", href: "/abonnement", shopOnly: false },
@@ -56,10 +58,15 @@ export async function SiteNav({
 
   return (
     <div className="mb-8">
-      <Link href="/studio" className="group inline-flex items-center gap-3 rounded-md text-sm">
-        <StreetSign />
-        <span className={ui.link}>Alle nettsteder</span>
-      </Link>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link href="/studio" className="group inline-flex items-center gap-3 rounded-md text-sm">
+          <StreetSign />
+          <span className={ui.link}>Alle nettsteder</span>
+        </Link>
+        <Link href="/studio/hjelp" className={`text-sm ${ui.link}`}>
+          Hjelp
+        </Link>
+      </div>
       <h1 className={`${heading} mt-6 text-[2.1rem] leading-none sm:text-4xl`}>{name}</h1>
       {/* Ruller sidelengs på mobil i stedet for å bryte over flere linjer. */}
       <nav aria-label="Nettsted" className="-mx-5 mt-4 overflow-x-auto px-5">

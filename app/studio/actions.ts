@@ -4,13 +4,14 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { getDb } from "@/db";
 import { pages, users } from "@/db/schema";
 import { headers } from "next/headers";
 import { createPreviewToken } from "@/lib/preview";
 import { clientKey, hit, reset, rules } from "@/lib/rate-limit";
 import { getSecret } from "@/lib/secret";
-import { PublishingError, publishPage, restoreVersion, saveDraft } from "@/lib/publishing";
+import { assertCanPublish, PublishingError, publishPage, restoreVersion, saveDraft } from "@/lib/publishing";
 import {
   clearPendingSecondFactor,
   createPendingSecondFactor,
@@ -21,6 +22,7 @@ import {
   requireUser,
 } from "@/lib/session";
 import { verifySecondFactor } from "@/lib/two-factor";
+import { pingPublished, publishSeoNotes, withSeoNotes } from "@/lib/seo/publish";
 
 export type ActionState = { ok: boolean; message: string } | null;
 
@@ -117,9 +119,13 @@ export async function saveDraftAction(
 export async function publishAction(pageId: string): Promise<ActionState> {
   try {
     const { db, user, site } = await authorizePage(pageId);
+    await assertCanPublish(db, site.id, user);
     const version = await publishPage(db, pageId, user.id);
     revalidatePath(`/studio/nettsted/${site.id}`, "layout");
-    return { ok: true, message: `Publisert som versjon ${version.number}` };
+    after(() => pingPublished(db, site.id, [pageId]).catch((err) => console.error("IndexNow feilet", err)));
+    // Rådene for Google stopper aldri publiseringen. Feiler de, publiseres det likevel uten råd.
+    const notes = await publishSeoNotes(db, pageId).catch(() => []);
+    return { ok: true, message: withSeoNotes(`Publisert som versjon ${version.number}.`, notes) };
   } catch (err) {
     return toState(err);
   }
@@ -128,8 +134,11 @@ export async function publishAction(pageId: string): Promise<ActionState> {
 export async function restoreAction(pageId: string, versionId: string): Promise<ActionState> {
   try {
     const { db, user, site } = await authorizePage(pageId);
+    // «Gå tilbake hit» publiserer på nytt, så samme sperre gjelder.
+    await assertCanPublish(db, site.id, user);
     const version = await restoreVersion(db, pageId, versionId, user.id);
     revalidatePath(`/studio/nettsted/${site.id}`, "layout");
+    after(() => pingPublished(db, site.id, [pageId]).catch((err) => console.error("IndexNow feilet", err)));
     return { ok: true, message: `Gjenopprettet og publisert som versjon ${version.number}` };
   } catch (err) {
     return toState(err);

@@ -27,6 +27,15 @@ export const siteLayoutSchema = z.object({
     .object({ src: z.string().regex(mediaSrcPattern), alt: z.string().trim().max(200), decorative: z.boolean().optional() })
     .nullable()
     .default(null),
+  /**
+   * Ikonet i nettleserfanen: et PNG-bilde på 180 px, med en utgave på 48 px ved siden av (lib/favicon.ts).
+   * Lagres fra Innstillinger med egen handling, aldri fra skjemaet for utseende.
+   */
+  favicon: z
+    .object({ src: z.string().regex(mediaSrcPattern).refine((v) => v.endsWith(".png"), "Ikonet må være PNG") })
+    .nullable()
+    // Et ødelagt ikon skal bare gi reserveikonet, ikke velte logo og bunntekst.
+    .catch(null),
   announcement: z
     .object({ text: z.string().trim().max(140, "Toppstripen kan ha maks 140 tegn").default(""), href })
     .default({ text: "", href: "" }),

@@ -45,3 +45,25 @@ export function costOre(usage: TokenUsage, batch: boolean): number {
     1_000_000;
   return Math.ceil(usd * (batch ? 0.5 : 1) * NOK_PER_USD * 100);
 }
+
+// ---------- Ukentlig AI-rapport (med i grunnprisen) ----------
+// Nettsteder uten tillegget får én mindre kjøring i uka: høyst tre forslag, bare SEO og innhold, lav innsats og
+// Batch API. Anslag i docs/AI-TEAMET.md: rundt 0,65 kr per kjøring, under 3 kr i måneden per nettsted.
+
+/** Lav innsats: færre tokens til tenkning. Tre forslag om tekst og titler trenger ikke mer. */
+export const WEEKLY_EFFORT = "low" as const;
+
+/** Høyst så mange forslag per ukentlig kjøring. */
+export const WEEKLY_MAX_SUGGESTIONS = 3;
+
+/** Eget kostnadstak for den ukentlige rapporten, per nettsted per kalendermåned, i øre. */
+export const WEEKLY_CAP_ORE = 800;
+
+/** Antatt pris for en ukentlig kjøring som ikke er ferdig ennå, i øre. Satt over anslaget med vilje. */
+export const WEEKLY_RUN_ESTIMATE_ORE = 150;
+
+/** Minste tid mellom to ukentlige kjøringer for samme nettsted. Litt under en uke, så nattjobben treffer samme ukedag. */
+export const WEEKLY_MIN_GAP_MS = 6 * 86_400_000 + 20 * 3_600_000;
+
+/** Daglig er tillegget til 249 kr, ukentlig er med i grunnprisen. */
+export type AiTier = "daglig" | "ukentlig";

@@ -18,6 +18,14 @@ export const rules = {
   discountFailuresPerIp: { limit: 10, windowSeconds: 10 * 60 },
   /** Koder fra appen har en million muligheter. Fem forsøk per kvarter gjør gjetting nytteløst. */
   totpPerUser: { limit: 5, windowSeconds: 15 * 60 },
+  /** Besøksstatistikken. Langt over det et menneske klikker seg gjennom, men stopper skript som vil blåse opp tallene. */
+  visitPerIp: { limit: 120, windowSeconds: 10 * 60 },
+  /** Påmelding til nyhetsbrev. Per adresse også, så ingen kan fylle innboksen til en annen med bekreftelser. */
+  newsletterPerIp: { limit: 5, windowSeconds: 10 * 60 },
+  newsletterPerSite: { limit: 100, windowSeconds: 60 * 60 },
+  newsletterPerEmail: { limit: 3, windowSeconds: 24 * 60 * 60 },
+  /** Bekreftelse og avmelding fra lenkene i e-postene. */
+  newsletterLinkPerIp: { limit: 30, windowSeconds: 10 * 60 },
 } satisfies Record<string, RateLimitRule>;
 
 /**
@@ -56,12 +64,17 @@ export async function reset(db: Db, key: string) {
  * som er nok til å skille forsøk fra hverandre uten å lagre personopplysningen.
  */
 export async function clientKey(headers: Headers, secret: Uint8Array): Promise<string> {
+  const ip = clientIp(headers);
+  const data = new Uint8Array([...secret, ...new TextEncoder().encode(ip)]);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest).slice(0, 12), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** IP-adressen til den som sendte forespørselen. Brukes bare til å lage koder, aldri lagret som den er. */
+export function clientIp(headers: Headers): string {
   // Cloudflare setter cf-connecting-ip selv og overskriver det klienten sender. X-Forwarded-For og X-Real-IP
   // kan hvem som helst sette, og da kunne en ny verdi per forsøk nullstilt grensene. De brukes derfor bare lokalt.
   const forwarded =
     process.env.NODE_ENV === "production" ? null : (headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? headers.get("x-real-ip"));
-  const ip = headers.get("cf-connecting-ip") ?? forwarded ?? "ukjent";
-  const data = new Uint8Array([...secret, ...new TextEncoder().encode(ip)]);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(digest).slice(0, 12), (b) => b.toString(16).padStart(2, "0")).join("");
+  return headers.get("cf-connecting-ip") ?? forwarded ?? "ukjent";
 }

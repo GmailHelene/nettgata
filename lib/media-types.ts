@@ -23,11 +23,33 @@ export const mediaSrcPattern = new RegExp(`^/media/${uuid}/${uuid}\\.(webp|jpg|p
 export const VARIANT_WIDTHS = [640, 1280] as const;
 export type VariantWidth = (typeof VARIANT_WIDTHS)[number];
 
-/** Alle filer i lageret: originalen og de mindre utgavene (…-w640.webp). Brukes av bilderuten. */
-export const mediaFileKeyPattern = new RegExp(`^${uuid}/${uuid}(-w(${VARIANT_WIDTHS.join("|")}))?\\.(webp|jpg|png|gif|avif)$`);
+/**
+ * Ikonet i nettleserfanen (favicon) lagres som et vanlig PNG-bilde på 180 px (apple-touch-icon), pluss en utgave
+ * på 48 px til fanen, med samme navn og «-w48». Google vil ha favicon i et multiplum av 48 px. Se lib/favicon.ts.
+ */
+export const ICON_VARIANT_WIDTH = 48;
+
+/** Alle filer i lageret: originalen og de mindre utgavene (…-w640.webp), og PDF-filer. Brukes av bilderuten. */
+export const mediaFileKeyPattern = new RegExp(
+  `^${uuid}/${uuid}((-w(${[...VARIANT_WIDTHS, ICON_VARIANT_WIDTH].join("|")}))?\\.(webp|jpg|png|gif|avif)|\\.pdf)$`,
+);
+
+/**
+ * Nedlastbare filer, som PDF-meny og brosjyre. Bare PDF, og typen sjekkes fra innholdet som for bilder.
+ * Filene får ingen mindre utgaver og vises aldri som bilde.
+ */
+export const PDF_CONTENT_TYPE = "application/pdf";
+export const MAX_FILE_BYTES = 10 * 1024 * 1024;
+/** Slik lagres en fil i innholdet: /media/<siteId>/<id>.pdf */
+export const fileSrcPattern = new RegExp(`^/media/${uuid}/${uuid}\\.pdf$`);
+
+/** PDF-filer starter alltid med «%PDF-». Alt annet avvises, uansett hva nettleseren sier filen er. */
+export function sniffPdf(bytes: Uint8Array): boolean {
+  return [0x25, 0x50, 0x44, 0x46, 0x2d].every((v, i) => bytes[i] === v);
+}
 
 /** <id>.webp blir <id>-w640.webp. Samme filtype som originalen. */
-export function variantKey(key: string, width: VariantWidth): string {
+export function variantKey(key: string, width: VariantWidth | typeof ICON_VARIANT_WIDTH): string {
   return key.replace(/\.(\w+)$/, `-w${width}.$1`);
 }
 
@@ -62,9 +84,9 @@ export function focusStyle(focus: unknown): { objectPosition: string } | undefin
   return valid(x) && valid(y) ? { objectPosition: `${x}% ${y}%` } : undefined;
 }
 
-const mediaSrcAnywhere = new RegExp(`/media/(${uuid}/${uuid}\\.(?:webp|jpg|png|gif|avif))`, "g");
+const mediaSrcAnywhere = new RegExp(`/media/(${uuid}/${uuid}\\.(?:webp|jpg|png|gif|avif|pdf))`, "g");
 
-/** Alle bildenøkler i et innhold (side, vare, logo), uansett hvor dypt i strukturen de ligger. */
+/** Alle bilde- og filnøkler i et innhold (side, vare, logo), uansett hvor dypt i strukturen de ligger. */
 export function mediaKeysIn(value: unknown): Set<string> {
   const json = typeof value === "string" ? value : (JSON.stringify(value) ?? "");
   return new Set(Array.from(json.matchAll(mediaSrcAnywhere), (m) => m[1]));

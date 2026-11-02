@@ -10,7 +10,7 @@ type Base = Omit<Profile, "key" | "label" | "description" | "schemaType" | "hero
   prices: Omit<Profile["prices"], "items">;
 };
 type Own = Pick<Profile, "key" | "label" | "description" | "schemaType" | "hero" | "services"> &
-  Partial<Pick<Profile, "themes" | "benefits" | "gallery" | "cta" | "faq">> & {
+  Partial<Pick<Profile, "themes" | "benefits" | "gallery" | "cta" | "faq" | "local">> & {
     prices: Profile["prices"]["items"];
     pricePage?: Partial<Profile["prices"]>;
   };
@@ -41,7 +41,14 @@ const handverk: Base = {
     ["Tar dere små jobber?", "Skriv om dere har en minstepris, eller om dere tar alt fra små reparasjoner til store prosjekter."],
   ],
   cta: { heading: "Klar for et tilbud?", text: "Fortell kort hva du trenger, gjerne med et bilde, så svarer vi innen én virkedag.", button: "Be om tilbud" },
-  contact: { text: "Beskriv jobben kort, og skriv gjerne adressen. Vi svarer innen én virkedag." },
+  contact: {
+    text: "Beskriv jobben kort, og skriv gjerne adressen. Vi svarer innen én virkedag.",
+    fields: [
+      { etikett: "Adressen der jobben skal gjøres", felttype: "tekst", pakrevd: "nei" },
+      { etikett: "Når passer det å starte?", felttype: "dato", pakrevd: "nei" },
+    ],
+  },
+  local: { team: "Folkene som kommer hjem til deg" },
 };
 
 const rorlegger = make(handverk, {
@@ -221,6 +228,7 @@ const skjonnhet: Base = {
   ],
   cta: { heading: "Klar for en ny time?", text: "Bestill time, eller send oss et spørsmål hvis du er usikker på hva du trenger.", button: "Bestill time" },
   contact: { text: "Spørsmål om en behandling eller en time? Skriv til oss, så svarer vi så fort vi kan." },
+  local: { team: "Hvem du møter hos oss", hours: true, map: true },
 };
 
 const frisor = make(skjonnhet, {
@@ -329,6 +337,7 @@ const helse: Base = {
   cta: { heading: "Bestill time", text: "Ta kontakt, så finner vi en tid som passer. Er du usikker på om vi kan hjelpe, spør oss først.", button: "Bestill time" },
   // Kontaktskjemaet er ikke laget for helseopplysninger. Det står derfor rett over skjemaet.
   contact: { text: "Ikke send helseopplysninger her. Skriv kort hva det gjelder og hvordan vi når deg, så tar vi kontakt." },
+  local: { team: "Hvem du møter hos oss", hours: true, map: true },
 };
 
 const fysioterapeut = make(helse, {
@@ -455,6 +464,7 @@ const mat: Base = {
   ],
   cta: { heading: "Velkommen innom", text: "Se åpningstidene og finn veien til oss, eller send en melding om du vil bestille bord.", button: "Kontakt oss" },
   contact: { text: "Vil du bestille bord, spørre om selskap eller catering? Skriv til oss." },
+  local: { hours: true, map: true, menu: true },
 };
 
 const kafe = make(mat, {
@@ -542,6 +552,8 @@ const bakeri = make(mat, {
 
 const catering = make(mat, {
   key: "catering",
+  // Catering har sjelden et lokale med faste tider. Menyen som PDF passer likevel.
+  local: { menu: true },
   label: "Catering og matbil",
   description: "Selskapsmat, lunsj til møter og matbil.",
   schemaType: "FoodEstablishment",
@@ -589,6 +601,7 @@ const kontor: Base = {
   ],
   cta: { heading: "La oss ta en prat", text: "Fortell kort hva du trenger hjelp med, så foreslår vi neste steg.", button: "Ta kontakt" },
   contact: { text: "Skriv kort hva det gjelder, så svarer vi innen én virkedag." },
+  local: { team: "Hvem du møter hos oss" },
 };
 
 const konsulent = make(kontor, {
@@ -891,6 +904,7 @@ const trening: Base = {
   ],
   cta: { heading: "Bli med på en time", text: "Send oss en melding, så finner vi en time som passer for deg.", button: "Bli med" },
   contact: { text: "Spørsmål om timer, medlemskap eller personlig trening? Skriv til oss." },
+  local: { team: "Instruktørene", hours: true, map: true },
 };
 
 const pt = make(trening, {
@@ -1022,6 +1036,7 @@ const opplevelser: Base = {
   ],
   cta: { heading: "Sjekk ledige datoer", text: "Send oss datoene og hvor mange dere er, så svarer vi med pris og ledighet.", button: "Spør om ledighet" },
   contact: { text: "Skriv datoer og antall personer, så svarer vi så fort vi kan." },
+  local: { map: true },
 };
 
 const overnatting = make(opplevelser, {
@@ -1215,6 +1230,7 @@ const service: Base = {
   ],
   cta: { heading: "Trenger du hjelp?", text: "Send en kort beskrivelse av hva du trenger, så får du svar og pris.", button: "Få pris" },
   contact: { text: "Skriv kort hva du trenger hjelp med, så svarer vi så fort vi kan." },
+  local: { hours: true, map: true },
 };
 
 const bilverksted = make(service, {

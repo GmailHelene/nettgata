@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { and, eq } from "drizzle-orm";
 import type { Db } from "@/db";
-import { orderLines, orders, products, sites } from "@/db/schema";
+import { orderLines, orders, productVariants, products, sites } from "@/db/schema";
 import { Container, Heading } from "@/components/sections";
 import { mediaSrcPattern } from "@/lib/media-types";
+import { productDescription, productTitle } from "@/lib/seo/auto";
+import { breadcrumbJsonLd } from "@/lib/seo/schema";
 import type { CatalogProduct } from "@/lib/shop/catalog";
 import { formatNok } from "@/lib/shop/money";
 import { carrierLabel, trackingUrl } from "@/lib/shop/tracking";
@@ -13,7 +15,7 @@ import { AddToCart } from "./add-to-cart";
 import { Checkout, ForgetCartAfterPayment } from "./checkout";
 import { Gallery } from "./gallery";
 import { BrowseControls } from "./browse-controls";
-import { availableFilters, browse, type BrowseQuery } from "@/lib/shop/browse";
+import { availableFilters, browse, resultSummary, type BrowseQuery } from "@/lib/shop/browse";
 import { ProductGrid } from "./product-grid";
 
 export type ShopRoute =
@@ -31,7 +33,8 @@ function summarize(text: string, max = 160): string | undefined {
   return `${short.slice(0, Math.max(short.lastIndexOf(" "), max / 2)).trimEnd()} …`;
 }
 
-export type ShopMeta = { title: string; description?: string; image?: { src: string; alt: string } };
+/** `seoTitle`: hele tittelen for Google på varesiden, med egenskap, pris og butikknavn (lib/seo/auto.ts). */
+export type ShopMeta = { title: string; seoTitle?: string; description?: string; image?: { src: string; alt: string }; priceNok?: string };
 
 /** Tittel, beskrivelse og delingsbilde for butikkens egne sider. Varesiden bruker varens første bilde. */
 export async function shopMeta(db: Db, site: typeof sites.$inferSelect, route: ShopRoute): Promise<ShopMeta> {
@@ -44,16 +47,23 @@ export async function shopMeta(db: Db, site: typeof sites.$inferSelect, route: S
       return { title: "Bestilling" };
     case "product": {
       const [p] = await db
-        .select({ name: products.name, description: products.description, images: products.images })
+        .select({ id: products.id, name: products.name, description: products.description, images: products.images, options: products.options })
         .from(products)
         .where(and(eq(products.siteId, site.id), eq(products.slug, route.slug), eq(products.status, "active")))
         .limit(1);
       if (!p) return { title: "Vare" };
       const image = p.images.find((i) => mediaSrcPattern.test(i.src));
+      const prices = (await db.select({ priceOre: productVariants.priceOre }).from(productVariants).where(eq(productVariants.productId, p.id))).map((v) => v.priceOre);
+      const min = prices.length ? Math.min(...prices) : null;
+      const price = min === null ? "" : `${prices.some((o) => o !== min) ? "fra " : ""}${formatNok(min)}`;
+      // En egenskap alle variantene har felles, som fargen når varen bare finnes i blått.
+      const attribute = p.options.find((o) => o.values.length === 1)?.values[0];
       return {
         title: p.name,
-        description: summarize(p.description),
+        seoTitle: productTitle({ name: p.name, attribute, price, shopName: site.name }),
+        description: summarize(p.description) ?? productDescription({ name: p.name, description: "", price, shopName: site.name }),
         image: image && { src: image.src, alt: image.decorative ? "" : image.alt },
+        ...(min !== null && { priceNok: (min / 100).toFixed(2) }),
       };
     }
   }
@@ -67,12 +77,12 @@ export function ProductsPage({
   query,
 }: {
   products: CatalogProduct[];
-  categories: { name: string; slug: string }[];
+  categories: { id: string; name: string; slug: string }[];
   activeSlug: string | null;
   basePath: string;
   query: BrowseQuery;
 }) {
-  const items = browse(all, query);
+  const items = browse(all, query, Object.fromEntries(categories.map((c) => [c.id, c.name])));
   return (
     <section className="py-12">
       <Container>
@@ -102,7 +112,7 @@ export function ProductsPage({
           {all.length > 0 && (
             <BrowseControls action={`${basePath}/produkter`} category={activeSlug} query={query} filters={availableFilters(all)} count={items.length} />
           )}
-          {items.length === 0 ? <p className="text-[var(--c-muted)]">{all.length ? "Ingen varer passer filtrene." : "Ingen varer her ennå."}</p> : (
+          {items.length === 0 ? <p className="text-[var(--c-muted)]">{!all.length ? "Ingen varer her ennå." : query.search ? `${resultSummary(0, query.search)}. Prøv et annet ord, eller færre ord.` : "Ingen varer passer filtrene."}</p> : (
             <>
               <h2 className="sr-only">Varer</h2>
               <ProductGrid products={items} basePath={basePath} />
@@ -128,8 +138,35 @@ function Accordion({ title, children, open = false }: { title: string; children:
   );
 }
 
-/** Produktdata for Google: pris, valuta og lagerstatus per variant. */
-function ProductStructuredData({ product, url, siteName }: { product: CatalogProduct; url: string; siteName: string }) {
+/**
+ * Frakt og retur for Google Shopping. Returen følger angrerettloven: 14 dager, kunden sender tilbake og betaler returen
+ * (det står i kjøpsvilkårene). Frakten er den billigste måten å få varen sendt på; hent selv teller ikke.
+ */
+export function offerExtras(settings: Pick<ShopSettings, "shippingOptions">) {
+  const shipped = settings.shippingOptions.filter((o) => o.requiresAddress);
+  const cheapest = shipped.length ? Math.min(...shipped.map((o) => o.priceOre)) : null;
+  return {
+    ...(cheapest !== null && {
+      shippingDetails: {
+        "@type": "OfferShippingDetails",
+        shippingRate: { "@type": "MonetaryAmount", value: (cheapest / 100).toFixed(2), currency: "NOK" },
+        shippingDestination: { "@type": "DefinedRegion", addressCountry: "NO" },
+      },
+    }),
+    hasMerchantReturnPolicy: {
+      "@type": "MerchantReturnPolicy",
+      applicableCountry: "NO",
+      returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+      merchantReturnDays: 14,
+      returnMethod: "https://schema.org/ReturnByMail",
+      returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
+    },
+  };
+}
+
+/** Produktdata for Google: pris, valuta og lagerstatus per variant, frakt og retur. */
+function ProductStructuredData({ product, url, siteName, settings }: { product: CatalogProduct; url: string; siteName: string; settings: ShopSettings }) {
+  const extras = offerExtras(settings);
   const data = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -145,9 +182,21 @@ function ProductStructuredData({ product, url, siteName }: { product: CatalogPro
       price: (v.priceOre / 100).toFixed(2),
       availability: v.stock === null || v.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
       ...(v.label && { name: v.label }),
+      ...extras,
     })),
   };
-  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, "\\u003c") }} />;
+  // Brødsmulene som vises over varen, også for Google. JSON-LD tillater flere blokker, men én graf er ryddigere.
+  const crumbs = breadcrumbJsonLd(
+    [
+      { path: "/", title: "Forside" },
+      { path: "/produkter", title: "Alle varer" },
+      { path: `/produkt/${product.slug}`, title: product.name },
+    ],
+    url,
+  );
+  const { "@context": context, ...productNode } = data;
+  const graph = { "@context": context, "@graph": [productNode, crumbs] };
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(graph).replace(/</g, "\\u003c") }} />;
 }
 
 export function ProductPage({
@@ -168,7 +217,7 @@ export function ProductPage({
   const paragraphs = product.description.split(/\n\s*\n/).filter(Boolean);
   return (
     <section className="py-8 md:py-12">
-      {!basePath && <ProductStructuredData product={product} url={`${origin}/produkt/${product.slug}`} siteName={siteName} />}
+      {!basePath && <ProductStructuredData product={product} url={`${origin}/produkt/${product.slug}`} siteName={siteName} settings={settings} />}
       <Container>
         <nav aria-label="Brødsmuler" className="mb-6 text-sm text-[var(--c-muted)]">
           <Link href={`${basePath}/`} className="hover:underline">

@@ -198,6 +198,11 @@ export const inquiries = pgTable(
     email: text("email"),
     phone: text("phone"),
     message: text("message").notNull(),
+    /**
+     * Svarene i de egne feltene i skjemaet (lib/content/form-fields.ts), i samme rekkefølge som i skjemaet.
+     * Null for eldre henvendelser, der svarene står nederst i meldingen.
+     */
+    answers: jsonb("answers").$type<{ label: string; value: string }[] | null>(),
     pagePath: text("page_path"),
     readAt: timestamp("read_at", { withTimezone: true }),
     createdAt: createdAt(),
@@ -649,4 +654,217 @@ export const bookingSlots = pgTable(
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
   },
   (t) => [uniqueIndex("booking_slots_staff_time_idx").on(t.staffId, t.startsAt), index("booking_slots_booking_idx").on(t.bookingId)],
+);
+
+// ---------- Statistikk ----------
+
+/**
+ * Besøk per nettsted og norsk dato. Bare tall, ingen opplysninger om hvem som var innom.
+ * Nettleseren sender en liten melding når en side vises (components/site/visit-beacon.tsx, lib/statistikk).
+ * Uten informasjonskapsler og uten lagring i nettleseren. Slettes etter STATS_KEEP_MONTHS (lib/retention.ts).
+ */
+export const visitDays = pgTable(
+  "visit_days",
+  {
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    day: date("day", { mode: "string" }).notNull(),
+    views: integer("views").notNull().default(0),
+    visitors: integer("visitors").notNull().default(0),
+    /** Besøkende på mobil eller nettbrett. Resten er datamaskin. */
+    mobileVisitors: integer("mobile_visitors").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.siteId, t.day] })],
+);
+
+/** Visninger per side og dag. Stien er uten spørring, så ingen nøkler eller e-postadresser havner her. */
+export const visitPages = pgTable(
+  "visit_pages",
+  {
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    day: date("day", { mode: "string" }).notNull(),
+    path: text("path").notNull(),
+    views: integer("views").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.siteId, t.day, t.path] })],
+);
+
+/** Hvor besøkene kom fra, per dag. Bare vertsnavnet, aldri hele adressen. Tom tekst er direkte besøk. */
+export const visitSources = pgTable(
+  "visit_sources",
+  {
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    day: date("day", { mode: "string" }).notNull(),
+    source: text("source").notNull(),
+    visits: integer("visits").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.siteId, t.day, t.source] })],
+);
+
+/**
+ * Skiller besøkende fra hverandre i dag, så samme person ikke telles to ganger. Koden er en hash av IP-adresse og
+ * nettleser med et salt som byttes hver dag, så den kan ikke kobles til i går eller til andre nettsteder.
+ * Radene slettes hver natt (lib/retention.ts) og tas ikke med i sikkerhetskopien (lib/backup.ts).
+ */
+export const visitHashes = pgTable(
+  "visit_hashes",
+  {
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    day: date("day", { mode: "string" }).notNull(),
+    hash: text("hash").notNull(),
+    views: integer("views").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.siteId, t.day, t.hash] }), index("visit_hashes_day_idx").on(t.day)],
+);
+
+// ---------- Nyhetsbrev ----------
+
+export const newsletterSubscriberStatusEnum = pgEnum("newsletter_subscriber_status", ["venter", "bekreftet", "avmeldt"]);
+
+/**
+ * Påmeldte til nyhetsbrevet til et kundenettsted. Dobbel opt-in: raden starter som «venter», og bare «bekreftet»
+ * får nyhetsbrev. Den som melder seg av, blir stående som «avmeldt», så adressen aldri får nyhetsbrev igjen ved en feil.
+ * Å melde seg på igjen krever ny bekreftelse. Ubekreftede slettes etter 30 dager (lib/retention.ts).
+ * E-postadressen lagres med små bokstaver, så samme adresse bare finnes én gang per nettsted.
+ */
+export const newsletterSubscribers = pgTable(
+  "newsletter_subscribers",
+  {
+    id: id(),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    name: text("name").notNull().default(""),
+    status: newsletterSubscriberStatusEnum("status").notNull().default("venter"),
+    /** Setningen den påmeldte så ved knappen, som dokumentasjon på hva det ble sagt ja til. */
+    consentText: text("consent_text").notNull(),
+    /** Siden påmeldingen kom fra. */
+    sourcePath: text("source_path").notNull().default("/"),
+    /** Siste påmelding. Bekreftelseslenken gjelder bare påmeldingen med dette tidspunktet. */
+    consentedAt: timestamp("consented_at", { withTimezone: true }).notNull(),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("newsletter_subscribers_site_email_idx").on(t.siteId, t.email), index("newsletter_subscribers_status_idx").on(t.status, t.consentedAt)],
+);
+
+export const newsletterStatusEnum = pgEnum("newsletter_status", ["kladd", "sender", "sendt"]);
+
+/** Ett nyhetsbrev. Kladden kan endres. Når det sendes, låses innholdet, og det blir historikk med antall mottakere. */
+export const newsletters = pgTable(
+  "newsletters",
+  {
+    id: id(),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    subject: text("subject").notNull().default(""),
+    preheader: text("preheader").notNull().default(""),
+    /** Blokkene i lib/nyhetsbrev/blocks.ts. */
+    blocks: jsonb("blocks").$type<unknown[]>().notNull().default([]),
+    status: newsletterStatusEnum("status").notNull().default("kladd"),
+    recipientCount: integer("recipient_count").notNull().default(0),
+    sentCount: integer("sent_count").notNull().default(0),
+    failedCount: integer("failed_count").notNull().default(0),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Når «Send» ble trykket. */
+    queuedAt: timestamp("queued_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [index("newsletters_site_idx").on(t.siteId, t.createdAt), index("newsletters_status_idx").on(t.status, t.queuedAt)],
+);
+
+/**
+ * Én mottaker av ett nyhetsbrev. Opprettes for alle bekreftede når nyhetsbrevet sendes, og sendes i porsjoner av
+ * bakgrunnsjobben (lib/nyhetsbrev/send.ts). Adressen hentes fra abonnenten når e-posten sendes, så den som melder seg
+ * av underveis, ikke får den. status: venter, sender (tatt av en kjøring), sendt, feilet eller hoppet (meldt av).
+ */
+export const newsletterDeliveries = pgTable(
+  "newsletter_deliveries",
+  {
+    newsletterId: uuid("newsletter_id").notNull().references(() => newsletters.id, { onDelete: "cascade" }),
+    subscriberId: uuid("subscriber_id").notNull().references(() => newsletterSubscribers.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("venter"),
+    error: text("error"),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+  },
+  (t) => [primaryKey({ columns: [t.newsletterId, t.subscriberId] }), index("newsletter_deliveries_status_idx").on(t.status, t.newsletterId)],
+);
+
+// ---------- Rapporter på e-post ----------
+
+/**
+ * Hvilke rapporter én bruker vil ha på e-post for ett nettsted. Ingen rad betyr standard: eieren får dem,
+ * redaktøren får dem bare hvis hen har slått dem på (lib/rapport/mottakere.ts). Utvikleren får dem ikke.
+ */
+export const reportPreferences = pgTable(
+  "report_preferences",
+  {
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    /** Månedsrapporten den 1. i måneden. */
+    monthlyReport: boolean("monthly_report").notNull(),
+    /** E-posten «X nye forslag» etter den ukentlige AI-rapporten. */
+    aiEmail: boolean("ai_email").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.siteId, t.userId] })],
+);
+
+/**
+ * Én rad per nettsted og måned som har fått månedsrapporten. Raden lages før e-postene sendes, så to kjøringer
+ * samtidig aldri sender samme rapport to ganger. month er «2026-10». status: sender, sendt eller ingen (ingen mottakere).
+ */
+export const monthlyReports = pgTable(
+  "monthly_reports",
+  {
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    month: text("month").notNull(),
+    status: text("status").notNull().default("sender"),
+    recipients: integer("recipients").notNull().default(0),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+  },
+  (t) => [primaryKey({ columns: [t.siteId, t.month] })],
+);
+
+// ---------- Kreditnota ----------
+
+/** Én linje på kreditnotaen, med negative beløp. Kopi av ordrelinjen, så den aldri endrer seg. */
+export type CreditNoteLine = { name: string; variantLabel: string | null; sku: string | null; quantity: number; unitPriceOre: number; vatRate: number; totalOre: number };
+/** MVA per sats på kreditnotaen, negative beløp. amountOre er inkludert MVA. */
+export type CreditNoteVat = { rate: number; amountOre: number; vatOre: number };
+
+/**
+ * Kreditnota for en betalt ordre som er kansellert eller refundert (lib/shop/credit-notes.ts). Egen nummerserie per
+ * nettsted, fra 1 og uten hull. Beløpene er negative og speiler ordren, også MVA per sats.
+ * Bokføringsloven: en kreditnota endres aldri. Databasen stopper endringer med en trigger (migrering 0016), og
+ * ordren kan ikke slettes så lenge kreditnotaen finnes. Refusjonen gir alltid hele beløpet tilbake, så det er
+ * høyst én kreditnota per ordre.
+ */
+export const creditNotes = pgTable(
+  "credit_notes",
+  {
+    id: id(),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: "restrict" }),
+    number: integer("number").notNull(),
+    /** kansellert eller refundert. */
+    reason: text("reason").notNull(),
+    lines: jsonb("lines").$type<CreditNoteLine[]>().notNull(),
+    vat: jsonb("vat").$type<CreditNoteVat[]>().notNull(),
+    subtotalOre: integer("subtotal_ore").notNull(),
+    discountOre: integer("discount_ore").notNull(),
+    shippingOre: integer("shipping_ore").notNull(),
+    totalOre: integer("total_ore").notNull(),
+    vatOre: integer("vat_ore").notNull(),
+    paymentMethod: text("payment_method").notNull(),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("credit_notes_site_number_idx").on(t.siteId, t.number),
+    uniqueIndex("credit_notes_order_idx").on(t.orderId),
+    index("credit_notes_site_created_idx").on(t.siteId, t.createdAt),
+  ],
 );

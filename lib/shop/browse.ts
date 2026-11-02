@@ -59,15 +59,30 @@ export function availableFilters(products: CatalogProduct[]) {
 }
 
 /**
+ * Søk, filter eller sortering i adressen. Slike sider er varianter av varelisten og skal ikke i søkemotorer
+ * (noindex). Kategorisidene (?kategori=) er egne sider og indekseres som før.
+ */
+export function isRefinedQuery(q: BrowseQuery): boolean {
+  return Boolean(q.search) || Boolean(q.sort) || q.inStock || Object.keys(q.options).length > 0;
+}
+
+/** «3 varer» eller «2 treff på «pledd»». Leses opp av skjermlesere når listen er filtrert. */
+export function resultSummary(count: number, search?: string): string {
+  if (search) return count === 0 ? `Ingen treff på «${search}»` : `${count} treff på «${search}»`;
+  return `${count} ${count === 1 ? "vare" : "varer"}`;
+}
+
+/**
  * Filtrerer og sorterer i minnet. Det holder godt for små og mellomstore butikker
  * (noen hundre varer); større kataloger bør flyttes til databasespørringer.
  */
-export function browse(products: CatalogProduct[], q: BrowseQuery): CatalogProduct[] {
-  // Søket treffer når alle ordene finnes i navnet, beskrivelsen eller variantene.
+export function browse(products: CatalogProduct[], q: BrowseQuery, categoryNames: Record<string, string> = {}): CatalogProduct[] {
+  // Søket treffer når alle ordene finnes i navnet, beskrivelsen, kategorien eller variantene.
   const words = fold(q.search ?? "").split(/\s+/).filter(Boolean);
   let result = products.filter((p) => {
     if (words.length) {
-      const haystack = fold([p.name, p.description, ...p.options.flatMap((o) => o.values)].join(" "));
+      const category = p.categoryId ? (categoryNames[p.categoryId] ?? "") : "";
+      const haystack = fold([p.name, p.description, category, ...p.options.flatMap((o) => o.values)].join(" "));
       if (!words.every((w) => haystack.includes(w))) return false;
     }
     const matching = p.variants.filter((v) =>

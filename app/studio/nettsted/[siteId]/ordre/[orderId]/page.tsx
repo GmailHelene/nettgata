@@ -8,6 +8,7 @@ import { bringSetupView } from "@/lib/bring/config";
 import { bringProductIds, bringProducts } from "@/lib/bring/products";
 import { cartWeight, formatWeight } from "@/lib/bring/weight";
 import { requireSiteAccess } from "@/lib/session";
+import { creditNoteForOrder, creditReasonLabel } from "@/lib/shop/credit-notes";
 import { formatNok } from "@/lib/shop/money";
 import { paymentLabels, type PaymentMethod } from "@/lib/shop/settings";
 import { carrierLabel, trackingUrl } from "@/lib/shop/tracking";
@@ -46,9 +47,10 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
   const db = await getDb();
   const [order] = await db.select().from(orders).where(and(eq(orders.id, orderId), eq(orders.siteId, site.id))).limit(1);
   if (!order) notFound();
-  const [lines, emails] = await Promise.all([
+  const [lines, emails, creditNote] = await Promise.all([
     db.select().from(orderLines).where(eq(orderLines.orderId, order.id)),
     db.select().from(emailLog).where(eq(emailLog.orderId, order.id)).orderBy(asc(emailLog.createdAt)),
+    creditNoteForOrder(db, site.id, order.id),
   ]);
   const status = orderStatusLabel[order.status];
 
@@ -144,6 +146,28 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
           </div>
         </dl>
       </section>
+
+      {creditNote && (
+        <section aria-labelledby="kreditnota" className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white p-5">
+          <div>
+            <h2 id="kreditnota" className="font-semibold">
+              Kreditnota nr. {creditNote.number}
+            </h2>
+            <p className="text-sm text-neutral-600">
+              {creditReasonLabel[creditNote.reason] ?? creditNote.reason}. Laget {formatOsloDateTime(creditNote.createdAt)}, {formatNok(creditNote.totalOre)}.
+              Kreditnotaen kan ikke endres.
+            </p>
+          </div>
+          <a
+            href={`/studio/nettsted/${site.id}/ordre/${order.id}/kreditnota`}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold"
+          >
+            Vis og skriv ut kreditnota
+          </a>
+        </section>
+      )}
 
       <section className="mt-6 grid gap-6 rounded-lg border bg-white p-5 sm:grid-cols-2">
         <div>

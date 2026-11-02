@@ -12,10 +12,13 @@ import { historyReducer, initHistory, type Doc } from "./editor-history";
 import { inputClass } from "./fields";
 import { PreviewFrame, type Device } from "@/components/studio/preview-frame";
 import { SeoPanel } from "./seo-panel";
+import { primaryPlace } from "@/lib/seo/auto";
 import { SectionLibrary } from "./section-library";
 import { SectionList } from "./section-list";
 import { useAutosave } from "./use-autosave";
 import type { Theme } from "@/lib/theme";
+import { PublishLockNotice } from "@/components/studio/publish-lock";
+import { HowTo } from "@/components/studio/help";
 
 type Props = {
   siteId: string;
@@ -26,6 +29,8 @@ type Props = {
   initialContent: PageContent;
   publishedNumber: number | null;
   versions: { id: string; number: number; createdAt: string }[];
+  /** Abonnementet er ikke betalt ennå. Serveren stopper publiseringen uansett (assertCanPublish). */
+  publishLocked?: boolean;
 };
 
 /** `undoFor` er siden rett etter slettingen. «Angre» vises bare så lenge ingenting annet er endret. */
@@ -51,7 +56,7 @@ function newId(taken: Section[]): string {
   return id;
 }
 
-export function PageEditor({ siteId, preview, pageId, path, initialTitle, initialContent, publishedNumber, versions }: Props) {
+export function PageEditor({ siteId, preview, pageId, path, initialTitle, initialContent, publishedNumber, versions, publishLocked = false }: Props) {
   const [history, dispatch] = useReducer(historyReducer, { title: initialTitle, content: initialContent }, initHistory);
   const doc = history.present;
   const { title, content } = doc;
@@ -68,7 +73,7 @@ export function PageEditor({ siteId, preview, pageId, path, initialTitle, initia
   const [pending, startTransition] = useTransition();
 
   const problems = useMemo(() => new Map(sections.map((s) => [s.id, sectionProblems(s)])), [sections]);
-  const withExampleText = useMemo(() => new Set(sections.filter(hasExampleText).map((s) => s.id)), [sections]);
+  const withExampleText = useMemo(() => new Set(sections.filter((s) => !s.hidden && hasExampleText(s)).map((s) => s.id)), [sections]);
   const draftCheck = useMemo(() => validatePageContent(content, "draft"), [content]);
   const trimmedTitle = title.trim();
   const blocked = !trimmedTitle
@@ -285,15 +290,20 @@ export function PageEditor({ siteId, preview, pageId, path, initialTitle, initia
           <button type="button" disabled={pending} onClick={openPreview} className={secondaryButton}>
             Forhåndsvis
           </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={publish}
-            className="rounded-md bg-[#173b6c] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-          >
-            Publiser
-          </button>
+          {publishLocked ? (
+            <PublishLockNotice siteId={siteId} compact />
+          ) : (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={publish}
+              className="rounded-md bg-[#173b6c] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            >
+              Publiser
+            </button>
+          )}
         </div>
+        {publishLocked && <PublishLockNotice siteId={siteId} />}
 
         {notice && (
           <div
@@ -334,6 +344,9 @@ export function PageEditor({ siteId, preview, pageId, path, initialTitle, initia
               pageTitle={trimmedTitle || "Sidetittel"}
               content={content}
               onChange={(seo) => commit({ title, content: { ...content, seo } }, "seo")}
+              keyword={preview.ctx.site.keyword}
+              place={primaryPlace(preview.ctx.site.info)}
+              shop={preview.ctx.shop}
             />
 
             <h2 className="mb-3 text-lg font-semibold">Seksjoner</h2>
@@ -364,6 +377,17 @@ export function PageEditor({ siteId, preview, pageId, path, initialTitle, initia
 
             <section className="mt-12">
               <h2 className="mb-3 text-lg font-semibold">Versjoner</h2>
+              <HowTo
+                title="Slik virker kladd, publisering og versjoner"
+                className="mb-3"
+                article="publisere"
+                steps={[
+                  "Alt du skriver lagres i kladden. Besøkende ser den ikke.",
+                  "«Forhåndsvis» viser kladden slik besøkende vil se den.",
+                  "«Publiser» legger kladden ut og lagrer den som en ny versjon.",
+                  "«Gå tilbake hit» publiserer en eldre versjon på nytt.",
+                ]}
+              />
               {versions.length === 0 ? (
                 <p className="text-sm text-neutral-600">Siden er ikke publisert ennå.</p>
               ) : (

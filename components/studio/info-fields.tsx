@@ -23,6 +23,9 @@ export function InfoFields({ value, onChange, hideOrgnr = false }: { value: Site
   const set = (key: keyof SiteInfo) => (v: string) => onChange({ ...value, [key]: v });
   const hours = value.openingHours;
   const setHours = (next: SiteInfo["openingHours"]) => onChange({ ...value, openingHours: next });
+  // Eldre lagret info kan mangle listen helt.
+  const special = value.specialHours ?? [];
+  const setSpecial = (next: SiteInfo["specialHours"]) => onChange({ ...value, specialHours: next });
 
   return (
     <div className="space-y-4">
@@ -35,6 +38,21 @@ export function InfoFields({ value, onChange, hideOrgnr = false }: { value: Site
         <Text name="postalCode" label="Postnr." inputMode="numeric" maxLength={4} value={value.postalCode} onChange={set("postalCode")} />
         <Text name="city" label="Poststed" value={value.city} onChange={set("city")} />
       </div>
+      <label className="block">
+        <span className="mb-1.5 block text-sm font-semibold">Område vi dekker (valgfritt)</span>
+        <input
+          name="serviceArea"
+          value={value.serviceArea ?? ""}
+          onChange={(e) => onChange({ ...value, serviceArea: e.target.value })}
+          maxLength={200}
+          placeholder="Drammen, Lier, Kongsberg"
+          aria-describedby="omrade-hjelp"
+          className={inputClass}
+        />
+        <span id="omrade-hjelp" className="mt-1 block text-sm text-neutral-700">
+          Stedene du jobber i, skilt med komma. Det første brukes i tittelen i Google, for eksempel «Rørlegger i Drammen».
+        </span>
+      </label>
       {!hideOrgnr && <Text name="orgnr" label="Org.nr." inputMode="numeric" value={value.orgnr} onChange={set("orgnr")} />}
 
       <fieldset className="rounded-md border border-neutral-300 p-3">
@@ -52,6 +70,40 @@ export function InfoFields({ value, onChange, hideOrgnr = false }: { value: Site
         </ol>
         <button type="button" className="mt-2 text-sm underline" onClick={() => setHours([...hours, { day: "", time: "" }])}>
           + Legg til dag
+        </button>
+      </fieldset>
+
+      <fieldset className="rounded-md border border-neutral-300 p-3">
+        <legend className="px-1 text-sm font-medium">Avvikende åpningstider</legend>
+        <p className="mb-2 text-sm text-neutral-700">
+          For eksempel julaften, romjul og påske. Skriv «Stengt» eller tiden. Dager som er passert, forsvinner av seg selv.
+        </p>
+        <ol className="space-y-2">
+          {special.map((s, i) => (
+            <li key={i} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[9.5rem_1fr_1fr_auto]">
+              <Text name="specialDate" label="Dato" type="date" value={s.date} onChange={(v) => setSpecial(special.map((x, j) => (j === i ? { ...x, date: v } : x)))} />
+              <Text
+                name="specialLabel"
+                label="Hva gjelder det (valgfritt)"
+                placeholder="Julaften"
+                value={s.label}
+                onChange={(v) => setSpecial(special.map((x, j) => (j === i ? { ...x, label: v } : x)))}
+              />
+              <Text
+                name="specialTime"
+                label="Tid"
+                placeholder="Stengt"
+                value={s.time}
+                onChange={(v) => setSpecial(special.map((x, j) => (j === i ? { ...x, time: v } : x)))}
+              />
+              <button type="button" className="mb-2 text-sm underline" onClick={() => setSpecial(special.filter((_, j) => j !== i))}>
+                Fjern
+              </button>
+            </li>
+          ))}
+        </ol>
+        <button type="button" className="mt-2 text-sm underline" onClick={() => setSpecial([...special, { date: "", label: "", time: "" }])}>
+          + Legg til avvikende dag
         </button>
       </fieldset>
     </div>

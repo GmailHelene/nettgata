@@ -10,6 +10,7 @@ import { ShopError } from "./catalog";
 import { allocateDiscount, assertUsable, claimDiscount, discountAmount, findDiscount, releaseDiscount, type Discount } from "./discounts";
 import { formatNok, vatOf } from "./money";
 import { availablePaymentMethods, checkoutShippingOptions, isOnlinePayment, paymentMethods, type CheckoutShippingOption, type ShopSettings } from "./settings";
+import { createCreditNote } from "./credit-notes";
 import { trackingSchema } from "./tracking";
 
 export const MAX_QUANTITY = 99;
@@ -408,6 +409,15 @@ export async function setOrderStatus(db: Db, siteId: string, orderId: string, ne
   if (updated.length === 0) throw new ShopError("Ordren ble endret samtidig av noe annet. Last siden på nytt og prøv igjen.");
   if (next === "cancelled") await releaseLines(db, order.id);
   await db.insert(auditLog).values({ siteId, userId, action: "order.status", detail: { orderId, from: order.status, to: next } });
+  // En betalt ordre som kanselleres eller refunderes, får kreditnota (bokføringsloven). Feiler det, står ordren likevel
+  // med ny status, og feilen logges. createCreditNote er trygg å kalle igjen.
+  if ((order.status === "paid" || order.status === "fulfilled") && (next === "cancelled" || next === "refunded")) {
+    try {
+      await createCreditNote(db, siteId, order.id, next === "cancelled" ? "kansellert" : "refundert", userId);
+    } catch (err) {
+      console.error("Kreditnota feilet", order.id, err);
+    }
+  }
 }
 
 /**

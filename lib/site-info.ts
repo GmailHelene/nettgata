@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { parseOsloDate } from "@/lib/oslo-time";
+import { parseGoogleVerification } from "@/lib/seo/verification";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -31,6 +33,28 @@ export const siteInfoSchema = z.object({
     .array(z.object({ day: z.string().trim().min(1).max(30), time: z.string().trim().min(1).max(40) }))
     .max(10)
     .default([]),
+  /**
+   * Avvikende åpningstider på enkeltdager, som julaften og påske. Dager som er passert, vises ikke.
+   * `time` er fri tekst som de vanlige tidene, for eksempel «Stengt» eller «10.00 - 14.00».
+   */
+  specialHours: z
+    .array(
+      z.object({
+        date: z.string().refine((v) => parseOsloDate(v) !== null, "Velg en gyldig dato for avvikende åpningstid"),
+        label: z.string().trim().max(60, "Navnet på dagen er for langt").default(""),
+        time: z.string().trim().min(1, "Skriv tiden eller «Stengt»").max(40, "Tiden er for lang"),
+      }),
+    )
+    .max(30, "Maks 30 avvikende dager")
+    .default([]),
+  /**
+   * «Område vi dekker»: stedene bedriften jobber i, skilt med komma. Brukes i titlene i Google (det første stedet),
+   * i strukturerte data (areaServed) og i kontaktseksjonen.
+   */
+  // Valgfrie, så info lagret før feltene fantes fortsatt er gyldig. Ugyldig lagret verdi gir tomt felt, aldri feil.
+  serviceArea: z.string().trim().max(200).optional().catch(undefined),
+  /** Koden fra Google Search Console, uten resten av meta-taggen (lib/seo/verification.ts). */
+  googleVerification: z.string().optional().catch(undefined),
 });
 export type SiteInfo = z.infer<typeof siteInfoSchema>;
 
@@ -47,6 +71,19 @@ export const siteInfoInputSchema = siteInfoSchema.extend({
       (v) => v === "" || (/^\+?[\d\s()-]+$/.test(v) && v.replace(/\D/g, "").length >= 8),
       "Telefonnummeret må ha minst åtte siffer, for eksempel 32 78 00 00",
     )
+    .default(""),
+  serviceArea: z.string().trim().max(200, "Området er for langt. Skriv de viktigste stedene.").default(""),
+  // Kunden kan lime inn hele meta-taggen fra Google eller bare koden. Vi lagrer koden.
+  googleVerification: z
+    .string()
+    .trim()
+    .max(400)
+    .transform((v, ctx) => {
+      const code = parseGoogleVerification(v);
+      if (code !== null) return code;
+      ctx.addIssue({ code: "custom", message: "Koden fra Google ser ikke riktig ut. Lim inn hele meta-taggen eller bare koden." });
+      return z.NEVER;
+    })
     .default(""),
 });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { sortOptions, type BrowseQuery } from "@/lib/shop/browse";
+import { resultSummary, sortOptions, type BrowseQuery } from "@/lib/shop/browse";
 
 /**
  * Søk, sortering og filtre som et vanlig GET-skjema. Det sendes først når kunden trykker «Bruk filter» eller
@@ -27,7 +27,15 @@ export function BrowseControls({
       <div className="flex w-full items-end gap-2">
         <label className="block flex-1">
           <span className="mb-1 block text-xs text-[var(--c-muted)]">Søk i varene</span>
-          <input type="search" name="sok" defaultValue={query.search} placeholder="For eksempel pledd eller lin" className={`${select} w-full`} />
+          <input
+            type="search"
+            name="sok"
+            defaultValue={query.search}
+            maxLength={80}
+            enterKeyHint="search"
+            placeholder="For eksempel pledd eller lin"
+            className={`${select} w-full`}
+          />
         </label>
         <button className="rounded-[var(--radius)] border border-[var(--c-muted)]/50 px-4 py-2 font-medium">Søk</button>
       </div>
@@ -59,8 +67,9 @@ export function BrowseControls({
         </select>
       </label>
       <button className="rounded-[var(--radius)] border border-[var(--c-muted)]/50 px-4 py-2 font-medium">Bruk filter</button>
-      <p className="w-full text-sm text-[var(--c-muted)]" aria-live="polite">
-        {count} {count === 1 ? "vare" : "varer"}
+      {/* Skjemaet laster siden på nytt, så antallet står også i sidetittelen, som skjermlesere leser først. */}
+      <p role="status" className="w-full text-sm text-[var(--c-muted)]" aria-live="polite">
+        {resultSummary(count, query.search)}
       </p>
     </form>
   );

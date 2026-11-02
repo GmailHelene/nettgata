@@ -2,13 +2,14 @@ import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { pages } from "@/db/schema";
 import { requireSiteAccess } from "@/lib/session";
+import { canPublish } from "@/lib/billing/state";
 import { PageList } from "../page-list";
 import { SiteLinks } from "../site-links";
 import { SiteNav } from "../site-nav";
 
 export default async function PagesPage({ params }: { params: Promise<{ siteId: string }> }) {
   const { siteId } = await params;
-  const { site } = await requireSiteAccess(siteId);
+  const { site, user } = await requireSiteAccess(siteId);
   const pageRows = await (await getDb()).select().from(pages).where(eq(pages.siteId, site.id)).orderBy(asc(pages.sortOrder), asc(pages.path));
 
   return (
@@ -17,6 +18,7 @@ export default async function PagesPage({ params }: { params: Promise<{ siteId: 
       <SiteLinks siteId={site.id} slug={site.slug} />
       <PageList
         siteId={site.id}
+        publishLocked={!canPublish(site.billing, user.isPlatformAdmin)}
         pages={pageRows.map((p) => ({
           id: p.id,
           title: p.title,

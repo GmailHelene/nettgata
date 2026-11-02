@@ -6,7 +6,7 @@ import { signType, StreetSign } from "@/components/brand";
  * Toppfeltet i studioet, i asfalt som bunnen av nettgata.no. På mobil vises ikke e-postadressen,
  * så feltet aldri blir bredere enn skjermen. Skjermlesere får den likevel med på «Logg ut».
  */
-export function StudioTopBar({ email, active }: { email: string; active?: "nettsteder" | "konto" }) {
+export function StudioTopBar({ email, active }: { email: string; active?: "nettsteder" | "konto" | "hjelp" }) {
   const item = "rounded-md px-2.5 py-2 text-sm font-medium text-white/90 transition-colors hover:bg-white/10 hover:text-white aria-[current=page]:bg-white/15 aria-[current=page]:text-white";
   return (
     <header className="bg-[#1b232b] text-white [&_:focus-visible]:!outline-white">
@@ -23,6 +23,9 @@ export function StudioTopBar({ email, active }: { email: string; active?: "netts
           <nav aria-label="Studio" className="flex items-center gap-1">
             <Link href="/studio" aria-current={active === "nettsteder" ? "page" : undefined} className={`${item} hidden sm:block`}>
               Nettsteder
+            </Link>
+            <Link href="/studio/hjelp" aria-current={active === "hjelp" ? "page" : undefined} className={item}>
+              Hjelp
             </Link>
             <Link href="/studio/konto" aria-current={active === "konto" ? "page" : undefined} className={item}>
               Konto

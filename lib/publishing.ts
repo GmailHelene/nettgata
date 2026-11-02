@@ -1,6 +1,7 @@
 import { and, desc, eq, gt, max, sql } from "drizzle-orm";
 import type { Db } from "@/db";
-import { auditLog, pageVersions, pages } from "@/db/schema";
+import { auditLog, pageVersions, pages, sites } from "@/db/schema";
+import { canPublish, PUBLISH_NEEDS_SUBSCRIPTION } from "@/lib/billing/state";
 import { sectionRegistry, validatePageContent } from "@/lib/content/registry";
 import { hasExampleText } from "@/lib/content/examples";
 import { missingMedia } from "@/lib/media";
@@ -22,7 +23,15 @@ export async function getPublishedPage(db: Db, siteId: string, path: string) {
     .where(and(eq(pages.siteId, siteId), eq(pages.path, normalizePath(path))))
     .limit(1);
   if (!row) return null;
-  return { pageId: row.page.id, title: row.version.title, content: row.version.content, versionNumber: row.version.number };
+  return {
+    pageId: row.page.id,
+    title: row.version.title,
+    content: row.version.content,
+    versionNumber: row.version.number,
+    // Til blogginnlegg i strukturerte data: når siden ble laget, og når den sist ble publisert.
+    createdAt: row.page.createdAt,
+    publishedAt: row.version.createdAt,
+  };
 }
 
 /** Innholdet på alle publiserte sider på nettstedet, for eksempel for å se hva personvernerklæringen må nevne. */
@@ -33,6 +42,18 @@ export async function getPublishedContents(db: Db, siteId: string): Promise<Page
     .innerJoin(pageVersions, eq(pages.publishedVersionId, pageVersions.id))
     .where(eq(pages.siteId, siteId));
   return rows.map((r) => r.content);
+}
+
+/**
+ * Sperren før betaling. Kalles av alle handlinger i studioet som publiserer (én side, alle sider, «Gå tilbake hit»).
+ * Seed-skriptet og demonettsteder publiserer uten å gå hit. Leser abonnementet på nytt fra databasen, så en
+ * betaling som nettopp er registrert av webhooken, gjelder med en gang.
+ */
+export async function assertCanPublish(db: Db, siteId: string, actor: { isPlatformAdmin: boolean }) {
+  if (actor.isPlatformAdmin) return;
+  const [site] = await db.select({ billing: sites.billing }).from(sites).where(eq(sites.id, siteId)).limit(1);
+  if (!site) throw new PublishingError("Fant ikke nettstedet");
+  if (!canPublish(site.billing, false)) throw new PublishingError(PUBLISH_NEEDS_SUBSCRIPTION);
 }
 
 /** Stopper publisering av en side med bilder som er slettet fra bildebiblioteket. */
@@ -114,7 +135,8 @@ export async function publishPage(db: Db, pageId: string, userId: string, opts: 
   if (!result.ok) throw new PublishingError(result.errors.map((e) => e.message).join("\n"));
   await assertMediaExists(db, page.siteId, result.content);
   if (!opts.allowPlaceholders) {
-    const unfinished = result.content.sections.filter(hasExampleText).map((s) => sectionRegistry[s.type].label);
+    // Avslåtte seksjoner vises ikke på nettstedet, så eksempeltekst i dem stopper ikke publisering.
+    const unfinished = result.content.sections.filter((s) => !s.hidden && hasExampleText(s)).map((s) => sectionRegistry[s.type].label);
     if (unfinished.length) {
       throw new PublishingError(`«${page.title}» har tekst som skal fylles inn før publisering: ${[...new Set(unfinished)].join(", ")}`);
     }

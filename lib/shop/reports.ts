@@ -1,8 +1,9 @@
-import { and, asc, count, desc, eq, gte, inArray, isNotNull, lt, lte, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, lt, lte, or, sql } from "drizzle-orm";
 import type { Db } from "@/db";
-import { orderLines, orders, productVariants, products } from "@/db/schema";
+import { creditNotes, orderLines, orders, productVariants, products } from "@/db/schema";
 import { csvKroner, toCsv } from "@/lib/csv";
 import { addDays, osloDate, parseOsloDate } from "@/lib/oslo-time";
+import { creditNotesBetween } from "./credit-notes";
 import { allocateDiscount } from "./discounts";
 import { vatBreakdown } from "./orders";
 
@@ -150,14 +151,26 @@ export type PeriodReport = Awaited<ReturnType<typeof periodReport>>;
 /**
  * Salg og MVA for ordre bestilt i perioden. Ordre som venter på betaling er med og vises for seg.
  * MVA per sats regnes fra ordrelinjene med rabatt og frakt fordelt likt som i kassen.
+ *
+ * En betalt ordre som senere er kansellert eller refundert, er salg i perioden den ble bestilt, og kreditnotaen
+ * trekker det fra i perioden kreditnotaen ble laget. Ordre som er kansellert uten kreditnota (aldri betalt, eller
+ * refundert før kreditnotaer fantes), er ikke med, som før.
  */
 export async function periodReport(db: Db, siteId: string, from: string, to: string) {
   const start = parseOsloDate(from)!;
   const end = parseOsloDate(addDays(to, 1))!;
+  const credited = db.select({ orderId: creditNotes.orderId }).from(creditNotes).where(eq(creditNotes.siteId, siteId));
   const rows = await db
     .select()
     .from(orders)
-    .where(and(eq(orders.siteId, siteId), gte(orders.createdAt, start), lt(orders.createdAt, end), inArray(orders.status, [...salesStatuses])))
+    .where(
+      and(
+        eq(orders.siteId, siteId),
+        gte(orders.createdAt, start),
+        lt(orders.createdAt, end),
+        or(inArray(orders.status, [...salesStatuses]), inArray(orders.id, credited)),
+      ),
+    )
     .orderBy(asc(orders.createdAt));
   const lines = rows.length ? await db.select().from(orderLines).where(inArray(orderLines.orderId, rows.map((o) => o.id))) : [];
   const linesByOrder = new Map<string, (typeof lines)[number][]>();
@@ -199,12 +212,46 @@ export async function periodReport(db: Db, siteId: string, from: string, to: str
     }
   }
 
+  // Kreditnotaer laget i perioden trekkes fra, med MVA per sats slik den sto på ordren.
+  const credits = await creditNotesBetween(db, siteId, start, end);
+  const sumCredits = { creditNotes: credits.length, creditOre: 0 };
+  for (const { note } of credits) {
+    for (const r of note.vat) {
+      const row = vat.get(r.rate) ?? { rate: r.rate, grossOre: 0, vatOre: 0 };
+      row.grossOre += r.amountOre;
+      row.vatOre += r.vatOre;
+      vat.set(r.rate, row);
+    }
+    const pay = payments.get(note.paymentMethod) ?? { method: note.paymentMethod, orders: 0, ore: 0 };
+    pay.ore += note.totalOre;
+    payments.set(note.paymentMethod, pay);
+    const month = osloDate(note.createdAt).slice(0, 7);
+    const mo = months.get(month) ?? { month, orders: 0, ore: 0 };
+    mo.ore += note.totalOre;
+    months.set(month, mo);
+    sum.totalOre += note.totalOre;
+    sum.subtotalOre += note.subtotalOre;
+    sum.discountOre += note.discountOre;
+    sum.shippingOre += note.shippingOre;
+    sumCredits.creditOre += note.totalOre;
+  }
+
   const vatRows = [...vat.values()].sort((a, b) => b.rate - a.rate).map((r) => ({ ...r, netOre: r.grossOre - r.vatOre }));
   const vatOre = vatRows.reduce((s, r) => s + r.vatOre, 0);
   return {
     from,
     to,
     ...sum,
+    ...sumCredits,
+    credits: credits.map(({ note, orderNumber }) => ({
+      id: note.id,
+      orderId: note.orderId,
+      number: note.number,
+      orderNumber,
+      date: osloDate(note.createdAt),
+      totalOre: note.totalOre,
+      vatOre: note.vatOre,
+    })),
     vatOre,
     netOre: sum.totalOre - vatOre,
     vat: vatRows,
@@ -221,6 +268,14 @@ export function reportCsv(report: PeriodReport, paymentLabel: (method: string) =
       ["Totalt", `${report.from} til ${report.to}`, report.orders, csvKroner(report.netOre), csvKroner(report.vatOre), csvKroner(report.totalOre)],
       ...report.payments.map((p) => ["Betalingsmåte", paymentLabel(p.method), p.orders, "", "", csvKroner(p.ore)]),
       ["Herav ikke betalt", "", report.unpaidOrders, "", "", csvKroner(report.unpaidOre)],
+      ...report.credits.map((c) => [
+        "Kreditnota",
+        `Nr. ${c.number}, ${c.date}, til ordre ${c.orderNumber}`,
+        "",
+        csvKroner(c.totalOre - c.vatOre),
+        csvKroner(c.vatOre),
+        csvKroner(c.totalOre),
+      ]),
     ],
   );
 }

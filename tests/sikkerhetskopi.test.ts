@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "@/db";
 import { demoInfo } from "@/db/demo";
 import { createPgliteDb } from "@/db/pglite";
-import { inquiries, pages, rateLimitEvents, sites, users } from "@/db/schema";
+import { emailLog, inquiries, pages, rateLimitEvents, sites, users } from "@/db/schema";
 import { runRetention } from "@/lib/retention";
 import { BACKUP_KEEP, backupKey, createBackup, openBackup, restoreBackup, runNightlyBackup, tablesInInsertOrder, type Backup } from "@/lib/backup";
 import { createSiteFromPack } from "@/lib/sites";
@@ -111,9 +111,15 @@ describe("sikkerhetskopi", () => {
       { key: "login-ip:a", createdAt: new Date("2027-11-28T00:00:00Z") },
       { key: "login-ip:b", createdAt: new Date("2027-11-30T12:00:00Z") },
     ]);
+    await db.insert(emailLog).values([
+      { siteId: site.id, kind: "ny-henvendelse", recipient: "a@example.no", subject: "Gammel", status: "sendt", createdAt: new Date("2026-11-15T10:00:00Z") },
+      { siteId: site.id, kind: "ny-henvendelse", recipient: "b@example.no", subject: "Ny", status: "sendt", createdAt: new Date("2027-10-01T10:00:00Z") },
+    ]);
     const result = await runRetention(db, now);
     expect(result.rateLimits).toBe(1);
     const names = (await db.select().from(inquiries)).map((i) => i.name).sort();
     expect(names).toEqual(["Ny"]);
+    expect(result.emailLog).toBe(1);
+    expect((await db.select().from(emailLog)).map((e) => e.subject)).toEqual(["Ny"]);
   });
 });

@@ -17,6 +17,7 @@ import { getStripe, missingBillingConfig } from "@/lib/billing/stripe";
 import { confirmCheckoutSession } from "@/lib/billing/sync";
 import { formatOsloDateTime, formatOsloDay } from "@/lib/oslo-time";
 import { requireSiteAccess } from "@/lib/session";
+import { HelpLink } from "@/components/studio/help";
 import { formatNok } from "@/lib/shop/money";
 import { SiteNav } from "../site-nav";
 import { AddonToggle } from "./addon-toggle";
@@ -138,6 +139,11 @@ export default async function SubscriptionPage({
         {showAddonToggle && <AddonToggle siteId={site.id} active={billing.addon} yearly={billing.interval === "year"} />}
         {!isOwner && (billing.stripeCustomerId || showPicker) && <p className="mt-4 text-sm text-neutral-600">Bare eieren av nettstedet kan endre abonnementet.</p>}
       </section>
+      {billing.stripeSubscriptionId && !billing.manual && (
+        <p className="-mt-4 mb-8 text-sm text-neutral-600">
+          Hjelp: <HelpLink slug="bytt-kort">Bytt kort</HelpLink> · <HelpLink slug="si-opp">Si opp</HelpLink>
+        </p>
+      )}
 
       {showPicker && isOwner && <PlanForm siteId={site.id} plan={planForKind(site.kind)} blockedReason={stripe ? null : NOT_READY} />}
 

@@ -11,7 +11,12 @@ export type EmailKind =
   | "bookingbekreftelse"
   | "ny-booking"
   | "booking-avbestilt"
-  | "booking-avbestilt-varsel";
+  | "booking-avbestilt-varsel"
+  | "nyhetsbrev-bekreft"
+  | "nyhetsbrev-test"
+  | "manedsrapport"
+  | "ai-forslag"
+  | "eksport";
 
 export type EmailMessage = {
   to: EmailAddress;
@@ -22,6 +27,8 @@ export type EmailMessage = {
   html: string;
   text: string;
   tags?: string[];
+  /** Ekstra e-posthoder, for eksempel List-Unsubscribe på nyhetsbrev. */
+  headers?: Record<string, string>;
 };
 
 export interface EmailProvider {
@@ -45,6 +52,7 @@ export function brevoProvider(apiKey: string, fromEmail: string): EmailProvider 
           htmlContent: m.html,
           textContent: m.text,
           ...(m.tags?.length && { tags: m.tags }),
+          ...(m.headers && Object.keys(m.headers).length && { headers: m.headers }),
         }),
         signal: AbortSignal.timeout(10_000),
       });

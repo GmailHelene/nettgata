@@ -36,6 +36,30 @@ Kostnaden per kjøring regnes ut fra `usage` i svaret og lagres i øre i `ai_run
 
 Fallback-modell ved avslag (`fallbacks`) er ikke slått på, fordi Batch API ikke tillater det. Et avslag gir en feilet kjøring uten forslag.
 
+## Ukentlig AI-rapport (med i grunnprisen)
+
+Bygget 02.11.2026. Spesifikasjonen lover en ukentlig rapport med forslag og Godkjenn i begge abonnementene. Den bruker samme motor som tillegget.
+
+- **Hvem:** `weeklyAiActive()` i `lib/ai/access.ts`. Nettsteder uten tillegget med abonnement `active` eller `past_due`, eller «Fakturert utenom Stripe». `trialing` og alt annet gir den ikke, så en forlatt prøveperiode koster ingenting. Nettstedet må også ha minst én publisert side (`startWeekly` i `lib/ai/runs.ts`). Har nettstedet tillegget, går den daglige i stedet.
+- **Når:** nattjobben `/api/cron/ai-natt` kjører både `startNightly` og `startWeekly`. Et nettsted får høyst én ukentlig kjøring per 6 dager og 20 timer (`WEEKLY_MIN_GAP_MS`), så den faller på samme ukedag hver uke. Kjøringen lagres med `trigger = "uke"`.
+- **Mindre kjøring:** høyst 3 forslag (`WEEKLY_MAX_SUGGESTIONS`), bare rollene SEO og innhold, og bare typene SEO-tittel, SEO-beskrivelse, tekst og blogginnlegg. Innlegg til sosiale medier, butikktips og «Lag nye forslag nå» hører til tillegget. Egen systemprompt og eget JSON-skjema (`WEEKLY_SYSTEM_PROMPT`, `WEEKLY_OUTPUT_SCHEMA`), og `validateSuggestions` forkaster det som ikke hører til nivået.
+- **Samme regler:** Batch API, samme Godkjenn som bare skriver i kladden, samme personvern (`buildSiteContext` er uendret).
+- **E-post:** når en ukentlig kjøring gir forslag, får eieren «X nye forslag til <nettsted>» med lenke til AI-teamet (`lib/rapport/ai-epost.ts`, `email_log.kind = "ai-forslag"`). Sendes én gang per kjøring. Eieren kan slå den av under Innstillinger, Rapporter på e-post. Redaktører kan slå den på.
+- **Studioet:** AI-teamet-siden viser forslagene i ukentlig modus, uten «Lag nye forslag nå», og en ærlig boks om hva tillegget gir i tillegg: opptil åtte forslag hver natt, innlegg til sosiale medier, butikktips og knappen.
+
+### Kostnad for den ukentlige rapporten
+
+| | |
+|---|---|
+| Modell | `claude-opus-5-5`, samme som tillegget. Modellen er ikke byttet for å spare penger, bare innsatsen er satt ned fra `medium` til `low` |
+| Kjøring | Batch API, halv pris |
+| Anslag per kjøring | 15 000 tokens inn og rundt 2 500 ut (tenkning og svar). (15 000 × 4 $ + 2 500 × 20 $) / 1 000 000 = 0,11 $. Halvparten med Batch API er 0,055 $, og med 11,5 kr per dollar blir det rundt 0,65 kr |
+| Anslag per måned | 4 til 5 kjøringer, rundt 3 kr per nettsted |
+| Kostnadstak | 8 kr per nettsted per kalendermåned (`WEEKLY_CAP_ORE`), sjekket på samme måte som det daglige taket. En kjøring som venter, regnes med 1,50 kr (`WEEKLY_RUN_ESTIMATE_ORE`). Taket gir rom for nettsteder med mange sider, men stopper dem før de koster mer enn 8 kr |
+| 100 nettsteder | Rundt 300 kr i måneden, høyst 800 kr |
+
+Skal det bli billigere, er neste steg å bruke Claude Sonnet 5.5 (2 $ og 10 $ per million tokens) for det ukentlige nivået. Det halverer omtrent prisen. Det er Helenes valg, og bør prøves på et par ekte nettsteder først.
+
 ## Hva som sendes til Anthropic
 
 Bare det `buildSiteContext()` i `lib/ai/context.ts` bygger:
@@ -50,7 +74,7 @@ Personvernerklæringen (`lib/legal/personvern.ts`, flagget `ai`) og underleveran
 
 ## Lagring
 
-- `ai_runs` (migrering 0012): én rad per kjøring med nettsted, `natt` eller `manuell`, status (`venter`, `ferdig`, `feilet`), batch-id, tokens, kostnad i øre, antall forslag og feil.
+- `ai_runs` (migrering 0012): én rad per kjøring med nettsted, `natt`, `manuell` eller `uke`, status (`venter`, `ferdig`, `feilet`), batch-id, tokens, kostnad i øre, antall forslag og feil.
 - `ai_suggestions`: rolle, type, side, seksjon, felt, verdien før, forslaget, begrunnelse, effekt, status (`ny`, `godkjent`, `avvist`, `utdatert`), hvem som bestemte og når.
 - Revisjonsloggen får `ai.run_started`, `ai.approved`, `ai.rejected`, `billing.addon_added` og `billing.addon_removed`.
 - Avviste og utdaterte forslag slettes etter 90 dager (`lib/retention.ts`, hver natt). Godkjente beholdes som historikk.
@@ -59,8 +83,8 @@ Personvernerklæringen (`lib/legal/personvern.ts`, flagget `ai`) og underleveran
 
 | Jobb | Når | Hva |
 |---|---|---|
-| `/api/cron/ai-natt` | Hver natt, 01:30 UTC (sammen med sikkerhetskopien) | Sender én forespørsel per nettsted med tillegg og plass under taket, i én batch |
-| `/api/cron/ai` | Hvert tiende minutt | Henter svar fra ferdige batcher. En kjøring behandles bare én gang. Kjøringer eldre enn 26 timer settes til feilet |
+| `/api/cron/ai-natt` | Hver natt, 01:30 UTC (sammen med sikkerhetskopien) | Sender én forespørsel per nettsted med tillegg og plass under taket, i én batch. Sender også den ukentlige rapporten for nettsteder uten tillegget som står for tur, i en egen batch |
+| `/api/cron/ai` | Hvert tiende minutt | Henter svar fra ferdige batcher. En kjøring behandles bare én gang. Kjøringer eldre enn 26 timer settes til feilet. Sender e-posten om nye ukentlige forslag |
 
 Begge krever cron-nøkkelen fra `SESSION_SECRET`, som de andre jobbene. Mangler `ANTHROPIC_API_KEY`, gjør jobbene ingenting.
 
@@ -80,15 +104,16 @@ Tankestrek byttes til vanlig bindestrek. Teksten valideres på nytt av `saveDraf
 | Fil | Hva |
 |---|---|
 | `lib/ai/config.ts` | Modell, priser, kostnadstak, grenser og `costOre()` |
-| `lib/ai/access.ts` | `aiTeamActive()`, også i nettleseren |
+| `lib/ai/access.ts` | `aiTeamActive()` og `weeklyAiActive()`, også i nettleseren |
 | `lib/ai/client.ts` | Anthropic-klienten bak et lite grensesnitt, `setAiClientForTests()` |
 | `lib/ai/context.ts` | Det eneste som bestemmer hva AI-en får se |
 | `lib/ai/prompt.ts` | Systemprompt, JSON-skjema og forespørselen |
 | `lib/ai/suggestions.ts` | Validering, Godkjenn, Avvis og lister |
-| `lib/ai/runs.ts` | Manuell kjøring, nattkjøring, henting av batcher og kostnadstak |
+| `lib/ai/runs.ts` | Manuell kjøring, nattkjøring, ukentlig kjøring, henting av batcher og kostnadstak |
 | `lib/billing/addon.ts` | Legge til og fjerne tillegget på et abonnement som løper |
 | `app/studio/nettsted/[siteId]/ai-teamet/` | Studiosiden |
 | `tests/ai-teamet.test.ts` | Tester med falsk Anthropic og falsk Stripe |
+| `tests/rapporter.test.ts` | Den ukentlige rapporten: hvem som får den, tak, høyst tre forslag og e-posten |
 
 ## Før lansering (Helene)
 
@@ -105,7 +130,6 @@ Skal tillegget skjules igjen, settes `ADDON_AVAILABLE = false`. Da kan det ikke 
 
 ## Ikke med ennå
 
-- Ukentlig rapport for alle i grunnprisen. Motoren kan brukes, med en annen sperre.
 - Effektmåling i neste rapport.
 - Publisering rett til Facebook og Instagram.
 - Nyhetsbrev, alt-tekst på bilder (AI-en ser ikke bildene) og helsesjekk av skjema og lenker.

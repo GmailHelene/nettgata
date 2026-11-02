@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
   // Bare for utviklingsserveren (npm run dev lytter på localhost): nettstedene vises på *.localhost, og uten dette
   // avviser Next forespørslene derfra til utviklingsressursene.
   allowedDevOrigins: ["localhost", "*.localhost"],
+  async rewrites() {
+    // Nøkkelfilen for IndexNow må ligge rett under domenet (lib/seo/indexnow.ts).
+    return [{ source: "/:key([0-9a-f]{32}).txt", destination: "/api/indexnow/:key" }];
+  },
   async headers() {
     return [
       {

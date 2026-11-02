@@ -5,6 +5,7 @@ import { fikenOverview, fikenPeriods } from "@/lib/fiken/send";
 import { fikenAvailableTo, fikenView } from "@/lib/fiken/state";
 import { paymentSetupView } from "@/lib/payments/config";
 import { requireSiteAccess } from "@/lib/session";
+import { HelpLink } from "@/components/studio/help";
 import { SiteNav } from "../site-nav";
 import { FikenSection } from "./fiken-section";
 import { ProviderForm } from "./provider-form";
@@ -30,7 +31,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ siteId
       <h2 className="mb-2 text-xl font-bold">Betaling med Vipps og Klarna</h2>
       <p className="mb-6 text-neutral-700">
         Kundene betaler rett til butikken din. Du har egen avtale med Vipps og Klarna, og pengene går til kontoen din, aldri via Nettgata. Lim inn
-        nøklene du har fått, så tester vi at de virker før betalingsmåten vises i kassen.
+        nøklene du har fått, så tester vi at de virker før betalingsmåten vises i kassen. <HelpLink slug="vipps-klarna" />
       </p>
       {!canEdit && (
         <p className="mb-6 rounded-md bg-neutral-100 p-3 text-sm text-neutral-800">

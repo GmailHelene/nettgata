@@ -1,5 +1,6 @@
 "use client";
 
+import { HelpLink } from "@/components/studio/help";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
@@ -87,7 +88,8 @@ export function MediaLibrary({ siteId, items }: { siteId: string; items: Item[] 
         </label>
       </div>
       <p className="mb-6 text-sm text-neutral-700">
-        Bildene krympes automatisk før de lastes opp. Et bilde kan slettes for godt når det ikke brukes på noen side, vare eller som logo.
+        Bildene krympes automatisk før de lastes opp. Et bilde kan slettes for godt når det ikke brukes på noen side, vare eller som logo. Skriv
+        hva bildet viser i alt-teksten, så skjermlesere og Google forstår det. <HelpLink slug="bilder" />
       </p>
 
       {status && (

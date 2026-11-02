@@ -90,7 +90,25 @@ const examples: Record<SectionType, Record<string, unknown>> = {
       { sporsmal: "Hva koster det?", svar: ex("Har dere faste priser, skriv dem her. Hvis ikke, forklar hva prisen avhenger av.") },
     ],
   },
-  kontakt: { overskrift: "Kontakt oss", tekst: "Send en melding her, eller ring oss om det haster." },
+  kontakt: { overskrift: "Kontakt oss", tekst: "Send en melding her, eller ring oss om det haster.", skjemafelt: [] },
+  ansatte: {
+    overskrift: "Folkene bak",
+    tekst: "",
+    personer: [
+      { navn: ex("Navn på personen"), rolle: ex("Rolle, for eksempel daglig leder"), bilde, tekst: ex("Skriv et par setninger om hva personen jobber med."), epost: "", telefon: "" },
+      { navn: ex("Navn på en kollega"), rolle: ex("Rolle"), bilde, tekst: ex("Kundene vil vite hvem de møter. Et ekte bilde gjør mye."), epost: "", telefon: "" },
+      { navn: ex("Navn på en til"), rolle: ex("Rolle"), bilde, tekst: "", epost: "", telefon: "" },
+    ],
+  },
+  apningstider: { overskrift: "Åpningstider", tekst: "" },
+  kart: { overskrift: "Finn veien hit", tekst: ex("Skriv hvor det er lurt å parkere, og hvilken inngang kundene skal bruke.") },
+  video: { overskrift: "", lenke: "", tittel: ex("Skriv kort hva videoen viser"), tekst: "" },
+  filer: { overskrift: "Meny", tekst: "", filer: [{ tittel: "Se menyen", fil: null }] },
+  nyhetsbrev: {
+    overskrift: "Få nyheter og tilbud på e-post",
+    tekst: ex("Skriv hva folk får og hvor ofte, for eksempel ett nyhetsbrev i måneden med nyheter og tilbud."),
+    knappTekst: "Meld meg på",
+  },
   bestill: {
     overskrift: "Bestill time",
     tekst: ex("Skriv hva kunden kan bestille her, og om de får bekreftelse på e-post eller SMS."),

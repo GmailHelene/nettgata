@@ -65,7 +65,19 @@ export function canConnectDomain(raw: unknown, isPlatformAdmin: boolean): boolea
   return isPlatformAdmin || hasActiveSubscription(raw);
 }
 
-export type BillingTone = "ok" | "warning" | "problem" | "neutral";
+export const PUBLISH_NEEDS_SUBSCRIPTION =
+  "Nettstedet kan publiseres når abonnementet er betalt. Velg abonnement under «Abonnement». Forhåndsvisningen virker som før.";
+
+/**
+ * Publisering krever betalende abonnement eller «Fakturert utenom Stripe». Plattformadmin kan alltid publisere,
+ * for eksempel demo- og pilotnettsteder. Sider som alt er publisert, blir liggende ute: sperren gjelder bare nye
+ * publiseringer, og forhåndsvisningen virker uansett.
+ */
+export function canPublish(raw: unknown, isPlatformAdmin: boolean): boolean {
+  return isPlatformAdmin || hasActiveSubscription(raw);
+}
+
+export type BillingTone ="ok" | "warning" | "problem" | "neutral";
 
 export type BillingSummary = {
   /** Kort merkelapp, for eksempel «Aktivt». */

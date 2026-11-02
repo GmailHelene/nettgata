@@ -16,6 +16,14 @@ export const sectionTypes = [
   "cta",
   "blogg",
   "bestill",
+  // Lokalpakken: det lokale bedrifter oftest spør etter.
+  "ansatte",
+  "apningstider",
+  "kart",
+  "video",
+  "filer",
+  // Påmelding til nyhetsbrevet med dobbel opt-in (lib/nyhetsbrev).
+  "nyhetsbrev",
 ] as const;
 
 /** Bakgrunn per seksjon. «Flate» og «Fargerik» gir rytme på siden uten nye farger. */
@@ -28,6 +36,11 @@ export const sectionSchema = z.object({
   variant: z.string().max(32).default("standard"),
   // Valgfri, så eldre innhold uten bakgrunn fortsatt er gyldig. Mangler den, brukes «standard».
   background: z.enum(sectionBackgrounds).optional(),
+  /**
+   * Slått av: seksjonen ligger på siden i studioet, men vises ikke på nettstedet. Den kan være uferdig
+   * og stopper ikke publisering, så kunden kan slå den på og av uten å slette innholdet.
+   */
+  hidden: z.boolean().optional(),
   props: z.record(z.string(), z.unknown()),
 });
 export type Section = z.infer<typeof sectionSchema>;

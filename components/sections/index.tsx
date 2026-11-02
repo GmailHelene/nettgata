@@ -1,12 +1,20 @@
 import Link from "next/link";
 import { Fragment, type CSSProperties, type ReactNode } from "react";
 import type { PageContent, Section } from "@/lib/content/types";
-import { EXAMPLE_IMAGE_SRC, isSafeHref, type ImageValue } from "@/lib/content/fields";
+import { EXAMPLE_IMAGE_SRC, isSafeHref, type FileValue, type ImageValue } from "@/lib/content/fields";
+import { readFormFields } from "@/lib/content/form-fields";
 import { sectionRegistry } from "@/lib/content/registry";
-import { focusStyle, mediaSrcPattern, mediaSrcSet } from "@/lib/media-types";
+import { mapLinks, youtubeEmbedUrl, youtubeId } from "@/lib/embeds";
+import { fileSrcPattern, focusStyle, mediaSrcPattern, mediaSrcSet } from "@/lib/media-types";
+import { formatSpecialDate, visibleSpecialHours } from "@/lib/opening-hours";
+import { listPlaces, parseServiceArea } from "@/lib/seo/auto";
+import { breadcrumbItems } from "@/lib/seo/schema";
 import { formatAddress, formatOrgnr, type SiteInfo } from "@/lib/site-info";
 import { ContactForm } from "./contact-form";
+import { NewsletterSignup } from "./newsletter-signup";
+import { consentSentence } from "@/lib/nyhetsbrev/blocks";
 import { BookingEmbed } from "./booking-embed";
+import { ClickToLoad } from "./click-to-load";
 import { OwnBooking } from "./own-booking";
 import type { PublicBookingSetup } from "@/lib/egen-booking/store";
 import { embeddableHost } from "@/lib/booking";
@@ -82,6 +90,8 @@ function Img({
       sizes={srcSet ? sizes : undefined}
       alt={value.decorative ? "" : value.alt}
       loading={eager ? "eager" : "lazy"}
+      // Det første bildet i toppseksjonen er som regel det største på skjermen (LCP). Det hentes før alt annet.
+      fetchPriority={eager ? "high" : undefined}
       decoding="async"
       className={className}
       style={focusStyle(value.focus)}
@@ -563,22 +573,292 @@ function Kontakt({ section, ctx, first }: { section: Section; ctx: RenderContext
               </p>
             )}
             {address && <p>{address}</p>}
+            {parseServiceArea(info.serviceArea).length > 0 && <p>Område vi dekker: {listPlaces(parseServiceArea(info.serviceArea))}</p>}
           </address>
           {info.openingHours.length > 0 && (
             <div className="mt-8">
               {first ? <h2 className="ng-h3 mb-3 text-xl">Åpningstider</h2> : <h3 className="ng-h3 mb-3 text-xl">Åpningstider</h3>}
-              <dl className="max-w-sm space-y-1">
-                {info.openingHours.map((h, i) => (
-                  <div key={i} className="flex justify-between gap-4">
-                    <dt>{h.day}</dt>
-                    <dd>{h.time}</dd>
-                  </div>
-                ))}
-              </dl>
+              <OpeningHoursList info={info} level={first ? 3 : 4} />
             </div>
           )}
         </div>
-        {section.variant === "skjema" && <ContactForm siteId={ctx.site.id} path={ctx.path} preview={ctx.preview} />}
+        {section.variant === "skjema" && (
+          <ContactForm siteId={ctx.site.id} path={ctx.path} preview={ctx.preview} sectionId={section.id} fields={readFormFields(p)} />
+        )}
+      </Container>
+    </section>
+  );
+}
+
+/**
+ * Ukedagene og avvikende dager, slik kunden skrev dem i Innstillinger. Én kilde for kontaktseksjonen,
+ * åpningstidsseksjonen og Google. `level` er nivået på underoverskriften for avvikende dager.
+ */
+function OpeningHoursList({ info, level }: { info: SiteInfo; level: 3 | 4 }) {
+  const special = visibleSpecialHours(info);
+  const Sub = level === 3 ? "h3" : "h4";
+  return (
+    <>
+      {info.openingHours.length > 0 && (
+        <dl className="max-w-sm space-y-1">
+          {info.openingHours.map((h, i) => (
+            <div key={i} className="flex justify-between gap-4">
+              <dt>{h.day}</dt>
+              <dd>{h.time}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {special.length > 0 && (
+        <div className="mt-6 max-w-sm">
+          <Sub className="mb-2 font-semibold">Avvikende åpningstider</Sub>
+          <dl className="space-y-1">
+            {special.map((s) => (
+              <div key={s.date} className="flex justify-between gap-4">
+                <dt>
+                  <time dateTime={s.date} className="first-letter:uppercase">
+                    {formatSpecialDate(s.date)}
+                  </time>
+                  {s.label && <span className="text-[var(--c-muted)]"> ({s.label})</span>}
+                </dt>
+                <dd className="text-right">{s.time}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Tekst bare for studioet. På nettstedet vises ingenting, så en tom seksjon ikke blir stående. */
+function PreviewNote({ ctx, children }: { ctx: RenderContext; children: ReactNode }) {
+  return ctx.preview ? <p className="rounded-[var(--radius)] bg-[var(--c-surface)] p-4 text-sm">{children}</p> : null;
+}
+
+function Apningstider({ section, ctx, first }: { section: Section; ctx: RenderContext; first: boolean }) {
+  const p = section.props;
+  const { info } = ctx.site;
+  const empty = info.openingHours.length === 0 && visibleSpecialHours(info).length === 0;
+  if (empty && !ctx.preview) return null;
+  return (
+    <section id="apningstider" className={`scroll-mt-20 ${pad}`}>
+      <Container>
+        <Heading first={first}>{str(p, "overskrift")}</Heading>
+        {empty ? (
+          <PreviewNote ctx={ctx}>Legg inn åpningstidene under Innstillinger, så vises de her og hos Google.</PreviewNote>
+        ) : (
+          <OpeningHoursList info={info} level={3} />
+        )}
+        {str(p, "tekst") && <p className="mt-6 max-w-2xl text-[var(--c-muted)]">{str(p, "tekst")}</p>}
+      </Container>
+    </section>
+  );
+}
+
+function Kart({ section, ctx, first }: { section: Section; ctx: RenderContext; first: boolean }) {
+  const p = section.props;
+  const address = formatAddress(ctx.site.info);
+  if (!address && !ctx.preview) return null;
+  const links = address ? mapLinks(address) : null;
+  const linkList = links && (
+    <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+      <li>
+        <a href={links.google} target="_blank" rel="noopener" className="underline underline-offset-4">
+          Åpne i Google Maps<span className="sr-only"> (åpnes i ny fane)</span>
+        </a>
+      </li>
+      <li>
+        <a href={links.osm} target="_blank" rel="noopener" className="underline underline-offset-4">
+          Åpne i OpenStreetMap<span className="sr-only"> (åpnes i ny fane)</span>
+        </a>
+      </li>
+    </ul>
+  );
+  return (
+    <section id="kart" className={`scroll-mt-20 ${pad}`}>
+      <Container className="grid gap-8 md:grid-cols-[1fr_2fr]">
+        <div>
+          <Heading first={first}>{str(p, "overskrift")}</Heading>
+          {address ? (
+            <address className="not-italic">
+              <p className="font-semibold">{ctx.site.name}</p>
+              <p>{address}</p>
+            </address>
+          ) : (
+            <PreviewNote ctx={ctx}>Legg inn adressen under Innstillinger, så vises den og kartet her.</PreviewNote>
+          )}
+          {str(p, "tekst") && (
+            <div className="mt-4 text-[var(--c-muted)]">
+              <Paragraphs text={str(p, "tekst")} />
+            </div>
+          )}
+          {section.variant === "lenker" && <div className="mt-4">{linkList}</div>}
+        </div>
+        {section.variant !== "lenker" && links && (
+          <ClickToLoad
+            src={links.embed}
+            title={`Kart som viser ${address}`}
+            buttonLabel="Vis kart"
+            notice="Kartet hentes fra Google Maps når du trykker. Da får Google vite IP-adressen din og kan bruke informasjonskapsler."
+            aspect="kart"
+          >
+            {linkList}
+          </ClickToLoad>
+        )}
+      </Container>
+    </section>
+  );
+}
+
+function Video({ section, ctx, first }: { section: Section; ctx: RenderContext; first: boolean }) {
+  const p = section.props;
+  const id = youtubeId(str(p, "lenke"));
+  const title = str(p, "tittel") || "Video";
+  if (!id && !ctx.preview) return null;
+  return (
+    <section className={pad}>
+      <Container>
+        <div className="mx-auto max-w-3xl">
+          {str(p, "overskrift") && <Heading first={first}>{str(p, "overskrift")}</Heading>}
+          {id ? (
+            <ClickToLoad
+              src={youtubeEmbedUrl(id)}
+              title={title}
+              buttonLabel={`Spill av video: ${title}`}
+              notice="Videoen hentes fra YouTube når du trykker. Da får YouTube vite IP-adressen din og kan bruke informasjonskapsler."
+              aspect="video"
+              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            >
+              <p className="text-sm">
+                <a href={`https://www.youtube.com/watch?v=${id}`} target="_blank" rel="noopener" className="underline underline-offset-4">
+                  Se videoen på YouTube<span className="sr-only"> (åpnes i ny fane)</span>
+                </a>
+              </p>
+            </ClickToLoad>
+          ) : (
+            <PreviewNote ctx={ctx}>Lim inn lenken til videoen på YouTube, så vises den her.</PreviewNote>
+          )}
+          {str(p, "tekst") && (
+            <div className="mt-4">
+              <Paragraphs text={str(p, "tekst")} />
+            </div>
+          )}
+        </div>
+      </Container>
+    </section>
+  );
+}
+
+function Ansatte({ section, first }: { section: Section; first: boolean }) {
+  const p = section.props;
+  const cards = section.variant !== "liste";
+  const people = list(p, "personer").filter((x) => str(x, "navn"));
+  return (
+    <section className={pad}>
+      <Container>
+        <Heading first={first}>{str(p, "overskrift")}</Heading>
+        {str(p, "tekst") && <p className="-mt-2 mb-8 max-w-2xl text-[var(--c-muted)]">{str(p, "tekst")}</p>}
+        <ul className={`grid gap-6 ${cards ? "sm:grid-cols-2 lg:grid-cols-3" : "md:grid-cols-2"}`}>
+          {people.map((x, i) => {
+            const bilde = cards ? image(x, "bilde") : null;
+            const epost = str(x, "epost");
+            const telefon = str(x, "telefon");
+            return (
+              <li key={i} className={cards ? "ng-card overflow-hidden" : "border-b border-[var(--c-muted)]/30 pb-5"}>
+                {bilde && <Img value={bilde} sizes={imageSizes.third} className="aspect-[4/5] w-full object-cover" />}
+                <div className={cards ? "p-5" : ""}>
+                  <h3 className="ng-h3 text-lg">{str(x, "navn")}</h3>
+                  {str(x, "rolle") && <p className="text-[var(--c-muted)]">{str(x, "rolle")}</p>}
+                  {str(x, "tekst") && <p className="mt-3 text-sm leading-relaxed">{str(x, "tekst")}</p>}
+                  {(epost || telefon) && (
+                    <ul className="mt-3 space-y-1 text-sm">
+                      {epost && (
+                        <li>
+                          E-post:{" "}
+                          <a className="underline" href={`mailto:${epost}`}>
+                            {epost}
+                          </a>
+                        </li>
+                      )}
+                      {telefon && (
+                        <li>
+                          Telefon:{" "}
+                          <a className="underline" href={`tel:${telefon.replace(/\s/g, "")}`}>
+                            {telefon}
+                          </a>
+                        </li>
+                      )}
+                    </ul>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </Container>
+    </section>
+  );
+}
+
+const fileSize = (bytes: number) =>
+  bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toLocaleString("nb-NO", { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(bytes / 1024))} kB`;
+
+function Filer({ section, ctx, first }: { section: Section; ctx: RenderContext; first: boolean }) {
+  const p = section.props;
+  const files = list(p, "filer")
+    .map((x) => ({ tittel: str(x, "tittel"), fil: x.fil as FileValue | null | undefined }))
+    .filter((x): x is { tittel: string; fil: FileValue } => Boolean(x.tittel && x.fil && fileSrcPattern.test(x.fil.src)));
+  if (!files.length && !ctx.preview) return null;
+  return (
+    <section className={pad}>
+      <Container>
+        <div className="max-w-3xl">
+          <Heading first={first}>{str(p, "overskrift")}</Heading>
+          {str(p, "tekst") && <p className="-mt-2 mb-6 text-[var(--c-muted)]">{str(p, "tekst")}</p>}
+          {files.length === 0 ? (
+            <PreviewNote ctx={ctx}>Last opp en PDF, for eksempel menyen, så vises lenken her.</PreviewNote>
+          ) : (
+            <ul className="space-y-3">
+              {files.map((x, i) => (
+                <li key={i}>
+                  <a href={x.fil.src} className="ng-card flex items-center gap-4 p-4 hover:underline">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true" className="shrink-0">
+                      <path d="M6 3h8l4 4v14H6z" />
+                      <path d="M14 3v4h4M9 13h6M9 17h6" />
+                    </svg>
+                    <span className="font-semibold">{x.tittel}</span>
+                    <span className="ml-auto text-sm text-[var(--c-muted)]">PDF{x.fil.size ? `, ${fileSize(x.fil.size)}` : ""}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </Container>
+    </section>
+  );
+}
+
+/** Påmelding til nyhetsbrevet. Samtykket og lenken til personvernerklæringen står alltid, uansett hva kunden skriver. */
+function Nyhetsbrev({ section, ctx, first }: { section: Section; ctx: RenderContext; first: boolean }) {
+  const p = section.props;
+  return (
+    <section className={pad}>
+      <Container>
+        <div className="ng-card mx-auto max-w-2xl px-6 py-10 sm:px-10">
+          <Heading first={first}>{str(p, "overskrift")}</Heading>
+          {str(p, "tekst") && <p className="mb-6 text-[var(--c-muted)]">{str(p, "tekst")}</p>}
+          <NewsletterSignup
+            siteId={ctx.site.id}
+            path={ctx.path}
+            preview={ctx.preview}
+            sectionId={section.id}
+            buttonText={str(p, "knappTekst") || "Meld meg på"}
+            consent={consentSentence(ctx.site.name)}
+            privacyHref={siteHref(ctx.basePath, "/personvern")}
+          />
+        </div>
       </Container>
     </section>
   );
@@ -653,7 +933,8 @@ function Bestill({ section, ctx, first }: { section: Section; ctx: RenderContext
 }
 
 export type RenderContext = {
-  site: { id: string; name: string; info: SiteInfo; schemaType: string };
+  /** `keyword`: bransjeordet til titler og strukturerte data (lib/seo/auto.ts). */
+  site: { id: string; name: string; info: SiteInfo; schemaType: string; keyword?: string };
   nav: { path: string; title: string }[];
   path: string;
   preview: boolean;
@@ -763,6 +1044,21 @@ function SiteFooter({ ctx }: { ctx: RenderContext }) {
           <p className="ng-logo text-lg">{name}</p>
           {layout.footerText && <p className="max-w-xs text-[var(--c-muted)]">{layout.footerText}</p>}
         </div>
+        {layout.footerColumns.length === 0 && ctx.nav.length > 1 && (
+          // Uten egne kolonner lenker bunnteksten til sidene i menyen, så alle sider har lenker inn.
+          <div>
+            <h2 className="mb-3 font-semibold">Sider</h2>
+            <ul className="space-y-2">
+              {ctx.nav.map((n) => (
+                <li key={n.path}>
+                  <a href={siteHref(ctx.basePath, n.path)} className="text-[var(--c-muted)] hover:text-[var(--c-text)] hover:underline">
+                    {n.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {layout.footerColumns.map((col) => (
           <div key={col.title}>
             <h2 className="mb-3 font-semibold">{col.title}</h2>
@@ -835,42 +1131,17 @@ function SiteFooter({ ctx }: { ctx: RenderContext }) {
   );
 }
 
-/** Strukturerte data for Google og AI-søk. Escaper < slik at innhold aldri kan bryte ut av script-taggen. */
-function StructuredData({ ctx, url }: { ctx: RenderContext; url?: string }) {
-  const { info, name, schemaType } = ctx.site;
-  const data: Record<string, unknown> = {
-    "@context": "https://schema.org",
-    "@type": schemaType,
-    name,
-    ...(url && { url }),
-    ...(info.phone && { telephone: info.phone }),
-    ...(info.email && { email: info.email }),
-    ...(info.orgnr && { vatID: `NO${info.orgnr}MVA`, identifier: info.orgnr }),
-    ...((info.street || info.city) && {
-      address: {
-        "@type": "PostalAddress",
-        streetAddress: info.street || undefined,
-        postalCode: info.postalCode || undefined,
-        addressLocality: info.city || undefined,
-        addressCountry: "NO",
-      },
-    }),
-  };
-  const json = JSON.stringify(data).replace(/</g, "\\u003c");
-  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: json }} />;
-}
-
 /** Rammen rundt alle sider på nettstedet: tema, meny, bunntekst og «Hopp til innhold». */
 export function SiteChrome({
   theme,
   ctx,
   children,
-  canonicalUrl,
   embedded = false,
 }: {
   theme: Theme;
   ctx: RenderContext;
   children: ReactNode;
+  /** Brukes ikke lenger her. Strukturerte data lages i app/[[...path]]/page.tsx. */
   canonicalUrl?: string;
   /** Miniatyr inne i en annen side: uten «Hopp til innhold», landemerker og id-er som ellers ville blitt dobbelt. */
   embedded?: boolean;
@@ -891,13 +1162,59 @@ export function SiteChrome({
       >
         Hopp til innhold
       </a>
-      {ctx.path === "/" && !ctx.preview && !ctx.basePath && <StructuredData ctx={ctx} url={canonicalUrl} />}
       <SiteHeader ctx={ctx} />
       <main id="innhold" className="flex-1">
         {children}
       </main>
       <SiteFooter ctx={ctx} />
     </div>
+  );
+}
+
+/** Brødsmuler på sider under en annen side, som blogginnlegg: «Forside / Blogg / Innlegget». */
+function Breadcrumbs({ ctx, title }: { ctx: RenderContext; title: string }) {
+  const trail = breadcrumbItems(ctx.path, title, ctx.nav);
+  return (
+    <Container className="pt-6">
+      <nav aria-label="Brødsmuler" className="text-sm text-[var(--c-muted)]">
+        <ol className="flex flex-wrap gap-x-1">
+          {trail.map((t, i) => (
+            <li key={t.path}>
+              {i > 0 && <span aria-hidden="true">/ </span>}
+              {i === trail.length - 1 ? (
+                <span aria-current="page">{t.title}</span>
+              ) : (
+                <a href={siteHref(ctx.basePath, t.path)} className="underline-offset-2 hover:underline">
+                  {t.title}
+                </a>
+              )}
+            </li>
+          ))}
+        </ol>
+      </nav>
+    </Container>
+  );
+}
+
+/** Under et blogginnlegg: lenker til de tre nyeste andre innleggene. Gir Google og leseren en vei videre. */
+function MorePosts({ ctx }: { ctx: RenderContext }) {
+  const others = (ctx.posts ?? []).filter((p) => p.path !== ctx.path).slice(0, 3);
+  if (!others.length) return null;
+  return (
+    <section className={pad}>
+      <Container>
+        <Heading>Flere innlegg</Heading>
+        <ul className="space-y-3">
+          {others.map((post) => (
+            <li key={post.path}>
+              <a href={siteHref(ctx.basePath, post.path)} className="font-semibold underline underline-offset-2">
+                {post.title}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </Container>
+    </section>
   );
 }
 
@@ -908,11 +1225,14 @@ export function PageRenderer({
   canonicalUrl,
   editor,
   embedded,
+  pageTitle,
 }: {
   content: PageContent;
   theme: Theme;
   ctx: RenderContext;
   canonicalUrl?: string;
+  /** Sidetittelen til brødsmulene på sider under en annen side. */
+  pageTitle?: string;
   /** Bare i redigereren: hver seksjon merkes, så et klikk i forhåndsvisningen kan velge den. */
   editor?: { selectedId: string | null };
   /** Miniatyr inne i en annen side (temagalleriet og salgssidene). */
@@ -920,14 +1240,17 @@ export function PageRenderer({
 }) {
   return (
     <SiteChrome theme={theme} ctx={ctx} canonicalUrl={canonicalUrl} embedded={embedded}>
-      {content.sections.map((section, i) => {
+      {!editor && !embedded && pageTitle && ctx.path.split("/").filter(Boolean).length > 1 && <Breadcrumbs ctx={ctx} title={pageTitle} />}
+      {/* Avslåtte seksjoner vises bare i redigereren, nedtonet, så kunden ser hvor de ligger. */}
+      {(editor ? content.sections : content.sections.filter((s) => !s.hidden)).map((section, i) => {
         const rendered = <SectionBackground background={section.background}>{renderSection(section, i, ctx)}</SectionBackground>;
         return editor ? (
           <div
             key={section.id}
             data-section-id={section.id}
-            data-section-label={sectionRegistry[section.type].label}
+            data-section-label={section.hidden ? `${sectionRegistry[section.type].label} (slått av)` : sectionRegistry[section.type].label}
             data-selected={editor.selectedId === section.id ? "" : undefined}
+            className={section.hidden ? "opacity-40" : undefined}
           >
             {rendered}
           </div>
@@ -935,6 +1258,7 @@ export function PageRenderer({
           <Fragment key={section.id}>{rendered}</Fragment>
         );
       })}
+      {!editor && !embedded && ctx.path.startsWith("/blogg/") && <MorePosts ctx={ctx} />}
     </SiteChrome>
   );
 }
@@ -978,5 +1302,17 @@ function renderSection(section: Section, i: number, ctx: RenderContext) {
       return <Blogg key={section.id} section={section} first={i === 0} ctx={ctx} />;
     case "bestill":
       return <Bestill key={section.id} section={section} first={i === 0} ctx={ctx} />;
+    case "ansatte":
+      return <Ansatte key={section.id} section={section} first={i === 0} />;
+    case "apningstider":
+      return <Apningstider key={section.id} section={section} first={i === 0} ctx={ctx} />;
+    case "kart":
+      return <Kart key={section.id} section={section} first={i === 0} ctx={ctx} />;
+    case "video":
+      return <Video key={section.id} section={section} first={i === 0} ctx={ctx} />;
+    case "filer":
+      return <Filer key={section.id} section={section} first={i === 0} ctx={ctx} />;
+    case "nyhetsbrev":
+      return <Nyhetsbrev key={section.id} section={section} first={i === 0} ctx={ctx} />;
   }
 }

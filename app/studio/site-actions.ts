@@ -1,18 +1,21 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { getDb } from "@/db";
 import { auditLog, inquiries, pages, sites } from "@/db/schema";
-import { siteLayoutSchema, type SiteLayout } from "@/lib/site-layout";
+import { readSiteLayout, siteLayoutSchema, type SiteLayout } from "@/lib/site-layout";
 import { notificationSettingsSchema, type NotificationSettings } from "@/lib/notifications";
 import type { Theme } from "@/lib/theme";
 import { lookupOrgnr, type BrregCompany } from "@/lib/brreg";
-import { parseRedirectList } from "@/lib/redirects";
-import { createPage, createPost, deletePage, movePage, publishAll, setPageInMenu, updateSiteSettings, updateSiteTheme } from "@/lib/pages";
-import { PublishingError } from "@/lib/publishing";
+import { parseRedirectList, type Redirect } from "@/lib/redirects";
+import { collectOldPaths, SitemapError, suggestRedirects, type ImportRow } from "@/lib/sitemap-import";
+import { createPage, createPost, deletePage, duplicatePage, movePage, publishAll, setPageInMenu, updateSiteSettings, updateSiteTheme } from "@/lib/pages";
+import { assertCanPublish, PublishingError } from "@/lib/publishing";
 import { requireSiteAccess, requireUser } from "@/lib/session";
+import { pingPublished } from "@/lib/seo/publish";
 import { createSiteFromPack, SiteError } from "@/lib/sites";
 import type { ActionState } from "./actions";
 
@@ -35,10 +38,23 @@ function infoFromForm(formData: FormData) {
     postalCode: text(formData, "postalCode"),
     city: text(formData, "city"),
     orgnr: text(formData, "orgnr"),
+    serviceArea: text(formData, "serviceArea"),
+    googleVerification: text(formData, "googleVerification"),
     openingHours: days
       .map((day, i) => ({ day: day.trim(), time: (times[i] ?? "").trim() }))
       .filter((h) => h.day && h.time),
+    specialHours: specialHoursFromForm(formData),
   };
+}
+
+/** Avvikende åpningstider. Rader uten dato og tid hoppes over, så en tom rad ikke gir feilmelding. */
+function specialHoursFromForm(formData: FormData) {
+  const dates = formData.getAll("specialDate").map(String);
+  const labels = formData.getAll("specialLabel").map(String);
+  const times = formData.getAll("specialTime").map(String);
+  return dates
+    .map((date, i) => ({ date: date.trim(), label: (labels[i] ?? "").trim(), time: (times[i] ?? "").trim() }))
+    .filter((s) => s.date || s.time);
 }
 
 /** Bare plattformadmin kan slå opp, siden oppslaget går mot et eksternt register. */
@@ -119,6 +135,18 @@ export async function deletePageAction(siteId: string, pageId: string): Promise<
   }
 }
 
+/** Kopi av en side, med kladden og alle seksjonene. Kopien er ikke publisert og ligger ikke i menyen. */
+export async function duplicatePageAction(siteId: string, pageId: string): Promise<ActionState> {
+  try {
+    const { user, site } = await requireSiteAccess(siteId);
+    const page = await duplicatePage(await getDb(), site.id, pageId, user.id);
+    revalidatePath(`/studio/nettsted/${site.id}`, "layout");
+    return { ok: true, message: `Kopien «${page.title}» er laget på ${page.path}. Den er ikke publisert og ligger ikke i menyen.` };
+  } catch (err) {
+    return toState(err);
+  }
+}
+
 export async function setMenuAction(siteId: string, pageId: string, show: boolean) {
   const { site } = await requireSiteAccess(siteId);
   await setPageInMenu(await getDb(), site.id, pageId, show);
@@ -134,8 +162,11 @@ export async function movePageAction(siteId: string, pageId: string, direction: 
 export async function publishAllAction(siteId: string): Promise<ActionState> {
   try {
     const { user, site } = await requireSiteAccess(siteId);
-    const { published, failed } = await publishAll(await getDb(), site.id, user.id);
+    const db = await getDb();
+    await assertCanPublish(db, site.id, user);
+    const { published, failed } = await publishAll(db, site.id, user.id);
     revalidatePath(`/studio/nettsted/${site.id}`, "layout");
+    if (published) after(() => pingPublished(db, site.id).catch((err) => console.error("IndexNow feilet", err)));
     const done = `${published} ${published === 1 ? "side er" : "sider er"} publisert.`;
     if (!failed.length) return { ok: true, message: done };
     return { ok: false, message: [done, "Disse er ikke publisert ennå:", ...failed.map((f) => `${f.title}: ${f.message}`)].join("\n") };
@@ -170,7 +201,10 @@ export async function saveAppearanceAction(siteId: string, input: { layout: Site
     const layout = siteLayoutSchema.safeParse(input.layout);
     if (!layout.success) return { ok: false, message: layout.error.issues[0].message };
     const db = await getDb();
-    await db.update(sites).set({ layout: layout.data }).where(eq(sites.id, site.id));
+    // Ikonet i fanen lagres med egen handling. Skjemaet for utseende kan ha en eldre utgave, så den lagrede beholdes.
+    const [current] = await db.select({ layout: sites.layout }).from(sites).where(eq(sites.id, site.id)).limit(1);
+    const favicon = readSiteLayout(current?.layout).favicon;
+    await db.update(sites).set({ layout: { ...layout.data, favicon } }).where(eq(sites.id, site.id));
     await db.insert(auditLog).values({ siteId: site.id, userId: user.id, action: "site.appearance_updated" });
     revalidatePath(`/studio/nettsted/${site.id}`, "layout");
     return { ok: true, message: "Utseendet er lagret og vises på nettstedet med en gang." };
@@ -216,6 +250,47 @@ export async function saveRedirectsAction(siteId: string, text: string): Promise
   } catch (err) {
     return toState(err);
   }
+}
+
+export type SitemapScan = { ok: boolean; message: string; rows: ImportRow[]; pages: { path: string; title: string }[] };
+
+/**
+ * Leser gamle adresser fra en sitemap (adresse eller opplastet fil) og foreslår nye sider. Lagrer ingenting:
+ * kunden går gjennom forslagene først. Henting fra nettet har SSRF-sperrer, se lib/sitemap-import.ts.
+ */
+export async function scanSitemapAction(siteId: string, source: { url: string } | { xml: string }): Promise<SitemapScan> {
+  const empty = { rows: [], pages: [] };
+  try {
+    const { site, role } = await requireSiteAccess(siteId);
+    if (role !== "owner") return { ok: false, message: "Bare eieren av nettstedet kan endre omdirigeringer.", ...empty };
+    const input = "url" in source ? { url: String(source.url ?? "").slice(0, 2000) } : { xml: String(source.xml ?? "") };
+    const { paths, skippedSitemaps } = await collectOldPaths(input);
+    if (!paths.length) return { ok: false, message: "Fant ingen gamle adresser i sitemapen.", ...empty };
+    const pageRows = await (await getDb())
+      .select({ path: pages.path, title: pages.title })
+      .from(pages)
+      .where(eq(pages.siteId, site.id))
+      .orderBy(asc(pages.sortOrder));
+    const rows = suggestRedirects(paths, pageRows);
+    const skipped = skippedSitemaps ? ` ${skippedSitemaps} ${skippedSitemaps === 1 ? "sitemap" : "sitemaper"} i indeksen ble ikke lest.` : "";
+    return { ok: true, message: `Fant ${paths.length} gamle ${paths.length === 1 ? "adresse" : "adresser"}.${skipped}`, rows, pages: pageRows };
+  } catch (err) {
+    unstable_rethrow(err);
+    if (err instanceof SitemapError) return { ok: false, message: err.message, ...empty };
+    console.error(err);
+    return { ok: false, message: "Noe gikk galt. Prøv igjen.", ...empty };
+  }
+}
+
+/**
+ * Lagrer omdirigeringene kunden har bekreftet fra sitemapen, sammen med dem som finnes fra før.
+ * Gjelder samme regler som når listen skrives for hånd (saveRedirectsAction). Gir tilbake hele listen som tekst.
+ */
+export async function importRedirectsAction(siteId: string, existingText: string, confirmed: Redirect[]): Promise<{ state: ActionState; text: string }> {
+  const lines = confirmed.slice(0, 1000).map((r) => `${String(r.from).trim()} ${String(r.to).trim()}`);
+  const text = [existingText.trim(), ...lines].filter(Boolean).join("\n");
+  const state = await saveRedirectsAction(siteId, text);
+  return { state, text: state?.ok ? text : existingText };
 }
 
 export async function saveNotificationsAction(siteId: string, input: NotificationSettings): Promise<ActionState> {

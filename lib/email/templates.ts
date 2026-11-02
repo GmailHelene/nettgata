@@ -86,6 +86,9 @@ function shopFooter(shop: ShopInfo): string {
 
 const platformFooter = (reason: string) => `Sendt fra Nettgata. ${esc(reason)}`;
 
+/** Byggeklossene, for e-poster som lages andre steder (lib/rapport). Samme utseende som resten. */
+export const emailParts = { esc, button, paragraph, layout, platformFooter };
+
 function linesTable(lines: LineData[], order: OrderData, withVat: boolean): string {
   const row = (left: string, right: string, style = "") =>
     `<tr><td style="padding:8px 0;font-size:15px;${style}">${left}</td><td style="padding:8px 0;font-size:15px;text-align:right;white-space:nowrap;${style}">${right}</td></tr>`;
@@ -324,11 +327,13 @@ export function newOrderEmail(o: { shop: ShopInfo; order: OrderData; lines: Line
 
 export function newInquiryEmail(o: {
   shop: ShopInfo;
-  inquiry: { name: string; email: string | null; phone: string | null; message: string; pagePath: string | null };
+  /** answers: svarene i de egne feltene i skjemaet, vist som en liste under meldingen. */
+  inquiry: { name: string; email: string | null; phone: string | null; message: string; pagePath: string | null; answers?: { label: string; value: string }[] };
   siteUrl: string;
   studioUrl: string;
 }): Rendered {
   const { shop, inquiry } = o;
+  const answers = inquiry.answers ?? [];
   const subject = `Ny henvendelse fra ${inquiry.name}`;
   const host = o.siteUrl.replace(/^https?:\/\//, "");
   const reply = inquiry.email
@@ -347,6 +352,14 @@ export function newInquiryEmail(o: {
         .join("<br>"),
     ),
     `<div style="margin:0 0 18px;padding:14px 16px;background:#f4f4f2;border-radius:6px;font-size:16px;line-height:1.5;">${esc(inquiry.message).replace(/\n/g, "<br>")}</div>`,
+    answers.length
+      ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px;">${answers
+          .map(
+            (a) =>
+              `<tr><td style="padding:6px 12px 6px 0;font-size:15px;vertical-align:top;font-weight:600;">${esc(a.label)}</td><td style="padding:6px 0;font-size:15px;vertical-align:top;">${esc(a.value).replace(/\n/g, "<br>")}</td></tr>`,
+          )
+          .join("")}</table>`
+      : "",
     paragraph(esc(reply)),
     button(o.studioUrl, "Se alle henvendelser"),
   ].join("");
@@ -358,6 +371,7 @@ export function newInquiryEmail(o: {
     inquiry.pagePath ? `Sendt fra siden: ${inquiry.pagePath}` : "",
     "",
     inquiry.message,
+    ...(answers.length ? ["", ...answers.map((a) => `${a.label}: ${a.value.replace(/\s*\n\s*/g, " / ")}`)] : []),
     "",
     reply,
     `Alle henvendelser: ${o.studioUrl}`,

@@ -1,7 +1,7 @@
 "use client";
 
 import { ImageInput } from "@/components/studio/image-input";
-import { effectiveTitle, GOOGLE_DESCRIPTION_CHARS, GOOGLE_TITLE_CHARS, seoHints } from "@/lib/content/seo";
+import { GOOGLE_DESCRIPTION_CHARS, GOOGLE_TITLE_CHARS, pageSeo, seoHints } from "@/lib/content/seo";
 import type { PageContent } from "@/lib/content/types";
 import { inputClass } from "./fields";
 
@@ -26,6 +26,9 @@ export function SeoPanel({
   pageTitle,
   content,
   onChange,
+  keyword,
+  place,
+  shop,
 }: {
   open: boolean;
   onToggle: () => void;
@@ -34,10 +37,16 @@ export function SeoPanel({
   pageTitle: string;
   content: PageContent;
   onChange: (seo: Seo) => void;
+  /** Bransjeordet og stedet de automatiske titlene bygger på (lib/seo/auto.ts). */
+  keyword?: string;
+  place?: string;
+  shop?: boolean;
 }) {
   const seo = content.seo ?? {};
-  const hints = seoHints({ pageTitle, siteName, content });
-  const title = effectiveTitle(seo.title, pageTitle, siteName);
+  const input = { pageTitle, siteName, content, path, keyword, place, shop };
+  const hints = seoHints(input);
+  // Tomme felt fylles automatisk av navn, bransje, sted og teksten på siden. Forhåndsvisningen viser det Google får.
+  const { title, description: shownDescription, autoTitle, autoDescription } = pageSeo(input);
   const description = seo.description ?? "";
 
   return (
@@ -84,7 +93,7 @@ export function SeoPanel({
               </p>
               <p className="mt-0.5 text-lg leading-snug text-[#1a0dab]">{cut(title, GOOGLE_TITLE_CHARS)}</p>
               <p className="mt-1 text-sm text-neutral-700">
-                {description ? cut(description, GOOGLE_DESCRIPTION_CHARS) : "Uten beskrivelse velger Google selv en tekstbit fra siden."}
+                {cut(shownDescription, GOOGLE_DESCRIPTION_CHARS)}
               </p>
             </div>
           </div>
@@ -95,11 +104,11 @@ export function SeoPanel({
               className={inputClass}
               maxLength={70}
               value={seo.title ?? ""}
-              placeholder={`${pageTitle} | ${siteName}`}
+              placeholder={autoTitle}
               onChange={(e) => onChange({ ...seo, title: e.target.value })}
             />
             <span className="mt-1 block text-xs text-neutral-600">
-              {title.length} tegn. Google viser rundt {GOOGLE_TITLE_CHARS}. Står feltet tomt, brukes «{pageTitle} | {siteName}».
+              {title.length} tegn. Google viser rundt {GOOGLE_TITLE_CHARS}. Står feltet tomt, lager vi tittelen for deg: «{autoTitle}».
             </span>
           </label>
 
@@ -110,11 +119,11 @@ export function SeoPanel({
               rows={3}
               maxLength={170}
               value={description}
-              placeholder="Én eller to setninger om hva siden handler om, med ord kundene søker på."
+              placeholder={autoDescription}
               onChange={(e) => onChange({ ...seo, description: e.target.value })}
             />
             <span className="mt-1 block text-xs text-neutral-600">
-              {description.length} tegn. Google viser rundt {GOOGLE_DESCRIPTION_CHARS}.
+              {description.length} tegn. Google viser rundt {GOOGLE_DESCRIPTION_CHARS}. Står feltet tomt, lager vi beskrivelsen av teksten på siden.
             </span>
           </label>
 

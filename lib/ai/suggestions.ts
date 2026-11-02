@@ -5,8 +5,8 @@ import { pageContentSchema, type PageContent } from "@/lib/content/types";
 import { createPost } from "@/lib/pages";
 import { saveDraft } from "@/lib/publishing";
 import { editableTextFields } from "./context";
-import { MAX_SUGGESTIONS_PER_RUN } from "./config";
-import { rawSuggestionSchema, type RawSuggestion, type SuggestionKind } from "./prompt";
+import { MAX_SUGGESTIONS_PER_RUN, WEEKLY_MAX_SUGGESTIONS, type AiTier } from "./config";
+import { KINDS, rawSuggestionSchema, ROLES, WEEKLY_KINDS, WEEKLY_ROLES, type RawSuggestion, type SuggestionKind } from "./prompt";
 
 export type Suggestion = typeof aiSuggestions.$inferSelect;
 export type NewSuggestion = typeof aiSuggestions.$inferInsert;
@@ -56,14 +56,24 @@ function currentValue(kind: SuggestionKind, content: PageContent, sectionId: str
  * Gjør svaret fra AI-en om til forslag som kan lagres. Alt som peker på sider eller felt utenfor nettstedet,
  * eller som er for langt, forkastes. Det er her en feil eller et påfunn fra modellen stoppes.
  */
-export function validateSuggestions(raw: unknown[], sitePages: PageRow[], siteId: string, runId: string | null): { accepted: NewSuggestion[]; rejected: number } {
+export function validateSuggestions(
+  raw: unknown[],
+  sitePages: PageRow[],
+  siteId: string,
+  runId: string | null,
+  tier: AiTier = "daglig",
+): { accepted: NewSuggestion[]; rejected: number } {
   const accepted: NewSuggestion[] = [];
   let rejected = 0;
   const pagesById = new Map(sitePages.map((p) => [p.id, p]));
+  // Den ukentlige rapporten har færre forslag og typer. Det modellen gir utover det, forkastes her også.
+  const max = tier === "ukentlig" ? WEEKLY_MAX_SUGGESTIONS : MAX_SUGGESTIONS_PER_RUN;
+  const kinds: readonly string[] = tier === "ukentlig" ? WEEKLY_KINDS : KINDS;
+  const roles: readonly string[] = tier === "ukentlig" ? WEEKLY_ROLES : ROLES;
 
-  for (const item of raw.slice(0, MAX_SUGGESTIONS_PER_RUN)) {
+  for (const item of raw.slice(0, max)) {
     const parsed = rawSuggestionSchema.safeParse(item);
-    if (!parsed.success) {
+    if (!parsed.success || !kinds.includes(parsed.data.type) || !roles.includes(parsed.data.rolle)) {
       rejected++;
       continue;
     }
@@ -71,7 +81,7 @@ export function validateSuggestions(raw: unknown[], sitePages: PageRow[], siteId
     if (row) accepted.push(row);
     else rejected++;
   }
-  rejected += Math.max(0, raw.length - MAX_SUGGESTIONS_PER_RUN);
+  rejected += Math.max(0, raw.length - max);
   return { accepted, rejected };
 }
 

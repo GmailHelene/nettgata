@@ -86,7 +86,7 @@ export default async function ReportsPage({
         ))}
       </div>
 
-      {report.orders === 0 ? (
+      {report.orders === 0 && report.creditNotes === 0 ? (
         <p className="rounded-lg border bg-white p-6 text-neutral-700">Ingen salg i denne perioden.</p>
       ) : (
         <>
@@ -131,12 +131,19 @@ export default async function ReportsPage({
                 </div>
                 <div className="flex justify-between">
                   <dt>Rabatt</dt>
-                  <dd>{report.discountOre ? `−${formatNok(report.discountOre)}` : formatNok(0)}</dd>
+                  {/* Rabatt på kreditnotaer går motsatt vei, så summen kan bli negativ når en rabattert ordre er kreditert. */}
+                  <dd>{report.discountOre > 0 ? `−${formatNok(report.discountOre)}` : formatNok(-report.discountOre)}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt>Frakt</dt>
                   <dd>{formatNok(report.shippingOre)}</dd>
                 </div>
+                {report.creditNotes > 0 && (
+                  <div className="flex justify-between">
+                    <dt>Herav kreditnotaer ({report.creditNotes})</dt>
+                    <dd>{formatNok(report.creditOre)}</dd>
+                  </div>
+                )}
                 <div className="flex justify-between border-t pt-1 font-semibold">
                   <dt>Salg inkl. MVA</dt>
                   <dd>{formatNok(report.totalOre)}</dd>
@@ -163,6 +170,46 @@ export default async function ReportsPage({
             </section>
           </div>
 
+          {report.credits.length > 0 && (
+            <section className="mb-6 overflow-x-auto rounded-lg border bg-white p-5">
+              <h3 className="mb-1 font-semibold">Kreditnotaer i perioden</h3>
+              <p className="mb-3 text-sm text-neutral-600">
+                Betalte ordre som er kansellert eller refundert. Beløpet trekkes fra i perioden kreditnotaen ble laget, også når ordren ble bestilt
+                tidligere.
+              </p>
+              <table className="w-full text-sm tabular-nums">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="py-2 font-medium">Kreditnota</th>
+                    <th className="py-2 font-medium">Dato</th>
+                    <th className="py-2 font-medium">Ordre</th>
+                    <th className="py-2 text-right font-medium">MVA</th>
+                    <th className="py-2 text-right font-medium">Inkl. MVA</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.credits.map((c) => (
+                    <tr key={c.id} className="border-b last:border-0">
+                      <td className="py-2">
+                        <a href={`/studio/nettsted/${site.id}/ordre/${c.orderId}/kreditnota`} className="underline">
+                          Nr. {c.number}
+                        </a>
+                      </td>
+                      <td className="py-2">{dayLabel(c.date)}</td>
+                      <td className="py-2">
+                        <Link href={`/studio/nettsted/${site.id}/ordre/${c.orderId}`} className="underline">
+                          #{c.orderNumber}
+                        </Link>
+                      </td>
+                      <td className="whitespace-nowrap py-2 pl-2 text-right">{formatNok(c.vatOre)}</td>
+                      <td className="whitespace-nowrap py-2 pl-2 text-right">{formatNok(c.totalOre)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )}
+
           {report.months.length > 1 && (
             <section className="mb-6 rounded-lg border bg-white p-5">
               <h3 className="mb-3 font-semibold">Per måned</h3>
@@ -182,8 +229,9 @@ export default async function ReportsPage({
       )}
 
       <p className="text-sm text-neutral-600">
-        Med i rapporten: ordre bestilt i perioden, også de som venter på betaling. Kansellerte og refunderte ordre er ikke med. Rapporten er et grunnlag
-        for regnskapet. Kontroller tallene mot regnskapet før du leverer MVA-meldingen.
+        Med i rapporten: ordre bestilt i perioden, også de som venter på betaling. En betalt ordre som senere er kansellert eller refundert, er med i
+        perioden den ble bestilt, og kreditnotaen trekker den fra i perioden kreditnotaen ble laget. Ordre som ble kansellert før de var betalt, er
+        ikke med. Rapporten er et grunnlag for regnskapet. Kontroller tallene mot regnskapet før du leverer MVA-meldingen.
       </p>
     </main>
   );

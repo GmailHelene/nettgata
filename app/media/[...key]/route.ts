@@ -1,4 +1,4 @@
-import { mediaFileKeyPattern, originalKey } from "@/lib/media-types";
+import { mediaFileKeyPattern, originalKey, PDF_CONTENT_TYPE } from "@/lib/media-types";
 import { getMediaStore } from "@/lib/storage";
 
 /**
@@ -21,6 +21,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ key
       "content-length": String(object.size),
       "cache-control": "public, max-age=31536000, immutable",
       "x-content-type-options": "nosniff",
+      // PDF-er (meny, brosjyre) åpnes i nettleserens egen visning. Typen er sjekket ved opplasting.
+      ...(key.endsWith(".pdf") && { "content-type": PDF_CONTENT_TYPE, "content-disposition": "inline" }),
     },
   });
 }

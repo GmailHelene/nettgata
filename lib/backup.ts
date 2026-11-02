@@ -41,9 +41,16 @@ export function tablesInInsertOrder(): PgTable[] {
   return ordered;
 }
 
+/**
+ * Tabeller som ikke kopieres. Besøkskodene i statistikken skal bare finnes én dag (lib/statistikk.ts),
+ * og en kopi som lagres i 30 dager ville brutt det. Mangler de etter en gjenoppretting, telles dagens besøkende litt for høyt.
+ */
+const NOT_BACKED_UP = new Set(["visit_hashes"]);
+
 export async function createBackup(db: Db, now = new Date()): Promise<Backup> {
   const result: Backup = { version: 1, createdAt: now.toISOString(), tables: {} };
   for (const table of tablesInInsertOrder()) {
+    if (NOT_BACKED_UP.has(getTableName(table))) continue;
     result.tables[getTableName(table)] = (await db.select().from(table)) as Record<string, unknown>[];
   }
   return result;

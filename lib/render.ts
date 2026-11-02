@@ -6,6 +6,7 @@ import { firstContentImage } from "@/lib/content/seo";
 import type { PageContent } from "@/lib/content/types";
 import { schemaTypeFor } from "@/lib/packs";
 import { readSiteInfo } from "@/lib/site-info";
+import { bransjeKeyword } from "@/lib/seo/auto";
 import { readSiteLayout } from "@/lib/site-layout";
 import { listCatalog } from "@/lib/shop/catalog";
 import { loadPublicSetup } from "@/lib/egen-booking/store";
@@ -65,7 +66,13 @@ export async function buildRenderContext(
   // I en nettbutikk står «Alle varer» alltid i menyen, rett etter forsiden.
   if (shop && !nav.some((n) => n.path === "/produkter")) nav.splice(nav[0]?.path === "/" ? 1 : 0, 0, { path: "/produkter", title: "Alle varer" });
   return {
-    site: { id: site.id, name: site.name, info: readSiteInfo(site.info), schemaType: schemaTypeFor(site.industryPack) },
+    site: {
+      id: site.id,
+      name: site.name,
+      info: readSiteInfo(site.info),
+      schemaType: schemaTypeFor(site.industryPack),
+      keyword: bransjeKeyword(site.industryPack),
+    },
     nav,
     path,
     preview,

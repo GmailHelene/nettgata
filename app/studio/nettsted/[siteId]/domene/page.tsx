@@ -5,6 +5,7 @@ import { domains } from "@/db/schema";
 import { domainViews, MAX_ROOTS_PER_SITE } from "@/lib/domains";
 import { getDomainServices, missingDomainConfig } from "@/lib/domains/services";
 import { requireSiteAccess } from "@/lib/session";
+import { HelpLink } from "@/components/studio/help";
 import { canConnectDomain, DOMAIN_NEEDS_SUBSCRIPTION } from "@/lib/billing/state";
 import { SiteNav } from "../site-nav";
 import { DomainManager } from "./domain-manager";
@@ -30,7 +31,7 @@ export default async function DomainPage({ params }: { params: Promise<{ siteId:
       <h2 className="mb-2 mt-4 text-xl font-bold">Eget domene</h2>
       <p className="mb-6 text-neutral-700">
         Skriv inn domenet ditt, legg inn pekerne hos forhandleren, så kobler vi det til automatisk med sikker tilkobling (https). Til da ligger nettstedet på{" "}
-        <span className="font-mono">{freeAddress}</span>.
+        <span className="font-mono">{freeAddress}</span>. <HelpLink slug="domene" />
       </p>
 
       {!owner && <p className="mb-6 rounded-lg border bg-white p-4 text-sm">Du ser statusen her. Bare eieren av nettstedet kan koble til, endre eller fjerne domener.</p>}

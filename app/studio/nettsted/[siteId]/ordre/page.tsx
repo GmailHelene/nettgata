@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LabelPrintHelp } from "@/components/studio/label-print-help";
+import { PageIntro } from "@/components/studio/help";
 import { getDb } from "@/db";
 import { bringLabelsReady, labelBadge } from "@/lib/bring/bulk";
 import { formatOsloDateTime } from "@/lib/oslo-time";
@@ -46,6 +47,7 @@ export default async function OrdersPage({
   return (
     <main className="mx-auto max-w-5xl px-5 py-12">
       <SiteNav siteId={site.id} name={site.name} shop active="ordre" />
+      <PageIntro article="ordre">Med Vipps og Klarna trekkes beløpet først når du markerer ordren som sendt eller hentet.</PageIntro>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <form action={base} className="flex flex-1 gap-2" role="search">

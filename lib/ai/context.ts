@@ -66,7 +66,8 @@ export function pageForAi(page: { id: string; path: string; title: string; draft
 export function editableTextFields(sectionType: string): string[] {
   const def = sectionRegistry[sectionType as keyof typeof sectionRegistry];
   if (!def) return [];
-  return def.fields.filter((f) => f.type === "text" || f.type === "textarea").map((f) => f.key);
+  // Felt med fast form (e-post, telefon, videolenke) er ikke tekst AI-en skal skrive om.
+  return def.fields.filter((f) => (f.type === "text" && !f.format) || f.type === "textarea").map((f) => f.key);
 }
 
 export async function buildSiteContext(db: Db, siteId: string): Promise<SiteContext> {

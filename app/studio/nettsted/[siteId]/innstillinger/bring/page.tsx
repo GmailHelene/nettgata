@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { bringSetupView } from "@/lib/bring/config";
 import { requireSiteAccess } from "@/lib/session";
+import { HelpLink } from "@/components/studio/help";
 import { readSiteInfo } from "@/lib/site-info";
 import { SiteNav } from "../../site-nav";
 import { BringAccountForm } from "./bring-account-form";
@@ -28,7 +29,7 @@ export default async function BringPage({ params }: { params: Promise<{ siteId: 
       <h2 className="mb-2 mt-4 text-xl font-bold">Frakt med Bring</h2>
       <p className="mb-6 text-neutral-700">
         Kassen henter fraktprisen fra Bring ut fra hvor mye varene veier og postnummeret til kunden. Fra ordren lager du fraktetiketten hos Bring med
-        ett trykk, og sporingsnummeret legges inn av seg selv.
+        ett trykk, og sporingsnummeret legges inn av seg selv. <HelpLink slug="bring" />
       </p>
 
       <section className="mb-6 rounded-lg border bg-white p-5">

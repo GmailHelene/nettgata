@@ -99,6 +99,27 @@
       "when": 1793566878463,
       "tag": "0013_egen_booking",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793578884789,
+      "tag": "0014_statistikk",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1793579722617,
+      "tag": "0015_nyhetsbrev",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793581029474,
+      "tag": "0016_rapporter_kreditnota",
+      "breakpoints": true
     }
   ]
 }

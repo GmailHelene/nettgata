@@ -15,11 +15,13 @@ export const GENERATED_PATHS = { personvern: "/personvern", angrerett: "/angrere
  * Oppdateres av seg selv når kunden endrer info eller betalingsmåter, fordi de lages når siden vises.
  * bookingHosts er bookingsystemene som er bygget inn på de publiserte sidene (embeddedBookingHosts).
  * ownBooking er sant når egen timebestilling er i bruk (usesOwnBooking i lib/egen-booking/store.ts).
+ * newsletter er sant når nyhetsbrevet er i bruk (usesNewsletter i lib/nyhetsbrev/subscribers.ts).
+ * embeds sier om de publiserte sidene har kart eller video som lastes ved trykk (embeddedServices i lib/embeds.ts).
  */
 export function generatedLegalPage(
   site: SiteLike,
   path: string,
-  extra: { bookingHosts?: readonly string[]; ownBooking?: boolean } = {},
+  extra: { bookingHosts?: readonly string[]; ownBooking?: boolean; newsletter?: boolean; embeds?: { kart?: boolean; video?: boolean } } = {},
 ): PageContent | null {
   const butikk = { navn: site.name, info: readSiteInfo(site.info) };
   const shop = site.kind === "nettbutikk";
@@ -33,6 +35,8 @@ export function generatedLegalPage(
       ai: aiTeamActive(site.billing),
       bookingtjenester: extra.bookingHosts,
       egenBooking: extra.ownBooking,
+      nyhetsbrev: extra.newsletter,
+      innebygd: extra.embeds,
     });
   }
   if (path === GENERATED_PATHS.angrerett && shop) return lagAngrerettside({ butikk, betalingsmater });
