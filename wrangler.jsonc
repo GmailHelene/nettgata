@@ -34,7 +34,11 @@
     "PLATFORM_CANONICAL_HOST": "nettgata.no",
     // Avsenderadressen for e-post (for eksempel ordre@nettgata.no). BREVO_API_KEY settes som hemmelighet.
     // Uten begge lagres e-postene bare i loggen. Se docs/EPOST.md.
-    "EMAIL_FROM": "ordre@nettgata.no"
+    "EMAIL_FROM": "ordre@nettgata.no",
+    // Google Ads (kontoen LuxusHair-Helene). Offentlige ID-er, ikke hemmeligheter. Taggen lastes bare
+    // etter samtykke, og konverteringen «Nettgata henvendelse» telles når en henvendelse er lagret.
+    "GOOGLE_ADS_TAG_ID": "AW-440645825",
+    "GOOGLE_ADS_LEAD_SEND_TO": "AW-440645825/pNdiCNn-pLAdEMHxjtIB"
   },
   // Hvert tiende minutt: ventende kundedomener og betalinger. Hver natt: sikkerhetskopi (se custom-worker.ts).
   "triggers": { "crons": ["*/10 * * * *", "30 1 * * *"] }
