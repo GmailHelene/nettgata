@@ -161,7 +161,7 @@ export function lagPersonvernerklaering(input: PersonvernInput): PageContent {
 
     input.nyhetsbrev &&
       tekstSeksjon("nyhetsbrev", "Nyhetsbrev", [
-        "Melder du deg på nyhetsbrevet, lagrer vi e-postadressen din, navnet hvis du oppgir det, når du meldte deg på og bekreftet, og hvilken side du meldte deg på fra. Du får først en e-post der du bekrefter påmeldingen, og vi sender ingen nyhetsbrev før du har bekreftet. Bekrefter du ikke innen 30 dager, sletter vi påmeldingen.",
+        "Melder du deg på nyhetsbrevet, lagrer vi e-postadressen din, navnet hvis du oppgir det, når du meldte deg på og bekreftet, og hvilken side du meldte deg på fra. Du får først en e-post der du bekrefter påmeldingen, og vi sender ingen nyhetsbrev før du har bekreftet. Bekrefter du ikke innen 30 dager, sletter vi påmeldingen. Oversikten over hvem hvert nyhetsbrev ble sendt til, slettes tolv måneder etter utsendingen.",
         "Grunnlaget er samtykket ditt (artikkel 6 nr. 1 bokstav a). Du melder deg av med lenken nederst i hvert nyhetsbrev. Da slutter vi å sende, men tar vare på at du har meldt deg av, så du ikke får nyhetsbrev ved en feil senere.",
       ]),
 
