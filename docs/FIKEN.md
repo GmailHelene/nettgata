@@ -2,17 +2,58 @@
 
 Butikkeieren kobler nettbutikken til sin egen Fiken-konto under Betaling i studioet, og sender betalte ordre dit som salg med et trykk. Én ordre blir ett betalt salg («Annet salg» i Fiken) med én linje per MVA-sats. Ingenting sendes av seg selv.
 
-**Viktig før kunder får bruke dette:** koblingen bruker personlig API-nøkkel, slik oppgaven ba om. Fiken skriver at personlige nøkler i tredjepartsløsninger bryter vilkårene deres, og at tredjeparter som integrerer på vegne av kundene sine, må bruke OAuth2. Se «Før lansering» nederst.
+Siden 2. november 2026 kobles det til med **OAuth2** (eieren logger inn hos Fiken og godtar), ikke med personlig API-nøkkel. Fiken skriver at personlige nøkler i tredjepartsløsninger bryter vilkårene deres. Gamle koblinger med personlig nøkkel leses ikke lenger, og butikken må koble til på nytt.
+
+## Det Helene må gjøre før butikkene får Fiken
+
+1. **Registrer deg som utvikler i Fiken:** Rediger konto, Profil, Andre innstillinger, huk av for utvikler.
+2. **Lag en app** under API-fanen i brukerinnstillingene. Velg vanlig app med client secret (ikke «Uten client secret (PKCE)»). Redirect URL: **`https://nettgata.no/studio/fiken/callback`** (nøyaktig, med https og uten skråstrek til slutt). Vil du teste lokalt, legg også til `http://localhost:3000/studio/fiken/callback` og sett `FIKEN_REDIRECT_URI` til den adressen i `.env.local`.
+3. **Legg inn verdiene i Cloudflare** (aldri i filer eller git):
+   - `FIKEN_CLIENT_ID`: vanlig variabel (Variables), ikke hemmelig.
+   - `FIKEN_CLIENT_SECRET`: Secret (`npx wrangler secret put FIKEN_CLIENT_SECRET`).
+   Når begge er satt, er Fiken åpent for alle eiere av nettbutikker i studioet. Til da ser kundene «Fiken kommer snart», og bare plattformadmin ser selve koblingen (uten å kunne koble til).
+4. **Test med et testselskap i Fiken** (se «Ikke bekreftet mot ekte Fiken» under). Appen kan brukes av opptil fem brukere mens den er under utvikling.
+5. **Produksjonsstatus:** Fiken vil at to til tre ekte brukere har tatt den i bruk før du ber om produksjonsstatus på api@fiken.no. Over fem brukere krever produksjonsstatus.
+6. Fiken nevnes ikke på salgssiden eller i annonser før du har testet med en ekte butikk.
+
+## OAuth2, det vi bruker
+
+Kilde: https://api.fiken.no/api/v2/docs/ (avsnittet «Authorization with OAuth2») og https://fiken.no/.well-known/oauth-authorization-server, lest 2. november 2026.
+
+| | |
+|---|---|
+| Innlogging | `GET https://fiken.no/oauth/authorize?response_type=code&client_id=...&redirect_uri=...&state=...&code_challenge=...&code_challenge_method=S256` |
+| Kode til nøkler | `POST https://fiken.no/oauth/token`, `application/x-www-form-urlencoded`, Basic-innlogging med client id og client secret. `grant_type=authorization_code&code=...&redirect_uri=...&state=...&code_verifier=...` |
+| Fornyelse | Samme endepunkt, `grant_type=refresh_token&refresh_token=...`. Svaret har ny tilgangsnøkkel og «possibly updated» fornyelsesnøkkel. Kommer det en ny, erstatter den den gamle |
+| Levetid | `expires_in` i svaret (86157 sekunder, rundt et døgn, i eksempelet til Fiken). Fiken oppgir ingen levetid for fornyelsesnøkkelen til apper med client secret (for apper uten secret: 90 dager uten bruk) |
+| Tilbaketrekking | `POST https://fiken.no/oauth/revoke` med `Authorization: Bearer <tilgangsnøkkel>`. Trekker tilbake hele tilgangen, også fornyelsesnøkkelen |
+| Scopes | Ingen. Spesifikasjonen har `scopes: {}`, og vi ber ikke om noen |
+| API-kall | Som før: `Authorization: Bearer <tilgangsnøkkel>` mot `https://api.fiken.no/api/v2` |
+
+Eieren kan også fjerne tilgangen selv i Fiken: Rediger konto, Sikkerhet, Apper du har gitt tilgang til. Selskaper som lages etter at eieren ga tilgang, må legges til der.
+
+### Slik er flyten bygget
+
+1. **«Koble til Fiken»** (bare eieren, `startFikenConnectAction`) lager en `state` og sender nettleseren til Fiken. `state` er `base64url(JSON).base64url(HMAC-SHA256)` med nettsted, bruker, en tilfeldig verdi og utløp om ti minutter. HMAC-nøkkelen er avledet fra SESSION_SECRET med HKDF (info `fiken-oauth-state-v1`), så den aldri er den samme som for økter.
+2. **PKCE:** `code_verifier` er HMAC av den tilfeldige verdien i `state`. Den lagres ikke, og kan ikke regnes ut av den som bare ser adressen. Fiken anbefaler PKCE også for apper med client secret.
+3. **`/studio/fiken/callback`** (`app/studio/fiken/callback/route.ts`, logikken i `fikenCallback` i `lib/fiken/connect.ts`): sjekker signatur og utløp, at innlogget bruker er den som startet, at brukeren fortsatt er eier av nettbutikken, og at `state` ikke er brukt før (`rate_limit_events` med nøkkel `fiken-oauth-state:<verdi>`, grense 1). Fiken godtar dessuten hver kode bare én gang. Så byttes koden mot nøkler, og eieren sendes til Betaling med en kort kode for resultatet (`?fiken=koblet|velg|avbrutt|utlopt|ingen-tilgang|ingen-selskap|feil`). Koden og state blir aldri med videre.
+4. **Selskap:** har brukeren ett selskap i Fiken, er butikken koblet til med en gang. Har brukeren flere, lagres listen, og eieren velger i studioet (`chooseFikenCompany`, som henter listen på nytt fra Fiken).
+5. **Fornyelse:** `fikenAccessToken` fornyer når det er under fem minutter igjen, før en sending, test eller valg av selskap. De nye nøklene lagres kryptert i én betinget `UPDATE` (bare hvis de gamle fortsatt ligger der). Fornyer to forespørsler samtidig, bruker den som tapte nøklene vinneren lagret.
+6. **Fornyelsen feiler:** svarer Fiken 400 eller 401 (koden eller fornyelsesnøkkelen er ugyldig eller trukket tilbake), settes `needsReconnect`, `lastError` og `testedAt: null`, og `fiken.needs_reconnect` logges. Studioet viser «Må kobles til på nytt» under Betaling og en advarsel under «Dette bør du se på» på oversikten. Nettverksfeil og 5xx kobler ikke fra.
+7. **«Koble fra»** trekker tilbake tilgangen hos Fiken og sletter nøklene. Svarer ikke Fiken, slettes de hos oss likevel, og eieren får beskjed om å fjerne appen i Fiken.
 
 ## Filer
 
 | Fil | Hva |
 |---|---|
-| `lib/fiken/state.ts` | Skjema for `sites.shop.fiken`, `fikenView()` uten nøkkel. Ren, uten hemmeligheter |
+| `lib/fiken/state.ts` | Skjema for `sites.shop.fiken`, `fikenView()` uten nøkler. Ren, uten hemmeligheter |
+| `lib/fiken/oauth.ts` | OAuth2: adresser, `state` med signatur, PKCE, kode til nøkler, fornyelse, tilbaketrekking, `fikenAvailableTo` |
+| `lib/fiken/connect.ts` | «Koble til Fiken» og callback (`fikenCallback`) |
+| `app/studio/fiken/callback/route.ts` | Ruten Fiken sender eieren tilbake til |
 | `lib/fiken/crypto.ts` | AES-GCM, nøkkel avledet fra SESSION_SECRET med HKDF (salt `nettgata-fiken`, info `fiken-api-nokkel-v1`). Nettstedet er tilleggsdata |
 | `lib/fiken/client.ts` | Kallene mot Fiken, tidsavbrudd (15 s) og norske feilmeldinger |
 | `lib/fiken/mapping.ts` | Ordre til salg. Bruker `allocateDiscount` og `vatBreakdown`, som kassen og MVA-rapporten |
-| `lib/fiken/config.ts` | Koble til, test, valg av kontoer, koble fra |
+| `lib/fiken/config.ts` | Lagring av nøklene, fornyelse (`fikenAccessToken`), valg av selskap, test, valg av kontoer, koble fra |
 | `lib/fiken/send.ts` | Sending, sperre mot samtidige sendinger, dobbeltsendingsvern, oversikt til studioet |
 | `app/studio/nettsted/[siteId]/betaling/fiken-*.ts(x)` | Studioet: handlinger (bare eier, `hit()`) og seksjonen «Regnskap: Fiken» |
 | `tests/fiken.test.ts` | Tester med etterlignet Fiken bak `fetch` og PGlite |
@@ -24,8 +65,8 @@ Butikkeieren kobler nettbutikken til sin egen Fiken-konto under Betaling i studi
 Kilde der ikke annet står: den offisielle dokumentasjonen, https://api.fiken.no/api/v2/docs/ (spesifikasjonen ligger på https://api.fiken.no/api/v2/docs/swagger.yaml), lest 1. november 2026.
 
 - Adresse: `https://api.fiken.no/api/v2`, bare HTTPS.
-- Personlig API-nøkkel sendes som `Authorization: Bearer <nøkkel>`. Den lages i Fiken under Rediger konto, API, Personlige API-nøkler. Den går aldri ut på tid, og kan trekkes tilbake samme sted.
-- API-tilgang koster 99 kr i måneden og bestilles under modultilgang i innstillingene i Fiken. Prisside: https://fiken.no/priser sier «Koble Fiken til andre systemer (API) 99 kr per måned, ekskl. mva» (lest 1. november 2026).
+- Tilgangsnøkkelen fra OAuth2 sendes som `Authorization: Bearer <nøkkel>`.
+- API-tilgang koster 99 kr i måneden eks. mva per selskap, betalt til Fiken, og bestilles under modultilgang i innstillingene i Fiken. Prisside: https://fiken.no/priser sier «Koble Fiken til andre systemer (API) 99 kr per måned, ekskl. mva» (sjekket på nytt 2. november 2026, uendret).
 - Bare ett kall om gangen. Samtidige kall kan gi 429, og over fire kall i sekundet kan bli bremset. Vi sender ett og ett med 250 ms pause, maks 40 ordre per trykk.
 - Beløp er heltall i øre. Datoer er `yyyy-MM-dd`.
 - Fiken anbefaler `X-Request-ID` (UUID) på alle kall. Vi sender det.
@@ -64,7 +105,7 @@ MVA-typer for salg: 25 % `HIGH`, 15 % `MEDIUM`, 12 % `LOW`. 0 % er `EXEMPT` («f
 
 ## Lagring
 
-`sites.shop.fiken`: kryptert nøkkel (`secret`, `v1:iv:chiffer`), selskapet, om det er MVA-registrert og testselskap, kontolistene fra Fiken, valgene (konto per betalingsmåte, inntektskontoer), `testedAt`, `lastError` og en sperre (`lockUntil`) mens en sending pågår. Alt skrives i én SQL-setning som bare rører `fiken`. `readShopSettings()` tar ikke med feltet, og studioet får bare `fikenView()`, som plukker ut feltene uten nøkkelen.
+`sites.shop.fiken`: `auth: "oauth"`, en tilfeldig `connectionId` per tilkobling, kryptert tilgangs- og fornyelsesnøkkel (`secret`, `v1:iv:chiffer` av JSON), `expiresAt`, selskapet (eller `companyChoices` til eieren har valgt), `needsReconnect`, om det er MVA-registrert og testselskap, kontolistene fra Fiken, valgene (konto per betalingsmåte, inntektskontoer), `testedAt`, `lastError` og en sperre (`lockUntil`) mens en sending pågår. Alt skrives i én SQL-setning som bare rører `fiken`. Oppdateringer fra test og sending gjelder bare tilkoblingen de startet på (`connectionId`), siden `secret` byttes ved hver fornyelse. `readShopSettings()` tar ikke med feltet, og studioet får bare `fikenView()`, som plukker ut feltene uten nøkler, `connectionId` og `expiresAt`. Ingen ny migrering.
 
 Forslag ved tilkobling: Vipps og Klarna til en bankkonto i Fiken med samme navn, ellers driftskontoen (1920). Faktura og betaling ved henting er av, fordi de ofte allerede er ført i Fiken (faktura laget der) eller i et kassesystem. Fiken anbefaler egen bankkonto i Fiken for Vipps-betalinger (https://hjelp.fiken.no/salg-med-vipps-bedrift).
 
@@ -95,17 +136,17 @@ Testene går mot et etterlignet API. Dette må prøves med et testselskap i Fike
 6. Om Fiken godtar to salg med samme salgsnummer. Vi stoler ikke på at Fiken stopper det.
 7. At `hasApiAccess: false` betyr at API-modulen mangler. Vi viser det bare som et hint.
 8. Om et testselskap i Fiken har API-tilgang uten å betale for modulen.
-9. Formatet på personlige nøkler. Vi krever bare synlige tegn uten mellomrom.
+9. OAuth2-flyten mot ekte Fiken: at Basic-innloggingen, PKCE med client secret og `state` i tokenkallet godtas, og hva Fiken svarer når fornyelsesnøkkelen er trukket tilbake (vi regner 400 og 401 som «koble til på nytt»).
 10. Ett tredjepartsprosjekt (github.com/Casper0301/fiken-mcp) skriver at Fiken ikke har `POST /sales`. Den offisielle spesifikasjonen har det («Creates a new sale. This corresponds to "Annet salg" in Fiken»).
 
-Gebyrer fra Vipps og Klarna, utbetalinger til banken og kreditnota ved refusjon føres ikke. Ordre som er sendt og senere kansellert eller refundert, listes i studioet så eieren kan rette dem i Fiken.
+Gebyrer fra Vipps og Klarna og utbetalinger til banken føres ikke.
 
-## Før lansering til kunder: OAuth2
+## Kreditnotaer: føres for hånd
 
-Fra dokumentasjonen: «Third parties that wish to integrate with Fiken on behalf of their customers must use the OAuth2 authorization method» og «Using personal API tokens in third-party applications violates Fiken's terms of service and may result in immediate API access termination.»
+Nettgata lager kreditnota av seg selv når en betalt ordre kanselleres eller refunderes (`lib/shop/credit-notes.ts`), men den sendes **ikke** til Fiken:
 
-Det som må til:
+- `POST /companies/{slug}/creditNotes/full` og `/partial` krever `invoiceId`, altså en faktura laget i Fiken. Salget vi sender, er «Annet salg» (`/sales`), ikke en faktura. Uavhengige kreditnotaer (`/creditNotes/drafts`) krever `customerId`, og vi sender ingen kunde til Fiken.
+- Spesifikasjonen sier ingenting om negative beløp på `/sales`. Det er ikke dokumentert at et negativt «Annet salg» er lov.
+- `PATCH /sales/{saleId}/delete` lager en motpostering og merker salget som slettet. Spesifikasjonen sier ikke hvilken dato motposteringen får, og en sletting er ikke en kreditnota.
 
-1. Huke av for at du er utvikler i Fiken (Rediger konto, Profil, Andre innstillinger) og lage en app under API. Da får du Client ID og Client Secret.
-2. Appen kan brukes av opptil fem brukere mens den utvikles. Fiken vil at to til tre ekte brukere er med før du ber om produksjonsstatus på api@fiken.no.
-3. I koden endres bare tilkoblingen: «Koble til Fiken» sender eieren til `https://fiken.no/oauth/authorize`, og tilgangs- og fornyelsesnøkkelen lagres kryptert der den personlige nøkkelen ligger nå. Sending, mapping, logg og feilhåndtering er de samme.
+Ordre som er sendt og senere kansellert eller refundert, listes derfor i studioet med salgs-ID i Fiken og kreditnotanummeret i Nettgata, så eieren fører kreditnotaen i Fiken. Kan sendes automatisk senere hvis en test med et testselskap viser at et negativt «Annet salg» med samme MVA-linjer blir godtatt.

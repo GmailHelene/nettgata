@@ -193,7 +193,8 @@ export const helpArticles: HelpArticle[] = [
       "Publiser siden.",
     ],
     notes: [
-      "Typene er kort tekst, lang tekst, valgliste, avkrysningsboks, dato, telefon og e-post. For en valgliste skriver du ett valg per linje.",
+      "Typene er kort tekst, lang tekst, valgliste, avkrysningsboks, dato, telefon, e-post og bilder. For en valgliste skriver du ett valg per linje.",
+      "Med typen «Bilder» kan den som skriver legge ved opptil fem bilder, for eksempel av jobben som skal gjøres. Bildene ses bare i «Henvendelser», av eier og redaktør, og slettes sammen med henvendelsen. Skjemaet kan ha ett slikt felt.",
       "Du kan ha opptil 10 egne felt.",
       "Svarene står under meldingen i «Henvendelser».",
     ],
@@ -355,14 +356,15 @@ export const helpArticles: HelpArticle[] = [
   },
   {
     slug: "vipps-klarna",
-    title: "Ta betalt med Vipps og Klarna",
+    title: "Ta betalt med Vipps, Klarna og Kustom",
     category: "nettbutikk",
     summary: "Du har egen avtale, og pengene går rett til kontoen din.",
-    intro: ["Du trenger en avtale med Vipps MobilePay om Vipps på nett, og en avtale med Klarna. Pengene går rett til butikken, aldri via Nettgata."],
+    intro: ["Du trenger en avtale med Vipps MobilePay om Vipps på nett, med Klarna eller med Kustom. Pengene går rett til butikken, aldri via Nettgata."],
     steps: [
       "Gå til «Betaling».",
       "Under Vipps: hent client_id, client_secret, abonnementsnøkkelen og salgsstednummeret (MSN) i portal.vippsmobilepay.com.",
       "Under Klarna: lag en API-nøkkel i Klarna Merchant Portal og lim inn brukernavn og passord med en gang. Klarna viser passordet bare én gang.",
+      "Under Kustom: logg inn i Kustom Portal, gå til API-innstillingene og trykk «Generate new». Lim inn API-brukernavnet og API-passordet med en gang. Kustom viser passordet bare én gang.",
       "Trykk «Lagre og test tilkoblingen». Betalingsmåten vises i kassen først når testen har lykkes.",
     ],
     notes: [
@@ -370,6 +372,8 @@ export const helpArticles: HelpArticle[] = [
       "Beløpet reserveres når kunden betaler, og trekkes når du markerer ordren som sendt eller hentet.",
       "Betaling ved henting og faktura velger du under «Innstillinger».",
       "Bare eieren kan legge inn nøklene.",
+      "Vil du prøve først, lag testnøkler i Kustom playground og velg Test. Da trekkes ingen ekte penger.",
+      "Kustom er en hel kasse der kunden velger betalingsmåte inne i Kustom. Den vises som et eget valg ved siden av Vipps og Klarna.",
     ],
     related: ["ordre"],
   },
@@ -381,7 +385,7 @@ export const helpArticles: HelpArticle[] = [
     steps: [
       "Gå til «Ordre». Ordre som er «Betalt, klar til sending» venter på deg.",
       "Pakk varene. Plukkliste og pakkseddel finner du fra ordren og ordrelisten.",
-      "Trykk «Marker som sendt». Med Vipps og Klarna trekkes beløpet nå, og kunden får e-post om at pakken er på vei.",
+      "Trykk «Marker som sendt». Med Vipps, Klarna og Kustom trekkes beløpet nå, og kunden får e-post om at pakken er på vei.",
       "Skal kunden ha pengene tilbake, trykk «Refunder».",
     ],
     notes: [

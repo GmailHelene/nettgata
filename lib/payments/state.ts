@@ -7,16 +7,16 @@ import { z } from "zod";
  * Denne filen er ren og uten hemmeligheter, så lib/shop/settings.ts kan bruke den
  * (den filen lastes også i nettleseren).
  */
-export const onlineProviders = ["vipps", "klarna"] as const;
+export const onlineProviders = ["vipps", "klarna", "kustom"] as const;
 export type OnlineProvider = (typeof onlineProviders)[number];
 
 export const paymentEnvironments = ["test", "production"] as const;
 export type PaymentEnvironment = (typeof paymentEnvironments)[number];
 
-export const providerNames: Record<OnlineProvider, string> = { vipps: "Vipps", klarna: "Klarna" };
+export const providerNames: Record<OnlineProvider, string> = { vipps: "Vipps", klarna: "Klarna", kustom: "Kustom" };
 
 /**
- * Slik ligger oppsettet i sites.shop.paymentProviders.<vipps|klarna>. Nøklene ligger kryptert i secret
+ * Slik ligger oppsettet i sites.shop.paymentProviders.<vipps|klarna|kustom>. Nøklene ligger kryptert i secret
  * (lib/payments/crypto.ts). Resten er ikke hemmelig.
  */
 export const storedProviderSchema = z.object({

@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useId, useRef } from "react";
 import { submitInquiry } from "@/app/actions/inquiry";
 import { formFieldName, type FormField } from "@/lib/content/form-fields";
+import { InquiryImages } from "./inquiry-images";
 
 const inputClass =
   "w-full rounded-[var(--radius)] border border-[var(--c-muted)] bg-[var(--c-bg)] px-3 py-2 text-[var(--c-text)] focus-visible:outline-2 focus-visible:outline-[var(--c-primary)]";
@@ -82,7 +83,8 @@ export function ContactForm({
   // Feltet med feil får fokus og blir merket. Uten felt får meldingen fokus.
   useEffect(() => {
     if (!state || state.ok) return;
-    const field = state.field ? formRef.current?.querySelector<HTMLElement>(`[name="${state.field}"]`) : null;
+    // Bildefeltet har ikke name (filene skal ikke sendes med skjemaet), men data-field.
+    const field = state.field ? formRef.current?.querySelector<HTMLElement>(`[name="${state.field}"], [data-field="${state.field}"]`) : null;
     (field ?? alertRef.current)?.focus();
   }, [state]);
   const invalid = (name: string) => (state && !state.ok && state.field === name ? { "aria-invalid": true, "aria-describedby": errorId } : {});
@@ -124,9 +126,22 @@ export function ContactForm({
         <span className="mb-1 block font-medium">Hva kan vi hjelpe deg med?</span>
         <textarea name="message" required rows={5} defaultValue={v?.message} className={inputClass} {...invalid("message")} />
       </label>
-      {fields.map((field, i) => (
-        <ExtraField key={`${i}-${field.label}`} field={field} name={formFieldName(i)} value={v?.extra?.[formFieldName(i)]} invalid={invalid(formFieldName(i))} />
-      ))}
+      {fields.map((field, i) =>
+        field.type === "bilder" ? (
+          <InquiryImages
+            key={`${i}-${field.label}`}
+            siteId={siteId}
+            path={path}
+            sectionId={sectionId}
+            field={field}
+            name={formFieldName(i)}
+            preview={preview}
+            invalid={invalid(formFieldName(i))}
+          />
+        ) : (
+          <ExtraField key={`${i}-${field.label}`} field={field} name={formFieldName(i)} value={v?.extra?.[formFieldName(i)]} invalid={invalid(formFieldName(i))} />
+        ),
+      )}
       {state && !state.ok && (
         <p ref={alertRef} id={errorId} tabIndex={-1} role="alert" className="font-medium outline-none">
           {state.message}

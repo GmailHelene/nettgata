@@ -29,6 +29,8 @@ import {
  *   nødvendige. Innebygd innhold fra Google lastes derfor først når den besøkende har lest knappeteksten og trykket.
  *   Google Ireland Limited er behandlingsansvarlig for brukere i EØS (Googles personvernerklæring).
  * - Klarna: «independent data controller» (Klarna Merchant Privacy Factsheet).
+ * - Kustom (sjekket 2. november 2026): Kustom AB (org.nr. 559463-5038, Sverige) er behandlingsansvarlig for opplysningene
+ *   i Kustom Checkout (Kustoms personvernerklæring, kustom.co/legal/privacy-policy).
  * - Posten Bring: «Vi er behandlingsansvarlig for slik informasjon» (personvernerklæringen til Posten Bring-konsernet).
  */
 
@@ -47,6 +49,8 @@ export type PersonvernInput = {
   bring?: boolean;
   /** Kontaktskjema på nettstedet. Standard er ja. */
   kontaktskjema?: boolean;
+  /** Kontaktskjemaet har felt for bilder (usesInquiryImages i lib/henvendelser/bilder.ts). Standard er nei. */
+  bilderISkjema?: boolean;
   /** Bookingsystemene som er bygget inn på de publiserte sidene (embeddedBookingHosts), for eksempel «timma.no». */
   bookingtjenester?: readonly string[];
   /** Egen timebestilling (lib/egen-booking) er i bruk. Standard er nei. */
@@ -69,6 +73,8 @@ function betaling(input: PersonvernInput, metoder: readonly Betalingsmate[]): st
       "Betaler du med Vipps, skjer betalingen i Vipps-appen. Vipps MobilePay AS (fra 12. januar 2027 Vipps AS) er selv behandlingsansvarlig for opplysningene de behandler om deg der. Vi får beskjed om at betalingen er gjennomført, og ellers bare det du selv velger å dele med oss i appen.",
     klarna:
       "Velger du Klarna, sender vi navn, adresse, e-postadresse, telefonnummer og hva du kjøper til Klarna Bank AB (publ), slik at Klarna kan gi deg betalingsløsningen. Klarna er selv behandlingsansvarlig for opplysningene de bruker til betaling, kredittvurdering og oppfølging, og har sin egen personvernerklæring.",
+    kustom:
+      "Velger du Kustom, betaler du i kassen til Kustom AB. Vi sender hva du kjøper og ordrenummeret til Kustom, og det du fyller inn i kassen, går rett til Kustom. Kustom er selv behandlingsansvarlig for opplysningene de bruker til betalingen, og har sin egen personvernerklæring. Vi får navn, adresse og e-postadresse tilbake, slik at vi kan sende varene.",
     kort: `Betaler du med kort, legger du inn kortet hos betalingsleverandøren vår${kort ? `, ${kort}` : ""}. Vi ser aldri hele kortnummeret ditt og lagrer det ikke.`,
     faktura:
       "Velger du faktura, sender vi fakturaen til e-postadressen din. Fakturaen er en del av regnskapet vårt og lagres like lenge som bestillingen.",
@@ -114,9 +120,9 @@ export function lagPersonvernerklaering(input: PersonvernInput): PageContent {
 
     skjema &&
       tekstSeksjon("henvendelser", "Når du sender oss en melding", [
-        "Skriver du til oss i kontaktskjemaet, lagrer vi navnet ditt, e-postadressen og telefonnummeret du oppgir, selve meldingen og hvilken side du sendte den fra. Meldingen havner i innboksen vår, og vi får et varsel på e-post.",
+        `Skriver du til oss i kontaktskjemaet, lagrer vi navnet ditt, e-postadressen og telefonnummeret du oppgir, selve meldingen og hvilken side du sendte den fra. Meldingen havner i innboksen vår, og vi får et varsel på e-post.${input.bilderISkjema ? " Legger du ved bilder, lagres de sammen med meldingen. Bildene ligger ikke åpent på nettstedet, og bare vi kan se dem. Bilder som lastes opp uten at skjemaet blir sendt, slettes automatisk etter et døgn." : ""}`,
         "Vi bruker opplysningene til å svare deg og følge opp det du spør om. Gjelder det et kjøp eller et tilbud, er grunnlaget at vi skal kunne inngå en avtale med deg (artikkel 6 nr. 1 bokstav b). Ellers er det vår berettigede interesse i å svare på det du lurer på (bokstav f).",
-        "Vi sletter henvendelser når saken er ferdig, og senest tolv måneder etter at vi sist hadde kontakt, med mindre de blir en del av et kundeforhold eller vi må ta vare på dem etter loven.",
+        `Vi sletter henvendelser når saken er ferdig, og senest tolv måneder etter at vi sist hadde kontakt, med mindre de blir en del av et kundeforhold eller vi må ta vare på dem etter loven.${input.bilderISkjema ? " Bilder du har lagt ved, slettes sammen med henvendelsen." : ""}`,
       ]),
 
     booking.length > 0 &&

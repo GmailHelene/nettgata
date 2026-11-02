@@ -9,6 +9,7 @@ import { requireSiteAccess } from "@/lib/session";
 import { formatNok } from "@/lib/shop/money";
 import { change, lowStock, orderCounts, salesOverview, topProducts, type Period } from "@/lib/shop/reports";
 import { availablePaymentMethods, readShopSettings } from "@/lib/shop/settings";
+import { fikenView } from "@/lib/fiken/state";
 import { getEmailProvider } from "@/lib/email/send";
 import { hasActiveSubscription } from "@/lib/billing/state";
 import { orderStatusLabel } from "./ordre/order-status";
@@ -89,7 +90,11 @@ export default async function OverviewPage({ params }: { params: Promise<{ siteI
     if (getEmailProvider().name === "logg") {
       tasks.push({ text: "E-post er ikke slått på ennå, så kundene får ingen ordrebekreftelse. Ikke åpne butikken før dette er på plass", href: `${base}/innstillinger`, tone: "warning" });
     }
-    if (!availablePaymentMethods(settings).some((m) => m === "vipps" || m === "klarna")) {
+    // Fiken trakk tilbake tilgangen (fornyelsen feilet), eller eieren har ikke valgt selskap ennå.
+    const fiken = fikenView(site.shop);
+    if (fiken?.needsReconnect) tasks.push({ text: "Fiken er koblet fra. Koble til Fiken på nytt for å sende ordre dit", href: `${base}/betaling#fiken-tittel`, tone: "warning" });
+    else if (fiken && !fiken.companySlug) tasks.push({ text: "Velg hvilket selskap i Fiken ordrene skal til", href: `${base}/betaling#fiken-tittel` });
+    if (!availablePaymentMethods(settings).some((m) => m === "vipps" || m === "klarna" || m === "kustom")) {
       tasks.push({ text: "Vipps eller Klarna er ikke koblet til ennå", href: `${base}/betaling` });
     }
     if (counts.paid) tasks.push({ text: `${counts.paid} ${counts.paid === 1 ? "ordre er betalt og klar" : "ordre er betalt og klare"} til sending`, href: `${base}/ordre?status=klar` });

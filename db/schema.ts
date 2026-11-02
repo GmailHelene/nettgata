@@ -47,6 +47,12 @@ export const users = pgTable("users", {
   totpLastStep: integer("totp_last_step"),
   /** HMAC av reservekodene som ikke er brukt ennå. */
   totpRecovery: jsonb("totp_recovery").$type<string[]>().notNull().default([]),
+  /**
+   * Når e-postadressen ble bekreftet. Selvbetjente kontoer (/studio/registrer) må bekrefte før de kan lage
+   * nettsted, og ubekreftede kontoer slettes etter sju dager (lib/selvbetjening.ts). Brukere fra før
+   * migrering 0017 og brukere som kom via invitasjon, regnes som bekreftet.
+   */
+  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
   createdAt: createdAt(),
 });
 
@@ -92,6 +98,15 @@ export const sites = pgTable("sites", {
   redirects: jsonb("redirects").$type<{ from: string; to: string }[]>().notNull().default([]),
   /** Innstillinger for egen timebestilling: varsel, avbestillingsfrist, dager fram i tid. Les via readBookingSettings(). */
   booking: jsonb("booking").$type<Partial<BookingSettings>>().notNull().default({}),
+  /**
+   * Laget av kunden selv (selvbetjening), ikke av plattformadmin. Bare slike nettsteder teller mot grensene for
+   * ubetalte nettsteder og lagringsplass, og bare de kan slettes etter lang tid uten aktivitet (lib/selvbetjening.ts).
+   */
+  selfServe: boolean("self_serve").notNull().default(false),
+  /** Sist noen andre enn plattformadmin var innom nettstedet i studioet, eller eieren logget inn. */
+  lastActivityAt: timestamp("last_activity_at", { withTimezone: true }).notNull().defaultNow(),
+  /** Når eieren fikk varsel om at et ubetalt nettsted uten aktivitet blir slettet. Nullstilles ved aktivitet. */
+  inactivityWarnedAt: timestamp("inactivity_warned_at", { withTimezone: true }),
   createdAt: createdAt(),
 });
 
@@ -208,6 +223,27 @@ export const inquiries = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("inquiries_site_idx").on(t.siteId, t.createdAt)],
+);
+
+/**
+ * Bilder den besøkende legger ved en henvendelse (felttypen «bilder», lib/henvendelser/bilder.ts). Lastes opp før
+ * skjemaet sendes, så raden finnes uten henvendelse en stund. upload_id er koden i opplastingsnøkkelen, og bare den
+ * samme nøkkelen kan knytte bildene til henvendelsen. Filene ligger privat i lageret under henvendelser/<siteId>/.
+ * Slettes henvendelsen, blir inquiry_id null, og ryddejobben sletter filen og raden.
+ */
+export const inquiryImages = pgTable(
+  "inquiry_images",
+  {
+    id: id(),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    inquiryId: uuid("inquiry_id").references(() => inquiries.id, { onDelete: "set null" }),
+    uploadId: text("upload_id").notNull(),
+    key: text("key").notNull().unique(),
+    contentType: text("content_type").notNull(),
+    size: integer("size").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("inquiry_images_inquiry_idx").on(t.inquiryId), index("inquiry_images_upload_idx").on(t.siteId, t.uploadId), index("inquiry_images_created_idx").on(t.createdAt)],
 );
 
 /**
@@ -443,7 +479,8 @@ export const emailLog = pgTable(
   "email_log",
   {
     id: id(),
-    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    /** Null for e-post om kontoen (bekreftelse, nytt passord), som ikke hører til et nettsted. */
+    siteId: uuid("site_id").references(() => sites.id, { onDelete: "cascade" }),
     /** ordrebekreftelse, ny-ordre, sendt eller ny-henvendelse. */
     kind: text("kind").notNull(),
     recipient: text("recipient").notNull(),

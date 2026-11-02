@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { FormStatus } from "@/components/studio/form-status";
 import { carrierKeys, carriers, type CarrierKey } from "@/lib/shop/tracking";
 import type { ActionState } from "../../../../actions";
-import { saveStaffNoteAction, saveTrackingAction } from "../../../../shop-actions";
+import { retryCreditNoteAction, saveStaffNoteAction, saveTrackingAction } from "../../../../shop-actions";
 
 const inputClass = "w-full rounded-md border border-neutral-400 px-3 py-2";
 
@@ -90,6 +90,25 @@ export function StaffNoteForm({ siteId, orderId, note }: { siteId: string; order
         className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold disabled:opacity-60"
       >
         Lagre notat
+      </button>
+      <FormStatus state={state} />
+    </div>
+  );
+}
+
+/** Knappen når kreditnotaen ikke ble laget sammen med kanselleringen eller refusjonen. */
+export function CreditNoteRetry({ siteId, orderId }: { siteId: string; orderId: string }) {
+  const [state, setState] = useState<ActionState>(null);
+  const [pending, startTransition] = useTransition();
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => startTransition(async () => setState(await retryCreditNoteAction(siteId, orderId)))}
+        className="rounded-md bg-[#173b6c] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      >
+        {pending ? "Lager kreditnota …" : "Lag kreditnota"}
       </button>
       <FormStatus state={state} />
     </div>

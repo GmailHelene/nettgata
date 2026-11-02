@@ -11,17 +11,21 @@ import { notificationSettingsSchema, type NotificationSettings } from "@/lib/not
 import type { Theme } from "@/lib/theme";
 import { lookupOrgnr, type BrregCompany } from "@/lib/brreg";
 import { parseRedirectList, type Redirect } from "@/lib/redirects";
-import { collectOldPaths, SitemapError, suggestRedirects, type ImportRow } from "@/lib/sitemap-import";
+import { assertSitemapFetchAllowed, collectOldPaths, SitemapError, suggestRedirects, type ImportRow } from "@/lib/sitemap-import";
 import { createPage, createPost, deletePage, duplicatePage, movePage, publishAll, setPageInMenu, updateSiteSettings, updateSiteTheme } from "@/lib/pages";
 import { assertCanPublish, PublishingError } from "@/lib/publishing";
 import { requireSiteAccess, requireUser } from "@/lib/session";
 import { pingPublished } from "@/lib/seo/publish";
 import { createSiteFromPack, SiteError } from "@/lib/sites";
+import { assertCanCreateSite, LimitError } from "@/lib/selvbetjening/grenser";
+import { hit, rules } from "@/lib/rate-limit";
+import { deleteInquiryImages } from "@/lib/henvendelser/bilder";
+import { getMediaStore } from "@/lib/storage";
 import type { ActionState } from "./actions";
 
 function toState(err: unknown): ActionState {
   unstable_rethrow(err);
-  if (err instanceof PublishingError || err instanceof SiteError) return { ok: false, message: err.message };
+  if (err instanceof PublishingError || err instanceof SiteError || err instanceof LimitError) return { ok: false, message: err.message };
   console.error(err);
   return { ok: false, message: "Noe gikk galt. Prøv igjen." };
 }
@@ -57,21 +61,31 @@ function specialHoursFromForm(formData: FormData) {
     .filter((s) => s.date || s.time);
 }
 
-/** Bare plattformadmin kan slå opp, siden oppslaget går mot et eksternt register. */
+/**
+ * Oppslag i Enhetsregisteret fra veiviseren. Plattformadmin og brukere med bekreftet e-post kan slå opp.
+ * Oppslaget går mot et eksternt register, så kundene har en grense per time.
+ */
 export async function lookupOrgnrAction(orgnr: string): Promise<BrregCompany | null> {
   const user = await requireUser();
-  if (!user.isPlatformAdmin) return null;
+  if (!user.isPlatformAdmin) {
+    if (!user.emailVerified) return null;
+    if (!(await hit(await getDb(), `brreg:${user.id}`, rules.brregPerUser))) return null;
+  }
   return lookupOrgnr(orgnr);
 }
 
-/** I fase 1 setter Helene opp nettstedene selv. Selvbetjening åpnes i fase 4. */
+/**
+ * Nytt nettsted fra veiviseren. Plattformadmin kan lage så mange hun vil. Kunder med bekreftet e-post kan lage
+ * nettsteder selv (selvbetjening), opptil grensen for ubetalte nettsteder i lib/selvbetjening/grenser.ts.
+ */
 export async function createSiteAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   let siteId: string;
   try {
     const user = await requireUser();
-    if (!user.isPlatformAdmin) return { ok: false, message: "Du har ikke tilgang til å opprette nettsteder" };
     const db = await getDb();
+    await assertCanCreateSite(db, user);
     const site = await createSiteFromPack(db, {
+      selfServe: !user.isPlatformAdmin,
       name: text(formData, "name"),
       packKey: text(formData, "pack"),
       themeKey: text(formData, "theme"),
@@ -189,6 +203,8 @@ export async function markInquiryReadAction(siteId: string, inquiryId: string) {
 export async function deleteInquiryAction(siteId: string, inquiryId: string) {
   const { site, user } = await requireSiteAccess(siteId);
   const db = await getDb();
+  // Bildene i lageret først. Med henvendelsen borte ville bare ryddejobben funnet dem igjen.
+  await deleteInquiryImages(db, await getMediaStore(), site.id, [inquiryId]);
   await db.delete(inquiries).where(and(eq(inquiries.id, inquiryId), eq(inquiries.siteId, site.id)));
   await db.insert(auditLog).values({ siteId: site.id, userId: user.id, action: "inquiry.deleted", detail: { inquiryId } });
   revalidatePath(`/studio/nettsted/${site.id}/henvendelser`);
@@ -264,9 +280,12 @@ export async function scanSitemapAction(siteId: string, source: { url: string } 
     const { site, role } = await requireSiteAccess(siteId);
     if (role !== "owner") return { ok: false, message: "Bare eieren av nettstedet kan endre omdirigeringer.", ...empty };
     const input = "url" in source ? { url: String(source.url ?? "").slice(0, 2000) } : { xml: String(source.xml ?? "") };
+    const db = await getDb();
+    // Bare henting fra nettet teller. En opplastet fil koster ingen forespørsler ut.
+    if ("url" in input) await assertSitemapFetchAllowed(db, site.id);
     const { paths, skippedSitemaps } = await collectOldPaths(input);
     if (!paths.length) return { ok: false, message: "Fant ingen gamle adresser i sitemapen.", ...empty };
-    const pageRows = await (await getDb())
+    const pageRows = await db
       .select({ path: pages.path, title: pages.title })
       .from(pages)
       .where(eq(pages.siteId, site.id))

@@ -4,7 +4,7 @@ import { accountCodePattern, companySlugPattern, type FikenAccount, type FikenCo
 import type { FikenSale } from "./mapping";
 
 /**
- * Kall mot Fiken API v2 (https://api.fiken.no/api/v2/docs). Nøkkelen sendes som Bearer i Authorization-hodet.
+ * Kall mot Fiken API v2 (https://api.fiken.no/api/v2/docs). Tilgangsnøkkelen fra OAuth2 sendes som Bearer i Authorization-hodet.
  * Fiken tillater bare ett kall om gangen per bruker, så alt her kalles ett og ett, aldri parallelt.
  * Forespørslene logges aldri, fordi hodene inneholder nøkkelen.
  */
@@ -28,9 +28,9 @@ export class FikenError extends ShopError {
 }
 
 const knownErrors: Record<number, string> = {
-  401: "Fiken godtok ikke API-nøkkelen. Sjekk at hele nøkkelen er limt inn, og at den ikke er slettet i Fiken.",
-  403: "Fiken avviste tilgangen. Sjekk at selskapet har API-modulen i Fiken (99 kr i måneden pluss mva), og at brukeren som laget nøkkelen fortsatt har tilgang til selskapet.",
-  404: "Fant ikke selskapet i Fiken. Det kan være slettet, eller nøkkelen har ikke tilgang til det lenger. Koble til på nytt og velg selskapet.",
+  401: "Fiken godtok ikke tilgangen. Den kan være trukket tilbake i Fiken. Koble til Fiken på nytt.",
+  403: "Fiken avviste tilgangen. Sjekk at selskapet har API-modulen i Fiken (99 kr i måneden pluss mva), og at brukeren som koblet til fortsatt har tilgang til selskapet.",
+  404: "Fant ikke selskapet i Fiken. Det kan være slettet, eller Nettgata har ikke tilgang til det lenger. Koble til på nytt og velg selskapet.",
   429: "Fiken har fått for mange forespørsler på kort tid. Vent et par minutter og prøv igjen.",
 };
 

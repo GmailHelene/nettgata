@@ -50,14 +50,18 @@ export const asNumber = (value: unknown): number | undefined => (typeof value ==
  * Hva ordren er knyttet til hos Vipps eller Klarna, lagret i orders.payment_ref:
  * - vipps:<miljø>:<referanse>
  * - klarna:<miljø>:hpp:<økt-ID> før kunden har betalt, klarna:<miljø>:order:<ordre-ID> etterpå
+ * - kustom:<miljø>:<ordre-ID> (samme ID i Checkout API og Order Management)
  * Miljøet lagres, så en ordre betalt i testmiljøet aldri trekkes eller refunderes med produksjonsnøklene.
  */
 export type PaymentRef =
   | { provider: "vipps"; environment: PaymentEnvironment; reference: string }
-  | { provider: "klarna"; environment: PaymentEnvironment; kind: "hpp" | "order"; id: string };
+  | { provider: "klarna"; environment: PaymentEnvironment; kind: "hpp" | "order"; id: string }
+  | { provider: "kustom"; environment: PaymentEnvironment; id: string };
 
 export function formatPaymentRef(ref: PaymentRef): string {
-  return ref.provider === "vipps" ? `vipps:${ref.environment}:${ref.reference}` : `klarna:${ref.environment}:${ref.kind}:${ref.id}`;
+  if (ref.provider === "vipps") return `vipps:${ref.environment}:${ref.reference}`;
+  if (ref.provider === "kustom") return `kustom:${ref.environment}:${ref.id}`;
+  return `klarna:${ref.environment}:${ref.kind}:${ref.id}`;
 }
 
 export function parsePaymentRef(value: string | null | undefined): PaymentRef | null {
@@ -67,6 +71,8 @@ export function parsePaymentRef(value: string | null | undefined): PaymentRef | 
   // Bare trygge tegn, fordi ID-en brukes i adressen til API-kallene.
   const klarna = /^klarna:(test|production):(hpp|order):([A-Za-z0-9-]{1,100})$/.exec(value);
   if (klarna) return { provider: "klarna", environment: klarna[1] as PaymentEnvironment, kind: klarna[2] as "hpp" | "order", id: klarna[3] };
+  const kustom = /^kustom:(test|production):([A-Za-z0-9-]{1,100})$/.exec(value);
+  if (kustom) return { provider: "kustom", environment: kustom[1] as PaymentEnvironment, id: kustom[2] };
   return null;
 }
 

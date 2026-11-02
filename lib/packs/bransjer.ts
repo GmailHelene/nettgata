@@ -46,6 +46,8 @@ const handverk: Base = {
     fields: [
       { etikett: "Adressen der jobben skal gjøres", felttype: "tekst", pakrevd: "nei" },
       { etikett: "Når passer det å starte?", felttype: "dato", pakrevd: "nei" },
+      // Skjemaet viser selv «(valgfritt)» etter navnet.
+      { etikett: "Bilder av jobben", felttype: "bilder", pakrevd: "nei" },
     ],
   },
   local: { team: "Folkene som kommer hjem til deg" },
@@ -1229,7 +1231,11 @@ const service: Base = {
     ["Hvilket område dekker dere?", "Skriv kommunene eller stedene dere jobber i."],
   ],
   cta: { heading: "Trenger du hjelp?", text: "Send en kort beskrivelse av hva du trenger, så får du svar og pris.", button: "Få pris" },
-  contact: { text: "Skriv kort hva du trenger hjelp med, så svarer vi så fort vi kan." },
+  // Bilder hjelper på pris for renhold, flytting og verksted. Feltet er valgfritt.
+  contact: {
+    text: "Skriv kort hva du trenger hjelp med, så svarer vi så fort vi kan.",
+    fields: [{ etikett: "Bilder", felttype: "bilder", pakrevd: "nei" }],
+  },
   local: { hours: true, map: true },
 };
 

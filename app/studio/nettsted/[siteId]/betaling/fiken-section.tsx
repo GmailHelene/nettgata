@@ -4,9 +4,16 @@ import { useState, useTransition } from "react";
 import { FormStatus } from "@/components/studio/form-status";
 import { inputClass } from "@/components/studio/info-fields";
 import type { FikenOverview, FikenPeriod, FikenPeriodKey } from "@/lib/fiken/send";
-import { fikenMethods, type FikenAccount, type FikenCompanyOption, type FikenMethod, type FikenSettings, type FikenView } from "@/lib/fiken/state";
+import { fikenMethods, type FikenAccount, type FikenMethod, type FikenSettings, type FikenView } from "@/lib/fiken/state";
 import type { ActionState } from "../../../actions";
-import { connectFikenAction, disconnectFikenAction, saveFikenSettingsAction, sendOrdersToFikenAction, testFikenAction } from "./fiken-actions";
+import {
+  chooseFikenCompanyAction,
+  disconnectFikenAction,
+  saveFikenSettingsAction,
+  sendOrdersToFikenAction,
+  startFikenConnectAction,
+  testFikenAction,
+} from "./fiken-actions";
 
 const focus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173b6c]";
 const primaryButton = `rounded-md bg-[#173b6c] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 ${focus}`;
@@ -40,32 +47,40 @@ function when(iso: string): string {
 
 function Status({ view }: { view: FikenView | null }) {
   if (!view) return <span className="rounded-full bg-neutral-200 px-3 py-1 text-sm text-neutral-800">Ikke koblet til</span>;
+  if (view.needsReconnect) return <span className="rounded-full bg-red-100 px-3 py-1 text-sm text-red-900">Må kobles til på nytt</span>;
+  if (!view.companySlug) return <span className="rounded-full bg-amber-100 px-3 py-1 text-sm text-amber-900">Velg selskap</span>;
   if (view.lastError) return <span className="rounded-full bg-red-100 px-3 py-1 text-sm text-red-900">Må sjekkes</span>;
   return <span className="rounded-full bg-green-100 px-3 py-1 text-sm text-green-900">Koblet til{view.testCompany ? " (testselskap)" : ""}</span>;
 }
 
 /**
- * Fiken på Betaling-siden. Nøkkelen skrives inn her og sendes til serveren, men kommer aldri tilbake:
- * studioet ser bare selskapet, kontoene og når koblingen sist virket.
+ * Fiken på Betaling-siden. Eieren kobler til med «Koble til Fiken» og logger inn hos Fiken (OAuth2). Nøklene blir på
+ * serveren: studioet ser bare selskapet, kontoene og når koblingen sist virket.
  */
 export function FikenSection({
   siteId,
   view,
   canEdit,
+  configured,
+  notice,
   periods,
   overview,
 }: {
   siteId: string;
   view: FikenView | null;
   canEdit: boolean;
+  /** Fiken-appen er registrert (FIKEN_CLIENT_ID og FIKEN_CLIENT_SECRET satt). Uten den kan ingen koble til. */
+  configured: boolean;
+  /** Resultatet etter at Fiken sendte eieren tilbake hit. */
+  notice: ActionState;
   periods: FikenPeriod[];
   overview: FikenOverview | null;
 }) {
-  const [replacing, setReplacing] = useState(false);
-  const [state, setState] = useState<ActionState>(null);
+  const [state, setState] = useState<ActionState>(notice);
   const [pending, startTransition] = useTransition();
-  const showConnect = canEdit && (!view || replacing);
-  const showTools = canEdit && view && !replacing;
+  const ready = view !== null && !view.needsReconnect && view.companySlug !== null;
+  const choosing = canEdit && view !== null && !view.needsReconnect && view.companySlug === null;
+  const showTools = canEdit && ready;
 
   const run = (action: () => Promise<ActionState>) =>
     startTransition(async () => {
@@ -85,11 +100,17 @@ export function FikenSection({
         satsene akkurat som i kassen og i MVA-rapporten.
       </p>
       <p className="rounded-md bg-amber-100 p-3 text-sm text-amber-900">
-        API-tilgang i Fiken koster 99 kr i måneden pluss mva. Den betaler du til Fiken, ikke til Nettgata, og du bestiller den i Fiken for selskapet
-        ordrene skal til.
+        API-modulen i Fiken koster 99 kr i måneden pluss mva per selskap. Den betaler du til Fiken, ikke til Nettgata, og du bestiller den i Fiken for
+        selskapet ordrene skal til.
       </p>
+      {!configured && (
+        <p className="rounded-md bg-neutral-100 p-3 text-sm text-neutral-800">
+          Bare plattformadmin ser dette. Fiken-appen er ikke registrert ennå, så ingen kan koble til. Legg inn FIKEN_CLIENT_ID og FIKEN_CLIENT_SECRET
+          først (se docs/FIKEN.md).
+        </p>
+      )}
 
-      {view && (
+      {ready && (
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
           <dt className="text-neutral-600">Selskap</dt>
           <dd>
@@ -105,45 +126,26 @@ export function FikenSection({
         </dl>
       )}
       {view?.lastError && (
-        <p className="rounded-md bg-red-100 p-3 text-sm text-red-900">
-          <strong>Siste kontakt med Fiken feilet:</strong> {view.lastError}
+        <p role={view.needsReconnect ? "alert" : undefined} className="rounded-md bg-red-100 p-3 text-sm text-red-900">
+          <strong>{view.needsReconnect ? "Fiken er koblet fra:" : "Siste kontakt med Fiken feilet:"}</strong> {view.lastError}
         </p>
       )}
       {!canEdit && <p className="rounded-md bg-neutral-100 p-3 text-sm text-neutral-800">Bare eieren av butikken kan koble til Fiken og sende ordre dit.</p>}
 
-      {showConnect && (
-        <ConnectForm
-          siteId={siteId}
-          replacing={view !== null}
-          onCancel={() => setReplacing(false)}
-          onConnected={(message) => {
-            setReplacing(false);
-            setState({ ok: true, message });
-          }}
-        />
-      )}
+      {canEdit && (!view || view.needsReconnect) && <ConnectButton siteId={siteId} disabled={!configured} again={view !== null} onResult={setState} />}
+      {choosing && <CompanyChoice siteId={siteId} view={view} onResult={setState} />}
 
       {showTools && (
         <div className="flex flex-wrap gap-3">
           <button type="button" disabled={pending} onClick={() => run(() => testFikenAction(siteId))} className={primaryButton}>
             {pending ? "Vent litt..." : "Test tilkoblingen"}
           </button>
+          <ConnectButton siteId={siteId} disabled={!configured || pending} again secondary onResult={setState} />
           <button
             type="button"
             disabled={pending}
             onClick={() => {
-              setState(null);
-              setReplacing(true);
-            }}
-            className={secondaryButton}
-          >
-            Bytt nøkkel eller selskap
-          </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => {
-              const ok = confirm("Koble Fiken fra Nettgata? Ordre som allerede er sendt, blir liggende i Fiken. Nøkkelen virker i Fiken til du sletter den der.");
+              const ok = confirm("Koble Fiken fra Nettgata? Nettgata mister tilgangen til regnskapet ditt. Ordre som allerede er sendt, blir liggende i Fiken.");
               if (ok) run(() => disconnectFikenAction(siteId));
             }}
             className={dangerButton}
@@ -151,6 +153,18 @@ export function FikenSection({
             Koble fra
           </button>
         </div>
+      )}
+      {canEdit && view && !showTools && (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => {
+            if (confirm("Fjerne Fiken-koblingen fra Nettgata?")) run(() => disconnectFikenAction(siteId));
+          }}
+          className={dangerButton}
+        >
+          Koble fra
+        </button>
       )}
       <FormStatus state={state} />
 
@@ -165,16 +179,17 @@ export function FikenSection({
       )}
       {overview && overview.needsCredit.length > 0 && (
         <div className="rounded-md bg-amber-100 p-3 text-sm text-amber-900">
-          <p className="font-semibold">Rett disse i Fiken</p>
+          <p className="font-semibold">Før kreditnota for disse i Fiken</p>
           <p className="mt-1">
-            Ordrene er sendt til Fiken, men kansellert eller refundert etterpå. Nettgata endrer ikke salg som allerede er sendt, så du må rette dem i
-            Fiken, for eksempel med en kreditnota.
+            Ordrene er sendt til Fiken, men kansellert eller refundert etterpå. Kreditnotaen fra Nettgata sendes ikke til Fiken, så du fører den selv
+            der, med samme beløp og MVA som kreditnotaen i Nettgata.
           </p>
           <ul className="mt-2 list-disc pl-5">
             {overview.needsCredit.map((o) => (
               <li key={o.number}>
                 Ordre {o.number}, {o.status === "refunded" ? "refundert" : "kansellert"}
                 {o.saleId ? ` (salg ${o.saleId} i Fiken)` : ""}
+                {o.creditNoteNumber ? `, kreditnota ${o.creditNoteNumber} i Nettgata` : ""}
               </li>
             ))}
           </ul>
@@ -182,12 +197,15 @@ export function FikenSection({
       )}
 
       <details className="rounded-md border p-3 text-sm">
-        <summary className={`cursor-pointer font-medium ${focus}`}>Hvor finner jeg API-nøkkelen?</summary>
+        <summary className={`cursor-pointer font-medium ${focus}`}>Slik kobler du til</summary>
         <ol className="mt-2 list-decimal space-y-1 pl-5">
-          <li>Logg inn i Fiken og bestill API-modulen for selskapet. Den koster 99 kr i måneden pluss mva.</li>
-          <li>Gå til Rediger konto, velg API og lag en ny personlig API-nøkkel.</li>
-          <li>Kopier nøkkelen og lim den inn her. Har du flere selskaper i Fiken, velger du hvilket ordrene skal til.</li>
+          <li>Bestill API-modulen i Fiken for selskapet, under modultilgang i innstillingene. Den koster 99 kr i måneden pluss mva per selskap.</li>
+          <li>Trykk «Koble til Fiken». Du sendes til Fiken, logger inn der og godtar at Nettgata får tilgang.</li>
+          <li>Har du flere selskaper i Fiken, velger du hvilket ordrene skal til når du kommer tilbake hit.</li>
         </ol>
+        <p className="mt-2">
+          Du gir aldri passordet ditt til Nettgata. Tilgangen kan du trekke tilbake her med «Koble fra», eller i Fiken under Rediger konto, Sikkerhet.
+        </p>
         <p className="mt-2">
           Har du en egen bankkonto i Fiken for Vipps eller Klarna, velger du den. Da kan du avstemme utbetalingene fra dem mot salget i Fiken.
         </p>
@@ -199,7 +217,7 @@ export function FikenSection({
           <li>Hver ordre blir ett betalt salg i Fiken, med ordrenummeret som salgsnummer. Navnet og adressen til kunden sendes ikke.</li>
           <li>Samme ordre sendes aldri to ganger, heller ikke om du kobler fra og til igjen.</li>
           <li>Gebyrene fra Vipps og Klarna, og utbetalingene til banken, fører du selv i Fiken.</li>
-          <li>Kansellerer eller refunderer du en ordre som er sendt, må du rette salget i Fiken. Ordrene det gjelder, vises her.</li>
+          <li>Kreditnotaer sendes ikke. Kansellerer eller refunderer du en ordre som er sendt, fører du kreditnotaen i Fiken. Ordrene det gjelder, vises her.</li>
           <li>Ordre betalt i testmiljøet hos Vipps eller Klarna sendes bare til et testselskap i Fiken.</li>
         </ul>
       </details>
@@ -207,106 +225,83 @@ export function FikenSection({
   );
 }
 
-function ConnectForm({
+/** Sender eieren til Fiken. Adressen lages på serveren, med en state som bare virker for denne eieren og denne butikken. */
+function ConnectButton({
   siteId,
-  replacing,
-  onCancel,
-  onConnected,
+  disabled,
+  again,
+  secondary,
+  onResult,
 }: {
   siteId: string;
-  replacing: boolean;
-  onCancel: () => void;
-  onConnected: (message: string) => void;
+  disabled: boolean;
+  again: boolean;
+  secondary?: boolean;
+  onResult: (state: ActionState) => void;
 }) {
-  const [token, setToken] = useState("");
-  const [companies, setCompanies] = useState<FikenCompanyOption[] | null>(null);
-  const [chosen, setChosen] = useState("");
-  const [state, setState] = useState<ActionState>(null);
   const [pending, startTransition] = useTransition();
+  return (
+    <button
+      type="button"
+      disabled={disabled || pending}
+      onClick={() =>
+        startTransition(async () => {
+          const result = await startFikenConnectAction(siteId);
+          if (result.ok && result.url) {
+            window.location.assign(result.url);
+            return;
+          }
+          onResult({ ok: false, message: result.message });
+        })
+      }
+      className={secondary ? secondaryButton : primaryButton}
+    >
+      {pending ? "Sender deg til Fiken..." : again ? "Koble til Fiken på nytt" : "Koble til Fiken"}
+    </button>
+  );
+}
 
-  const submit = () =>
-    startTransition(async () => {
-      const result = await connectFikenAction(siteId, { token, ...(companies && chosen ? { companySlug: chosen } : {}) });
-      if (result.connected) {
-        // Nøkkelen er lagret kryptert. Den skal ikke ligge igjen i skjemaet.
-        setToken("");
-        setCompanies(null);
-        onConnected(result.message);
-        return;
-      }
-      setState({ ok: result.ok, message: result.message });
-      if (result.companies) {
-        setCompanies(result.companies);
-        setChosen((result.companies.find((c) => c.hasApiAccess) ?? result.companies[0])?.slug ?? "");
-      }
-    });
+function CompanyChoice({ siteId, view, onResult }: { siteId: string; view: FikenView; onResult: (state: ActionState) => void }) {
+  const companies = view.companyChoices;
+  const [chosen, setChosen] = useState((companies.find((c) => c.hasApiAccess) ?? companies[0])?.slug ?? "");
+  const [pending, startTransition] = useTransition();
 
   return (
     <form
       className="space-y-4 rounded-md border border-neutral-300 p-4"
       onSubmit={(e) => {
         e.preventDefault();
-        submit();
+        startTransition(async () => {
+          onResult(await chooseFikenCompanyAction(siteId, chosen));
+        });
       }}
     >
-      <label className="block">
-        <span className="mb-1 block text-sm font-medium">API-nøkkel fra Fiken</span>
-        <input
-          type="password"
-          required
-          value={token}
-          onChange={(e) => {
-            setToken(e.target.value);
-            setCompanies(null);
-          }}
-          autoComplete="new-password"
-          spellCheck={false}
-          autoCapitalize="none"
-          aria-describedby="fiken-nokkel-hjelp"
-          className={`${inputClass} font-mono ${focus}`}
-        />
-        <span id="fiken-nokkel-hjelp" className="mt-1 block text-xs text-neutral-600">
-          Nøkkelen lagres kryptert og vises aldri igjen, heller ikke for deg. Vil du bytte den senere, limer du inn en ny.
-        </span>
-      </label>
-
-      {companies && (
-        <fieldset>
-          <legend className="mb-2 text-sm font-medium">Hvilket selskap skal ordrene til?</legend>
-          <div className="space-y-2">
-            {companies.map((c) => (
-              <label key={c.slug} className="flex items-start gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="fiken-selskap"
-                  value={c.slug}
-                  checked={chosen === c.slug}
-                  onChange={() => setChosen(c.slug)}
-                  className={`mt-1 ${focus}`}
-                />
-                <span>
-                  {c.name}
-                  {c.organizationNumber ? ` (org.nr. ${c.organizationNumber})` : ""}
-                  {c.testCompany ? ", testselskap" : ""}
-                  {!c.hasApiAccess && <span className="block text-xs text-red-800">Fiken sier at API-modulen ikke er aktivert for dette selskapet.</span>}
-                </span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      )}
-
-      <div className="flex flex-wrap gap-3">
-        <button disabled={pending} className={primaryButton}>
-          {pending ? "Kobler til..." : companies ? "Koble til valgt selskap" : "Koble til Fiken"}
-        </button>
-        {replacing && (
-          <button type="button" disabled={pending} onClick={onCancel} className={secondaryButton}>
-            Avbryt
-          </button>
-        )}
-      </div>
-      <FormStatus state={state} />
+      <fieldset>
+        <legend className="mb-2 text-sm font-medium">Hvilket selskap skal ordrene til?</legend>
+        <div className="space-y-2">
+          {companies.map((c) => (
+            <label key={c.slug} className="flex items-start gap-2 text-sm">
+              <input
+                type="radio"
+                name="fiken-selskap"
+                value={c.slug}
+                checked={chosen === c.slug}
+                onChange={() => setChosen(c.slug)}
+                className={`mt-1 ${focus}`}
+              />
+              <span>
+                {c.name}
+                {c.organizationNumber ? ` (org.nr. ${c.organizationNumber})` : ""}
+                {c.testCompany ? ", testselskap" : ""}
+                {!c.hasApiAccess && <span className="block text-xs text-red-800">Fiken sier at API-modulen ikke er aktivert for dette selskapet.</span>}
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <button disabled={pending || !chosen} className={primaryButton}>
+        {pending ? "Kobler til..." : "Bruk valgt selskap"}
+      </button>
     </form>
   );
 }

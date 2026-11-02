@@ -16,7 +16,12 @@ export type EmailKind =
   | "nyhetsbrev-test"
   | "manedsrapport"
   | "ai-forslag"
-  | "eksport";
+  | "eksport"
+  | "konto-bekreft"
+  | "konto-finnes"
+  | "konto-velkommen"
+  | "konto-passord"
+  | "slettevarsel";
 
 export type EmailMessage = {
   to: EmailAddress;
@@ -93,7 +98,7 @@ export function emailPreview(id: string): Preview | null {
 export async function deliver(
   db: Db,
   provider: EmailProvider,
-  entry: { siteId: string; kind: EmailKind; orderId?: string; inquiryId?: string; bookingId?: string },
+  entry: { siteId: string | null; kind: EmailKind; orderId?: string; inquiryId?: string; bookingId?: string },
   original: EmailMessage,
 ) {
   // Emnet bygges av navn som kunden har skrevet. Linjeskift i et emne kan gi ekstra e-posthoder (Bcc) med SMTP.

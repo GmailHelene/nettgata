@@ -271,7 +271,7 @@ describe("Last ned alt", () => {
 
 describe("tilgang til Last ned alt", () => {
   const actAs = (role: "owner" | "editor" | "developer") => {
-    const access = { user: { id: ownerId, email: "eier@salong.no", name: null, isPlatformAdmin: false }, site, role };
+    const access = { user: { id: ownerId, email: "eier@salong.no", name: null, isPlatformAdmin: false, emailVerified: true }, site, role };
     vi.mocked(requireSiteAccess).mockResolvedValue(access);
     vi.mocked(checkSiteAccess).mockResolvedValue(access);
   };

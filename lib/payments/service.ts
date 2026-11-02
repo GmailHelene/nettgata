@@ -4,12 +4,13 @@ import { auditLog, orderLines, orders, sites } from "@/db/schema";
 import { isPlatformHost, resolveHost } from "@/lib/hosts";
 import { ShopError } from "@/lib/shop/catalog";
 import { cancelUnpaidOrder, canTransition, markOrderPaid, setOrderStatus, setPaymentRef, type OrderStatus } from "@/lib/shop/orders";
-import { isOnlinePayment } from "@/lib/shop/settings";
+import { isOnlinePayment, readShopSettings } from "@/lib/shop/settings";
 import { carrierLabel, trackingUrl } from "@/lib/shop/tracking";
 import { publicSiteUrl } from "@/lib/site-url";
 import { formatPaymentRef, idempotencyUuid, parsePaymentRef, PaymentError, sameToken, type PaymentRef } from "./common";
 import { loadCredentials } from "./config";
 import { klarnaClient, klarnaOrderBody, type KlarnaClient } from "./klarna";
+import { kustomClient, type KustomClient } from "./kustom";
 import { providerNames, readStoredProvider } from "./state";
 import { vippsClient, vippsReference, type VippsClient, type VippsPayment } from "./vipps";
 
@@ -24,6 +25,8 @@ const LIMITS = {
   vippsMs: 60 * 60_000,
   /** Klarnas betalingsside er åpen i nesten to døgn. Vi stenger den etter en time, så varene ikke er låst så lenge. */
   klarnaMs: 60 * 60_000,
+  /** Kustom-kassen er åpen i 48 timer. Vi gir opp etter en time. Valideringen hindrer at en kansellert ordre betales senere. */
+  kustomMs: 60 * 60_000,
   /** Nøklene er fjernet eller byttet til et annet miljø, så betalingen kan ikke sjekkes. */
   unverifiableTestMs: 60 * 60_000,
   unverifiableProductionMs: 24 * 60 * 60_000,
@@ -33,7 +36,7 @@ const LIMITS = {
 const KLARNA_CLOSED = ["CANCELLED", "EXPIRED", "CLOSED"];
 
 type Clients = Map<string, Promise<AnyClient | null>>;
-type AnyClient = { provider: "vipps"; client: VippsClient } | { provider: "klarna"; client: KlarnaClient };
+type AnyClient = { provider: "vipps"; client: VippsClient } | { provider: "klarna"; client: KlarnaClient } | { provider: "kustom"; client: KustomClient };
 
 export type PaymentContext = {
   now?: Date;
@@ -75,9 +78,9 @@ function clientFor(site: Site, ref: PaymentRef, ctx: PaymentContext): Promise<An
   const created = (async (): Promise<AnyClient | null> => {
     const access = await loadCredentials(site, ref.provider);
     if (!access || access.environment !== ref.environment) return null;
-    return access.provider === "vipps"
-      ? { provider: "vipps", client: vippsClient(access.environment, access.credentials) }
-      : { provider: "klarna", client: klarnaClient(access.environment, access.credentials) };
+    if (access.provider === "vipps") return { provider: "vipps", client: vippsClient(access.environment, access.credentials) };
+    if (access.provider === "kustom") return { provider: "kustom", client: kustomClient(access.environment, access.credentials) };
+    return { provider: "klarna", client: klarnaClient(access.environment, access.credentials) };
   })();
   ctx.clients?.set(key, created);
   return created;
@@ -100,6 +103,21 @@ export async function paymentOrigin(db: Db, site: { id: string; slug: string }, 
 
 export const returnUrl = (origin: string, order: { id: string; accessToken: string }) =>
   `${origin}/api/betaling/retur?ordre=${order.id}&t=${order.accessToken}`;
+
+/** Adressene Kustom trenger. Alle bærer ordrenøkkelen, så bare Kustom og kunden kjenner dem. */
+export function kustomUrls(site: Site, origin: string, order: { id: string; accessToken: string }) {
+  const q = `ordre=${order.id}&t=${order.accessToken}`;
+  const host = new URL(origin).host;
+  return {
+    terms: `${origin}${basePathFor(site, host)}${readShopSettings(site.shop).termsPath}`,
+    checkout: `${origin}/api/betaling/kustom?${q}`,
+    confirmation: returnUrl(origin, order),
+    // {checkout.order.id} fylles inn av Kustom. Vi sjekker at den stemmer med ordren vår, men stoler ikke på mer.
+    push: `${origin}/api/betaling/kustom/push?${q}&kustom={checkout.order.id}`,
+    // Kustom krever https for valideringen. Lokalt (http) sendes den ikke med.
+    ...(origin.startsWith("https://") && { validation: `${origin}/api/betaling/kustom/valider?${q}` }),
+  };
+}
 
 /**
  * Starter betalingen for en ny ordre og gir adressen kunden skal sendes til. Referansen lagres på ordren før kallet,
@@ -136,6 +154,24 @@ export async function startPayment(db: Db, site: Site, order: Order, returnTo: s
       await vipps.cancel(reference, { transactionOnly: true, idempotencyKey: `stopp-${order.id}` }).catch(() => undefined);
       await cancelUnpaidOrder(db, site.id, order.id, { provider, reason: "start_failed", ...errorInfo(err) });
       logFailure("Vipps-betalingen kunne ikke startes", order.id, err);
+      throw failed();
+    }
+  }
+
+  if (access.provider === "kustom") {
+    const kustom = kustomClient(access.environment, access.credentials);
+    try {
+      const lines = await db.select().from(orderLines).where(eq(orderLines.orderId, order.id));
+      const urls = kustomUrls(site, new URL(returnTo).origin, order);
+      const checkout = await kustom.createCheckout(klarnaOrderBody(order, lines), urls);
+      if (!(await setPaymentRef(db, order.id, formatPaymentRef({ provider: "kustom", environment: access.environment, id: checkout.orderId })))) {
+        throw new PaymentError("Ordren ble endret før betalingen startet");
+      }
+      // Kassen vises på vår egen side, som henter en fersk html_snippet hver gang.
+      return urls.checkout;
+    } catch (err) {
+      await cancelUnpaidOrder(db, site.id, order.id, { provider, reason: "start_failed", ...errorInfo(err) });
+      logFailure("Kustom-kassen kunne ikke startes", order.id, err);
       throw failed();
     }
   }
@@ -213,6 +249,7 @@ async function syncLoaded(db: Db, site: Site, order: Order, ctx: PaymentContext)
   try {
     if (access.provider === "vipps" && ref.provider === "vipps") return await syncVipps(db, site, order, ref, access.client, ctx, age, cancel);
     if (access.provider === "klarna" && ref.provider === "klarna") return await syncKlarna(db, site, order, ref, access.client, ctx, age, cancel);
+    if (access.provider === "kustom" && ref.provider === "kustom") return await syncKustom(db, site, order, ref, access.client, ctx, age, cancel);
   } catch (err) {
     // Finnes ikke betalingen hos løsningen med dagens nøkler, kan den aldri bli betalt. Den ryddes bort etter fristen.
     const limit = ref.environment === "test" ? LIMITS.unverifiableTestMs : LIMITS.unverifiableProductionMs;
@@ -407,6 +444,67 @@ async function settleKlarnaOrder(
   return { status, paid: false, cancelled: false, providerState: ko.status };
 }
 
+/** Kustom-ordre i disse tilstandene har ingen reservasjon igjen. */
+const KUSTOM_CLOSED = ["CANCELLED", "EXPIRED", "CLOSED"];
+
+/** Kustom svarer 404 på Order Management før kunden har fullført kjøpet. */
+const notFound = (err: unknown) => err instanceof PaymentError && err.info.status === 404;
+
+/**
+ * Kustom: ordren finnes i Order Management først når kunden har fullført kjøpet. Før det svarer Kustom 404.
+ * Etter fristen gir vi opp. Kassen kan ikke stenges hos Kustom, men valideringen avviser kjøpet når ordren ikke venter lenger.
+ */
+async function syncKustom(
+  db: Db,
+  site: Site,
+  order: Order,
+  ref: Extract<PaymentRef, { provider: "kustom" }>,
+  kustom: KustomClient,
+  ctx: PaymentContext,
+  age: number,
+  cancel: Cancel,
+): Promise<SyncResult> {
+  const details = { provider: "kustom", environment: ref.environment, reference: ref.id };
+  const ko = await kustom.getOrder(ref.id).catch((err) => {
+    if (notFound(err)) return null;
+    throw err;
+  });
+  if (!ko) {
+    if (ctx.sweep && age > LIMITS.kustomMs) return cancel("timeout", details);
+    return { status: order.status, paid: false, cancelled: false, providerState: "checkout_incomplete" };
+  }
+
+  const kustomCancel = async () => {
+    if (ko.capturedOre > 0 || KUSTOM_CLOSED.includes(ko.status)) return;
+    await kustom.cancelOrder(ref.id, await idempotencyUuid(`kustom-cancel:${order.id}`)).catch((err) => logFailure("Kustom-ordren kunne ikke kanselleres", order.id, err));
+  };
+
+  if (ko.fraudStatus === "REJECTED" || KUSTOM_CLOSED.includes(ko.status)) return cancel(ko.fraudStatus === "REJECTED" ? "rejected" : ko.status.toLowerCase(), details);
+  // Beløp, valuta og begge referansene må stemme. Ellers hører ikke betalingen til denne ordren.
+  if (
+    ko.currency !== "NOK" ||
+    ko.orderAmountOre !== order.totalOre ||
+    ko.originalOrderAmountOre !== order.totalOre ||
+    ko.reference1 !== String(order.number) ||
+    ko.reference2 !== order.id
+  ) {
+    await audit(db, site.id, null, "payment.amount_mismatch", { orderId: order.id, ...details, expectedOre: order.totalOre, authorizedOre: ko.orderAmountOre, currency: ko.currency });
+    await kustomCancel();
+    return cancel("amount_mismatch", details);
+  }
+  // PENDING betyr at Kustom kontrollerer kjøpet. Push og bakgrunnsjobben sjekker igjen.
+  if (ko.fraudStatus !== "ACCEPTED") return { status: order.status, paid: false, cancelled: false, providerState: ko.fraudStatus };
+
+  // Kvitteres før ordren merkes betalt. Feiler kvitteringen, sender Kustom push igjen, og sjekken gjøres på nytt.
+  await kustom.acknowledge(ref.id, await idempotencyUuid(`kustom-ack:${order.id}`));
+  if (await markOrderPaid(db, site.id, order.id, { ...details, amountOre: order.totalOre })) {
+    return { status: "paid", paid: true, cancelled: false, providerState: ko.status };
+  }
+  const status = await currentStatus(db, order.id);
+  if (status === "cancelled") await kustomCancel();
+  return { status, paid: false, cancelled: false, providerState: ko.status };
+}
+
 // ---------- Trekk, kansellering og refusjon ----------
 
 /** Gir pengene tilbake hos Vipps: refunderer det som er trukket, og frigjør det som bare er reservert. */
@@ -473,6 +571,35 @@ async function releaseKlarna(
   return { refundedOre: Math.max(refundable, 0), releasedOre: Math.max(reserved, 0) };
 }
 
+/** Gir pengene tilbake hos Kustom. Finnes ikke ordren der ennå (kunden har ikke fullført), er ingenting reservert. */
+async function releaseKustom(
+  db: Db,
+  site: Site,
+  order: Order,
+  ref: Extract<PaymentRef, { provider: "kustom" }>,
+  kustom: KustomClient,
+  userId: string | null,
+): Promise<{ refundedOre: number; releasedOre: number }> {
+  const ko = await kustom.getOrder(ref.id).catch((err) => {
+    if (notFound(err)) return null;
+    throw err;
+  });
+  if (!ko) return { refundedOre: 0, releasedOre: 0 };
+  const details = { orderId: order.id, provider: "kustom", environment: ref.environment, reference: ref.id };
+  const refundable = ko.capturedOre - ko.refundedOre;
+  if (refundable > 0) {
+    await kustom.refund(ref.id, refundable, await idempotencyUuid(`kustom-refund:${order.id}`));
+    await audit(db, site.id, userId, "payment.refunded", { ...details, amountOre: refundable });
+  }
+  const reserved = ko.remainingAuthorizedOre;
+  if (reserved > 0 && !KUSTOM_CLOSED.includes(ko.status)) {
+    if (ko.capturedOre === 0) await kustom.cancelOrder(ref.id, await idempotencyUuid(`kustom-cancel:${order.id}`));
+    else await kustom.releaseRemaining(ref.id, await idempotencyUuid(`kustom-release:${order.id}`));
+    await audit(db, site.id, userId, "payment.released", { ...details, amountOre: reserved });
+  }
+  return { refundedOre: Math.max(refundable, 0), releasedOre: Math.max(reserved, 0) };
+}
+
 /**
  * Klient for en ordre som allerede er betalt eller venter. Mangler nøklene, går det an å fortsette bare for
  * betalinger i testmiljøet, der det ikke finnes ekte penger.
@@ -530,6 +657,23 @@ async function capturePayment(db: Db, site: Site, order: Order, userId: string |
     await audit(db, site.id, userId, "payment.captured", { orderId: order.id, provider: "klarna", environment: ref.environment, reference: ref.id, amountOre: missing });
     return missing;
   }
+
+  if (access.provider === "kustom" && ref.provider === "kustom") {
+    const ko = await access.client.getOrder(ref.id).catch((err) => {
+      if (notFound(err)) throw new PaymentError("Kunden har ikke fullført betalingen hos Kustom, så beløpet kan ikke trekkes.");
+      throw err;
+    });
+    if (KUSTOM_CLOSED.includes(ko.status)) throw new PaymentError("Ordren er kansellert eller utløpt hos Kustom, så beløpet kan ikke trekkes.");
+    if (ko.orderAmountOre !== total) throw new PaymentError("Beløpet hos Kustom stemmer ikke med ordren. Sjekk ordren i Kustom-portalen.");
+    const missing = ko.orderAmountOre - ko.capturedOre;
+    if (missing <= 0) return 0;
+    const shipping = order.trackingNumber
+      ? { company: carrierLabel(order.trackingCarrier), trackingNumber: order.trackingNumber, trackingUri: trackingUrl(order.trackingCarrier, order.trackingNumber) }
+      : undefined;
+    await access.client.capture(ref.id, missing, await idempotencyUuid(`kustom-capture:${order.id}`), shipping);
+    await audit(db, site.id, userId, "payment.captured", { orderId: order.id, provider: "kustom", environment: ref.environment, reference: ref.id, amountOre: missing });
+    return missing;
+  }
   return 0;
 }
 
@@ -539,6 +683,7 @@ async function releasePayment(db: Db, site: Site, order: Order, userId: string |
   const { ref, access } = found;
   if (access.provider === "vipps" && ref.provider === "vipps") return releaseVipps(db, site, order, ref, access.client, userId);
   if (access.provider === "klarna" && ref.provider === "klarna") return releaseKlarna(db, site, order, ref, access.client, userId);
+  if (access.provider === "kustom" && ref.provider === "kustom") return releaseKustom(db, site, order, ref, access.client, userId);
   return { refundedOre: 0, releasedOre: 0 };
 }
 
@@ -669,7 +814,7 @@ export async function sweepPayments(db: Db, opts: { now?: Date; limit?: number; 
     .select({ order: orders, site: sites })
     .from(orders)
     .innerJoin(sites, eq(orders.siteId, sites.id))
-    .where(and(eq(orders.status, "pending_payment"), inArray(orders.paymentMethod, ["vipps", "klarna"])))
+    .where(and(eq(orders.status, "pending_payment"), inArray(orders.paymentMethod, ["vipps", "klarna", "kustom"])))
     .orderBy(asc(orders.createdAt))
     .limit(opts.limit ?? 100);
   const ctx: PaymentContext = { now: opts.now, sweep: true, clients: new Map() };
@@ -689,4 +834,74 @@ export async function sweepPayments(db: Db, opts: { now?: Date; limit?: number; 
     }
   }
   return summary;
+}
+
+// ---------- Kustom: kassesiden, push og validering ----------
+
+export type KustomPage = { kind: "snippet"; snippet: string; siteName: string; orderId: string; token: string } | { kind: "redirect"; location: string };
+
+/**
+ * Siden med Kustom-kassen. Henter en fersk html_snippet hver gang (den skal aldri lagres). Er ordren ikke lenger
+ * ubetalt, eller kjøpet allerede fullført hos Kustom, sendes kunden til kvitteringen i stedet.
+ */
+export async function kustomCheckoutPage(db: Db, input: { orderId: string; token: string; host: string }): Promise<KustomPage | null> {
+  const row = await customerOrder(db, input.orderId, input.token);
+  if (!row) return null;
+  const { order, site } = row;
+  const receipt = { kind: "redirect" as const, location: `${basePathFor(site, input.host)}/ordre/${order.id}?t=${order.accessToken}` };
+  const ref = parsePaymentRef(order.paymentRef);
+  if (order.status !== "pending_payment" || ref?.provider !== "kustom") return receipt;
+  const access = await clientFor(site, ref, {});
+  if (access?.provider !== "kustom") return receipt;
+  try {
+    const checkout = await access.client.getCheckout(ref.id);
+    if (checkout.status !== "checkout_incomplete" || !checkout.htmlSnippet) return receipt;
+    return { kind: "snippet", snippet: checkout.htmlSnippet, siteName: site.name, orderId: order.id, token: order.accessToken };
+  } catch (err) {
+    logFailure("Kustom-kassen kunne ikke hentes", order.id, err);
+    return receipt;
+  }
+}
+
+/**
+ * Push fra Kustom (server til server). Vi stoler bare på at den sier «se på denne ordren»: ordren hentes alltid fra
+ * Kustom. Kommer push flere ganger, skjer ingenting nytt, bortsett fra at ordren kvitteres på nytt hvis det trengs.
+ */
+export async function handleKustomPush(db: Db, input: { orderId: string; token: string; kustomOrderId: string }): Promise<{ found: boolean; paidOrderId: string | null }> {
+  const row = await customerOrder(db, input.orderId, input.token);
+  if (!row) return { found: false, paidOrderId: null };
+  const ref = parsePaymentRef(row.order.paymentRef);
+  if (ref?.provider !== "kustom" || !sameToken(ref.id, input.kustomOrderId)) return { found: false, paidOrderId: null };
+  const result = await syncLoaded(db, row.site, row.order, {});
+  if (result.paid) return { found: true, paidOrderId: row.order.id };
+  // Allerede betalt tidligere (gjentatt push): kvitter igjen, i tilfelle forrige kvittering ikke kom fram.
+  if (row.order.status !== "pending_payment" && row.order.status !== "cancelled") {
+    const access = await clientFor(row.site, ref, {});
+    if (access?.provider === "kustom") await access.client.acknowledge(ref.id, await idempotencyUuid(`kustom-ack:${row.order.id}`));
+  }
+  return { found: true, paidOrderId: null };
+}
+
+/**
+ * Validering: Kustom spør før kjøpet fullføres. Vi godtar bare hvis ordren fortsatt venter på betaling, og beløpet
+ * og referansene i kassen er de samme som hos oss. Ellers sendes kunden til kvitteringssiden, som forklarer hva som gjelder.
+ */
+export async function validateKustom(db: Db, input: { orderId: string; token: string; origin: string; body: unknown }): Promise<{ ok: true } | { ok: false; location: string | null }> {
+  const row = await customerOrder(db, input.orderId, input.token);
+  if (!row) return { ok: false, location: null };
+  const { order, site } = row;
+  const location = `${input.origin}${basePathFor(site, new URL(input.origin).host)}/ordre/${order.id}?t=${order.accessToken}`;
+  const ref = parsePaymentRef(order.paymentRef);
+  const b = (input.body && typeof input.body === "object" ? input.body : {}) as Record<string, unknown>;
+  const matches =
+    order.status === "pending_payment" &&
+    ref?.provider === "kustom" &&
+    b.order_id === ref.id &&
+    b.order_amount === order.totalOre &&
+    String(b.purchase_currency ?? "").toUpperCase() === "NOK" &&
+    String(b.merchant_reference1 ?? "") === String(order.number) &&
+    b.merchant_reference2 === order.id;
+  if (matches) return { ok: true };
+  await audit(db, site.id, null, "payment.validation_rejected", { orderId: order.id, provider: "kustom", status: order.status });
+  return { ok: false, location };
 }

@@ -7,7 +7,7 @@ Grunnlag: markedsanalysen (funksjonskart, funksjonsrevisjon og MVP-liste), produ
 
 **Lag:** N = synlig for nybegynneren. A = avansert lag. U = utviklerlaget. S = skjult automatikk som bare virker.
 
-Sist oppdatert 02.11.2026 (hjelp i studioet og kunnskapsbase, «Last ned alt»; SEO som lager seg selv: titler, beskrivelser, strukturerte data, IndexNow og Search Console; publisering sperret før betaling, søk i nettbutikken, favicon, dupliser side, import fra sitemap, kart og video i personvernerklæringen, PDF-filer i biblioteket; temaer og sjangre, salgssiden nettgata.no, juridiske tekster godkjent, Vipps og Klarna, abonnement med Stripe, sikkerhetskopi, blogg, invitasjoner og omdirigeringer, timebestilling, Bring, Fiken for plattformadmin, funn fra test med kundegrupper, AI-teamet).
+Sist oppdatert 02.11.2026 (selvbetjent registrering med bekreftelse, glemt passord og opprydding av ubetalte nettsteder; hjelp i studioet og kunnskapsbase, «Last ned alt»; SEO som lager seg selv: titler, beskrivelser, strukturerte data, IndexNow og Search Console; publisering sperret før betaling, søk i nettbutikken, favicon, dupliser side, import fra sitemap, kart og video i personvernerklæringen, PDF-filer i biblioteket; temaer og sjangre, salgssiden nettgata.no, juridiske tekster godkjent, Vipps og Klarna, abonnement med Stripe, sikkerhetskopi, blogg, invitasjoner og omdirigeringer, timebestilling, Bring, Fiken med OAuth2 og «Del på Facebook», funn fra test med kundegrupper, AI-teamet).
 
 ---
 
@@ -75,12 +75,14 @@ Sist oppdatert 02.11.2026 (hjelp i studioet og kunnskapsbase, «Last ned alt»; 
 | Åpningstider som egen seksjon, fra samme kilde som kontakt og Google | N | Bygget |
 | Avvikende åpningstider (romjul, påske) under Innstillinger, passerte dager skjules av seg selv | N | Bygget |
 | Slå en seksjon av og på uten å slette den (avslått seksjon stopper ikke publisering) | N | Bygget |
-| Kart (uten sporing før samtykke) | N | Bygget: adresse og lenker til Google Maps og OpenStreetMap, kartet lastes først ved trykk på «Vis kart». Personvernerklæringen får avsnittet «Kart og video» når kart eller video er i bruk (teksten venter på Helenes godkjenning) |
+| Kart (uten sporing før samtykke) | N | Bygget: adresse og lenker til Google Maps og OpenStreetMap, kartet lastes først ved trykk på «Vis kart». Personvernerklæringen får avsnittet «Kart og video» når kart eller video er i bruk (teksten venter på Helenes godkjenning). Kartnøkkel: se under tabellen |
 | Video (YouTube uten informasjonskapsler, eller opplastet) | N | Bygget for YouTube (youtube-nocookie, lastes ved trykk). Opplastet video: Senere |
 | Tabell, prisplaner, logoer fra samarbeidspartnere | N | MVP |
 | Nedlastbare filer (PDF-meny, brosjyre) | N | Bygget: PDF sjekkes fra innholdet, maks 10 MB, byttes med én opplasting |
 | Bransjeseksjoner: meny med allergener, timeplan, prosjektgalleri, sertifiseringer | N | MVP (per pakke) |
 | Egendefinerte felt og datatyper (f.eks. «Prosjekter» med egne felt) | U | Senere |
+
+**Kartnøkkel (Google Maps Embed API).** Uten nøkkel bruker kartet Googles udokumenterte innbygging (`maps.google.com/maps?q=…&output=embed`). Settes `GOOGLE_MAPS_EMBED_KEY` under «vars» i `wrangler.jsonc`, brukes den dokumenterte Maps Embed API-en (`google.com/maps/embed/v1/place`). Helene lager nøkkelen selv i Google Cloud og begrenser den til bare Maps Embed API (API-begrensning). Begrensning på nettadresse (HTTP-referrer) er ikke praktisk, fordi kundene har hvert sitt domene. Nøkkelen er ikke hemmelig, den står i kartadressen den besøkende laster. Maps Embed API er gratis uten bruksgrense, men Google krever at prosjektet har en faktureringskonto. Ingen endring i CSP trengs (vi setter bare `frame-ancestors`).
 
 ## 4. Bilder og media
 
@@ -184,7 +186,7 @@ Sist oppdatert 02.11.2026 (hjelp i studioet og kunnskapsbase, «Last ned alt»; 
 | Honningkrukke og rate limiting mot spam | S | Ferdig |
 | Feltene beholdes ved feilmelding | S | Ferdig |
 | E-postvarsel til bedriften ved ny henvendelse (Brevo) | S | MVP |
-| Tilbudsforespørsel med bildeopplasting (håndverker) | N | MVP (håndverkerpakkene har fått felt for adresse og oppstartsdato, bildeopplasting gjenstår) |
+| Tilbudsforespørsel med bildeopplasting (håndverker): felttypen «Bilder» i kontaktskjemaet, opptil fem bilder som gjøres mindre i nettleseren (maks 2000 px, JPEG) og lastes opp med en kortlivet nøkkel bundet til nettsted, side og skjema. Typen sjekkes fra innholdet (JPEG, PNG, WebP, aldri SVG), med grenser per IP og nettsted. Filene ligger privat i lageret og ses bare i innboksen av eier og redaktør. Varselet sier «X bilder vedlagt», uten bilder eller lenker til dem. Slettes med henvendelsen (også etter tolv måneder), bilder fra skjemaer som ikke ble sendt slettes etter et døgn, og bildene er med i «Last ned alt». Håndverkerpakkene har feltet «Bilder av jobben» fra start | N | Bygget (personverntekst venter på Helenes godkjenning; HEIC fra iPhone gjøres om til JPEG av telefonen, andre HEIC-filer avvises med melding) |
 | Egne felt i kontaktskjemaet (tekst, lang tekst, valgliste, avkrysning, dato, telefon, e-post), påkrevd eller valgfritt, i valgfri rekkefølge | N | Bygget (svarene lagres i egen kolonne og vises som liste i innboksen og i e-posten) |
 | Kundeliste med ordrehistorikk, hvor mye hver har handlet for, søk, internt notat og CSV | A | Ferdig (segmenter og samtykke til nyhetsbrev: Senere) |
 
@@ -207,6 +209,7 @@ Sist oppdatert 02.11.2026 (hjelp i studioet og kunnskapsbase, «Last ned alt»; 
 | Vareside med galleri, brødsmuler, trekkspill og fast kjøpsknapp på mobil | N | Ferdig |
 | Produktdata for Google (pris, lager per variant) | S | Ferdig |
 | Vipps ePayment og Klarna (kort, faktura, delbetaling) med butikkens egne avtaler, trekk ved sending, refusjon | N | Bygget (ikke prøvd med ekte testnøkler) |
+| Kustom Checkout (tidligere Klarna Checkout) som eget valg i kassen: innebygd kasse, validering, push, kvittering, trekk ved sending, kansellering og refusjon. Se docs/KUSTOM.md | N | Bygget (ikke prøvd mot Kustom playground, ikke på salgssiden) |
 | Betal ved henting, faktura, testbetaling i utvikling | N | Ferdig |
 | Kassen stengt til kjøpsvilkårene er publisert | S | Ferdig |
 | «Utvalgte varer»-seksjon og nettbutikkpakker (generell, klær, interiør, lokalmat) | N | Bygget |
@@ -219,7 +222,7 @@ Sist oppdatert 02.11.2026 (hjelp i studioet og kunnskapsbase, «Last ned alt»; 
 | Kreditnota: lages av seg selv når en betalt ordre kanselleres eller refunderes. Egen nummerserie per nettsted fra 1, uten hull og trygg ved samtidighet, med henvisning til ordren, negative linjer og MVA per sats som på ordren. Kan skrives ut eller lagres som PDF, står på ordren, trekkes fra i salgs- og MVA-rapporten i perioden den ble laget og er med i CSV-en. Kan aldri endres (trigger i databasen). Hele ordren krediteres, fordi refusjon alltid gir hele beløpet tilbake | A | Bygget |
 | Rabattkoder: prosent, beløp eller fri frakt, minstebeløp, periode og bruksgrense | N | Ferdig (automatiske kampanjer: MVP) |
 | Salgs- og MVA-rapport per måned, termin, år eller egen periode, med MVA per sats og CSV | A | Ferdig |
-| Fiken-eksport (betalte ordre sendes til butikkens egen Fiken som salg, én linje per MVA-sats) og ordreeksport som stemmer mot Vipps-oppgjør | A | Fiken: Bygget, men bare åpent for plattformadmin (`fikenAvailableTo`). Ikke prøvd mot ekte Fiken, og den personlige API-nøkkelen må byttes til OAuth2 før butikkene får den, se docs/FIKEN.md. Vipps-oppgjør: MVP |
+| Fiken-eksport (betalte ordre sendes til butikkens egen Fiken som salg, én linje per MVA-sats) og ordreeksport som stemmer mot Vipps-oppgjør | A | Fiken: Bygget med OAuth2 (02.11.2026). Åpnes for butikkene når FIKEN_CLIENT_ID og FIKEN_CLIENT_SECRET er satt, til da bare plattformadmin, og kundene ser «Fiken kommer snart». Kreditnotaer føres for hånd i Fiken. Ikke prøvd mot ekte Fiken, se docs/FIKEN.md. Ikke på salgssiden før Helene har testet. Vipps-oppgjør: MVP |
 | Produktfeed til Google og Meta | S | Bygget (/produktfeed.xml på butikkens domene) |
 | Sortering (pris, nyeste) og filtre på valg og lager | N | Ferdig |
 | Søk i varer for kunden: navn, beskrivelse, kategori og varianter, antall treff leses opp, søkesider er noindex | N | Bygget |
@@ -267,7 +270,7 @@ Sist oppdatert 02.11.2026 (hjelp i studioet og kunnskapsbase, «Last ned alt»; 
 | Faste roller: SEO, innhold og markedsføring, butikk og drift, sikkerhet | N | Bygget for tillegget: SEO, innhold og butikk (sikkerhet: Senere) |
 | Alt som foreslås kan forhåndsvises og angres | S | Bygget: før og etter i kortet, Godkjenn skriver bare i kladden, angres med versjonene |
 | Effektmåling i neste rapport | N | Senere |
-| Daglig rapport og sosiale medier (tillegg 249 kr/mnd) | N | Bygget, ikke deployet: daglige forslag med Claude Opus 5.5 (Batch API), kostnadstak 40 kr per nettsted per måned, innlegg til Facebook og Instagram som kopieres, se docs/AI-TEAMET.md |
+| Daglig rapport og sosiale medier (tillegg 249 kr/mnd) | N | Bygget, ikke deployet: daglige forslag med Claude Opus 5.5 (Batch API), kostnadstak 40 kr per nettsted per måned, innlegg til Facebook og Instagram som kopieres, med «Kopier tekst» og «Del på Facebook» (02.11.2026), se docs/AI-TEAMET.md |
 
 ## 14. Statistikk og rapporter
 
@@ -292,8 +295,12 @@ Sist oppdatert 02.11.2026 (hjelp i studioet og kunnskapsbase, «Last ned alt»; 
 
 | Funksjon | Lag | Status |
 |---|---|---|
-| Nytt nettsted i fire steg: org.nr. (Brreg), 11 sjangre og 45 bransjepakker med søk og forslag fra næringskoden, temagalleri, kontaktinfo | N | Bygget (for plattformadmin) |
-| Selvbetjent registrering for kunder | N | Fase 4 |
+| Nytt nettsted i fire steg: org.nr. (Brreg), 11 sjangre og 45 bransjepakker med søk og forslag fra næringskoden, temagalleri, kontaktinfo | N | Bygget (plattformadmin og kunder med bekreftet e-post) |
+| Selvbetjent registrering på /studio/registrer: e-post, passord, navn, godtar vilkår og databehandleravtale (versjonen logges), bekreftelseslenke (48 t) med ny lenke på forespørsel, samme svar om adressen finnes, honningkrukke, grenser per IP og adresse, Turnstile når nøklene er satt | N | Bygget |
+| Glemt passord: lenke på e-post (1 t, én gang), logger ut alle økter | N | Bygget |
+| Velkomst-e-post med tre steg og lenke til hjelpen | S | Bygget |
+| Gratis å bygge og forhåndsvise: høyst 2 ubetalte nettsteder per bruker og 200 MB per nettsted, banner «Velg abonnement for å publisere» | N | Bygget |
+| Opprydding: ubekreftede kontoer slettes etter 7 dager, ubetalte nettsteder uten aktivitet får varsel etter 60 dager og slettes 14 dager senere (med filene i R2) | S | Bygget (teksten i personvern og vilkår venter på Helenes godkjenning) |
 | Import fra eksisterende nettside med 301-kart | N | MVP |
 | Import fra Google-profil og Facebook | N | Senere |
 | Flytting fra Wix, Squarespace, Shopify og WordPress | A | Senere |

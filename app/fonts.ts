@@ -1,5 +1,4 @@
 import {
-  Archivo,
   Barlow_Condensed,
   Bricolage_Grotesque,
   Cormorant_Garamond,
@@ -19,12 +18,15 @@ import {
  * Fontene lastes ned ved bygging og serveres fra vårt eget domene. Besøkende sender
  * derfor ingenting til Google (personvern). Bare Inter forhåndslastes; de andre hentes
  * først når et nettsted faktisk bruker dem, så mange temaer koster ikke noe for den enkelte siden.
+ *
+ * Archivo er unntaket. Den er salgssidens font (overskrifter og brødtekst) og skal forhåndslastes der, men ikke
+ * på kundesidene, som går gjennom samme rute. next/font forhåndslaster per rute og gir ingen fast filadresse,
+ * så Archivo ligger i public/fonts med @font-face i globals.css, og salgssiden ber om forhåndslasting selv.
  */
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair", display: "swap", preload: false });
 const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces", display: "swap", preload: false });
 const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-dmsans", display: "swap", preload: false });
-const archivo = Archivo({ subsets: ["latin"], variable: "--font-archivo", display: "swap", preload: false });
 const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
   weight: ["500", "600", "700"],
@@ -46,7 +48,6 @@ export const fontVariables = [
   playfair,
   fraunces,
   dmSans,
-  archivo,
   cormorant,
   nunito,
   manrope,

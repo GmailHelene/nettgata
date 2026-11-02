@@ -18,6 +18,8 @@ export type CardData = {
   value: string;
   ingress: string | null;
   channel: string | null;
+  /** Facebooks delingslenke med adressen til nettstedet. Bare for innlegg til sosiale medier. */
+  shareUrl: string | null;
   reason: string;
   effect: string;
 };
@@ -28,20 +30,10 @@ const box = "whitespace-pre-line rounded-lg border border-[#d5dbe0] p-3 text-[0.
 export function SuggestionCard({ siteId, s }: { siteId: string; s: CardData }) {
   const [approved, approve, approving] = useActionState<SuggestionActionState>(approveAction.bind(null, siteId, s.id), null);
   const [rejected, reject, rejecting] = useActionState<SuggestionActionState>(rejectAction.bind(null, siteId, s.id), null);
-  const [copied, setCopied] = useState(false);
   const done = approved?.ok || rejected?.ok;
   const state = approved ?? rejected;
   const headingId = `forslag-${s.id}`;
   const approveLabel = s.kind === "tips" ? "Notert" : s.kind === "sosialt_innlegg" ? "Godkjenn teksten" : "Godkjenn";
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(s.value);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
-  }
 
   return (
     <article aria-labelledby={headingId} className={`${ui.card} p-5`}>
@@ -92,21 +84,12 @@ export function SuggestionCard({ siteId, s }: { siteId: string; s: CardData }) {
               </button>
             </form>
           )}
-          {s.kind === "sosialt_innlegg" && (
-            <button type="button" onClick={copy} className={ui.buttonGhost}>
-              {copied ? "Kopiert" : "Kopier teksten"}
-            </button>
-          )}
         </div>
       )}
       {s.kind !== "tips" && s.kind !== "sosialt_innlegg" && !done && (
         <p className={`mt-2 text-sm ${ui.muted}`}>Godkjenn legger endringen i kladden. Den vises på nettstedet først når du publiserer.</p>
       )}
-      {done && s.kind === "sosialt_innlegg" && (
-        <button type="button" onClick={copy} className={`${ui.buttonGhost} mt-4`}>
-          {copied ? "Kopiert" : "Kopier teksten"}
-        </button>
-      )}
+      {s.kind === "sosialt_innlegg" && <SocialShare id={s.id} text={s.value} channel={s.channel} shareUrl={s.shareUrl} />}
       <div className="mt-3">
         <FormStatus state={state ? { ok: state.ok, message: state.message } : null} />
         {approved?.ok && approved.pageId && (
@@ -118,6 +101,61 @@ export function SuggestionCard({ siteId, s }: { siteId: string; s: CardData }) {
         )}
       </div>
     </article>
+  );
+}
+
+/**
+ * «Kopier tekst» og «Del på Facebook» for innleggsforslag. Ingen Meta-app og ingen sporing. Facebook fyller ikke inn
+ * teksten selv, så «Del på Facebook» kopierer den først og åpner så delingssiden i en ny fane. Det er en vanlig lenke,
+ * så nettleseren ikke stopper fanen som et sprettoppvindu. Står utenfor skjemaene, så Godkjenn og Avvis virker som før.
+ */
+function SocialShare({ id, text, channel, shareUrl }: { id: string; text: string; channel: string | null; shareUrl: string | null }) {
+  const [status, setStatus] = useState<string>("");
+  const facebook = channel !== "instagram" && shareUrl;
+
+  async function copy(): Promise<boolean> {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  const failed = "Teksten ble ikke kopiert. Merk teksten over og kopier den selv.";
+
+  return (
+    <div className="mt-4">
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={async () => setStatus((await copy()) ? "Teksten er kopiert." : failed)}
+          className={ui.buttonGhost}
+          aria-describedby={`del-status-${id}`}
+        >
+          Kopier tekst
+        </button>
+        {facebook && (
+          <a
+            href={shareUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={async () => setStatus((await copy()) ? "Teksten er kopiert. Lim den inn i Facebook." : failed)}
+            className={ui.buttonGhost}
+            aria-describedby={`del-status-${id}`}
+          >
+            Del på Facebook<span className="sr-only"> (åpnes i ny fane)</span>
+          </a>
+        )}
+      </div>
+      <p id={`del-status-${id}`} role="status" aria-live="polite" className="mt-2 min-h-[1.25rem] text-sm font-medium text-[#2f5a47]">
+        {status}
+      </p>
+      {channel === "instagram" ? (
+        <p className={`text-sm ${ui.muted}`}>Tips: Instagram har ingen delingslenke. Kopier teksten, lag et nytt innlegg i Instagram-appen og lim den inn.</p>
+      ) : (
+        facebook && <p className={`text-sm ${ui.muted}`}>Facebook fyller ikke inn teksten selv, så «Del på Facebook» kopierer den først.</p>
+      )}
+    </div>
   );
 }
 

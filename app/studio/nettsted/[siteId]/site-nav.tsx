@@ -3,7 +3,8 @@ import { and, count, eq, isNull } from "drizzle-orm";
 import { heading, StreetSign } from "@/components/brand";
 import { ui } from "@/components/studio/ui";
 import { getDb } from "@/db";
-import { aiSuggestions, inquiries, orders } from "@/db/schema";
+import { aiSuggestions, inquiries, orders, sites } from "@/db/schema";
+import { hasActiveSubscription } from "@/lib/billing/state";
 
 const tabs = [
   { key: "oversikt", label: "Oversikt", href: "", shopOnly: false },
@@ -44,13 +45,16 @@ export async function SiteNav({
   shop?: boolean;
 }) {
   const db = await getDb();
-  const [[{ unread }], [{ toShip }], [{ newIdeas }]] = await Promise.all([
+  const [[{ unread }], [{ toShip }], [{ newIdeas }], [site]] = await Promise.all([
     db.select({ unread: count() }).from(inquiries).where(and(eq(inquiries.siteId, siteId), isNull(inquiries.readAt))),
     shop
       ? db.select({ toShip: count() }).from(orders).where(and(eq(orders.siteId, siteId), eq(orders.status, "paid")))
       : Promise.resolve([{ toShip: 0 }]),
     db.select({ newIdeas: count() }).from(aiSuggestions).where(and(eq(aiSuggestions.siteId, siteId), eq(aiSuggestions.status, "ny"))),
+    db.select({ selfServe: sites.selfServe, billing: sites.billing }).from(sites).where(eq(sites.id, siteId)).limit(1),
   ]);
+  // Nettsteder kunden har laget selv, kan bygges gratis, men ikke publiseres før abonnementet er valgt.
+  const needsPlan = Boolean(site?.selfServe) && !hasActiveSubscription(site?.billing);
   const badges: Partial<Record<SiteTab, { text: string; className: string }>> = {};
   if (unread > 0) badges.henvendelser = { text: `${unread} ${unread === 1 ? "ny" : "nye"}`, className: "bg-[#a13a2c] text-white" };
   if (newIdeas > 0) badges["ai-teamet"] = { text: `${newIdeas} forslag`, className: "bg-[#2f5a47] text-white" };
@@ -86,6 +90,17 @@ export async function SiteNav({
             ))}
         </div>
       </nav>
+      {needsPlan && active !== "abonnement" && (
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#173b6c]/30 bg-[#eef3f9] px-4 py-3.5">
+          <p>
+            <strong className="font-semibold">Velg abonnement for å publisere.</strong>{" "}
+            <span className={ui.muted}>Du kan bygge og forhåndsvise så mye du vil før det, helt gratis.</span>
+          </p>
+          <Link href={`/studio/nettsted/${siteId}/abonnement`} className={ui.button}>
+            Velg abonnement
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

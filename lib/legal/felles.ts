@@ -14,7 +14,7 @@ import { formatAddress, formatOrgnr, type SiteInfo } from "@/lib/site-info";
 export const JURIDISK_GODKJENT = true;
 
 /** Datoen tekstene sist ble endret og sjekket mot regelverket. Vises som «Sist endret». */
-export const TEKSTVERSJON = "2026-11-01";
+export const TEKSTVERSJON = "2026-11-02";
 
 export const UTKAST_MERKNAD = "Utkast. Teksten er ikke ferdig gjennomgått, og den er ikke juridisk rådgivning.";
 

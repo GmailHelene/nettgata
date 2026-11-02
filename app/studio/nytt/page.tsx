@@ -3,12 +3,16 @@ import { redirect } from "next/navigation";
 import { heading } from "@/components/brand";
 import { StudioTopBar } from "@/components/studio/top-bar";
 import { ui } from "@/components/studio/ui";
+import { getDb } from "@/db";
+import { MAX_UNPAID_SITES, SITE_LIMIT_MESSAGE, unpaidSelfServeSites } from "@/lib/selvbetjening/grenser";
 import { requireUser } from "@/lib/session";
 import { NewSiteForm } from "./new-site-form";
 
-export default async function NewSitePage() {
+export default async function NewSitePage({ searchParams }: { searchParams: Promise<{ velkommen?: string }> }) {
   const user = await requireUser();
-  if (!user.isPlatformAdmin) redirect("/studio");
+  // Kunder må ha bekreftet e-posten. Studioet viser hvordan (se /studio).
+  if (!user.isPlatformAdmin && !user.emailVerified) redirect("/studio");
+  const full = !user.isPlatformAdmin && (await unpaidSelfServeSites(await getDb(), user.id)).length >= MAX_UNPAID_SITES;
   return (
     <>
       <StudioTopBar email={user.email} />
@@ -16,13 +20,29 @@ export default async function NewSitePage() {
         <Link href="/studio" className={`text-sm ${ui.link}`}>
           Alle nettsteder
         </Link>
+        {(await searchParams).velkommen && (
+          <p role="status" className={`${ui.success} mt-6 max-w-2xl`}>
+            E-posten er bekreftet, og du er logget inn. Velkommen til Nettgata!
+          </p>
+        )}
         <p className={`${ui.eyebrow} mt-6`}>Ledig tomt</p>
         <h1 className={`${heading} text-[2.4rem] leading-none sm:text-5xl`}>Nytt nettsted</h1>
         <p className={`mb-8 mt-3 max-w-2xl ${ui.muted}`}>
           Start med org.nr., så henter jeg navn og adresse fra Brønnøysundregistrene og foreslår bransje. Deretter velger du design blant
           temaene.
+          {!user.isPlatformAdmin && " Du kan bygge og forhåndsvise gratis. Abonnement trenger du først når nettstedet skal publiseres."}
         </p>
-        <NewSiteForm />
+        {full ? (
+          <div className={`${ui.card} max-w-2xl p-6`}>
+            <h2 className={`${heading} text-xl`}>Du har nådd grensen for gratis nettsteder</h2>
+            <p className={`mt-2 ${ui.muted}`}>{SITE_LIMIT_MESSAGE}</p>
+            <Link href="/studio" className={`${ui.button} mt-5`}>
+              Til nettstedene dine
+            </Link>
+          </div>
+        ) : (
+          <NewSiteForm />
+        )}
       </main>
     </>
   );

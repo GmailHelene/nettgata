@@ -13,6 +13,8 @@
  * stoppes også der.
  */
 
+import type { Db } from "@/db";
+import { hit, rules } from "@/lib/rate-limit";
 import { MAX_REDIRECTS, normalizeFrom } from "@/lib/redirects";
 
 export class SitemapError extends Error {}
@@ -163,6 +165,17 @@ export async function fetchSitemapText(
     return readLimited(res, opts.maxBytes ?? MAX_SITEMAP_BYTES);
   }
   throw new SitemapError("Nettsiden sendte videre for mange ganger");
+}
+
+export const SITEMAP_LIMIT_MESSAGE =
+  "Du har hentet sitemap mange ganger den siste timen. Vent litt før du prøver igjen, eller last opp sitemap.xml som fil i stedet.";
+
+/**
+ * Teller én henting fra nettet for nettstedet og stopper når grensen er nådd (rules.sitemapFetchPerSite).
+ * Opplastet fil teller ikke, for da henter serveren ingenting.
+ */
+export async function assertSitemapFetchAllowed(db: Db, siteId: string, now = new Date()): Promise<void> {
+  if (!(await hit(db, `sitemap:${siteId}`, rules.sitemapFetchPerSite, now))) throw new SitemapError(SITEMAP_LIMIT_MESSAGE);
 }
 
 /** Gamle stier fra en liste med fulle adresser. Forsiden og duplikater hoppes over. */

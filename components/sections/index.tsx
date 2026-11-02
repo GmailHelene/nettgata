@@ -137,21 +137,23 @@ export function Container({ children, className = "" }: { children: ReactNode; c
 /**
  * `level` styrer utseendet. `first` gjør overskriften til sidens H1 uten å endre utseendet, så en side
  * som starter med for eksempel en tekstseksjon også har én hovedoverskrift for Google og skjermlesere.
+ * `h1={false}`: miniatyrer inne i en annen side (temagalleriet og salgssidene) får H2 med samme utseende,
+ * så siden rundt beholder sin ene H1.
  */
-export function Heading({ children, level = 2, first = false }: { children: ReactNode; level?: 1 | 2; first?: boolean }) {
-  const Tag = level === 1 || first ? "h1" : "h2";
+export function Heading({ children, level = 2, first = false, h1 = true }: { children: ReactNode; level?: 1 | 2; first?: boolean; h1?: boolean }) {
+  const Tag = (level === 1 || first) && h1 ? "h1" : "h2";
   // Font, vekt, store bokstaver og størrelse kommer fra temaet (ng-h i globals.css).
   return <Tag className={`ng-h ${level === 1 ? "ng-h1" : "ng-h2 mb-6"}`}>{children}</Tag>;
 }
 
-function Hero({ section, isFirst, basePath }: { section: Section; isFirst: boolean; basePath: string }) {
+function Hero({ section, isFirst, h1, basePath }: { section: Section; isFirst: boolean; h1: boolean; basePath: string }) {
   const p = section.props;
   const bilde = image(p, "bilde");
   const variant = bilde ? section.variant : section.variant === "sentrert" ? "sentrert" : "standard";
   const centered = variant === "sentrert" || variant === "bakgrunn";
   const text = (
     <div className={centered ? "mx-auto max-w-3xl" : "max-w-3xl"}>
-      <Heading level={isFirst ? 1 : 2}>{str(p, "overskrift")}</Heading>
+      <Heading level={isFirst ? 1 : 2} h1={h1}>{str(p, "overskrift")}</Heading>
       {str(p, "undertekst") && (
         <p className={`mt-5 text-lg ${variant === "bakgrunn" ? "text-white" : "text-[var(--c-muted)]"}`}>{str(p, "undertekst")}</p>
       )}
@@ -1073,6 +1075,8 @@ function SiteFooter({ ctx }: { ctx: RenderContext }) {
             </ul>
           </div>
         ))}
+        {/* Kolonnen vises bare når det finnes noe å vise, ellers står overskriften alene. */}
+        {(info.phone || info.email || address || social.length > 0) && (
         <div>
           <h2 className="mb-3 font-semibold">Kontakt</h2>
           <address className="space-y-1 not-italic text-[var(--c-muted)]">
@@ -1104,6 +1108,7 @@ function SiteFooter({ ctx }: { ctx: RenderContext }) {
             </ul>
           )}
         </div>
+        )}
       </Container>
       <div className="border-t border-[var(--c-muted)]/20">
         <Container className="flex flex-wrap items-center justify-between gap-3 py-5 text-xs text-[var(--c-muted)]">
@@ -1243,7 +1248,7 @@ export function PageRenderer({
       {!editor && !embedded && pageTitle && ctx.path.split("/").filter(Boolean).length > 1 && <Breadcrumbs ctx={ctx} title={pageTitle} />}
       {/* Avslåtte seksjoner vises bare i redigereren, nedtonet, så kunden ser hvor de ligger. */}
       {(editor ? content.sections : content.sections.filter((s) => !s.hidden)).map((section, i) => {
-        const rendered = <SectionBackground background={section.background}>{renderSection(section, i, ctx)}</SectionBackground>;
+        const rendered = <SectionBackground background={section.background}>{renderSection(section, i, ctx, !embedded)}</SectionBackground>;
         return editor ? (
           <div
             key={section.id}
@@ -1272,47 +1277,49 @@ export function SectionPreview({ section, theme, ctx }: { section: Section; them
   );
 }
 
-function renderSection(section: Section, i: number, ctx: RenderContext) {
+/** `h1`: false i miniatyrer, se Heading. */
+function renderSection(section: Section, i: number, ctx: RenderContext, h1 = true) {
+  const first = i === 0 && h1;
   switch (section.type) {
     case "hero":
-      return <Hero key={section.id} section={section} isFirst={i === 0} basePath={ctx.basePath} />;
+      return <Hero key={section.id} section={section} isFirst={i === 0} h1={h1} basePath={ctx.basePath} />;
     case "tekst":
-      return <Tekst key={section.id} section={section} first={i === 0} />;
+      return <Tekst key={section.id} section={section} first={first} />;
     case "bildetekst":
-      return <BildeTekst key={section.id} section={section} first={i === 0} basePath={ctx.basePath} />;
+      return <BildeTekst key={section.id} section={section} first={first} basePath={ctx.basePath} />;
     case "galleri":
-      return <Galleri key={section.id} section={section} first={i === 0} />;
+      return <Galleri key={section.id} section={section} first={first} />;
     case "omtaler":
-      return <Omtaler key={section.id} section={section} first={i === 0} />;
+      return <Omtaler key={section.id} section={section} first={first} />;
     case "faq":
-      return <Faq key={section.id} section={section} first={i === 0} />;
+      return <Faq key={section.id} section={section} first={first} />;
     case "tjenester":
-      return <Tjenester key={section.id} section={section} first={i === 0} />;
+      return <Tjenester key={section.id} section={section} first={first} />;
     case "produkter":
-      return <Produkter key={section.id} section={section} first={i === 0} ctx={ctx} />;
+      return <Produkter key={section.id} section={section} first={first} ctx={ctx} />;
     case "kontakt":
-      return <Kontakt key={section.id} section={section} first={i === 0} ctx={ctx} />;
+      return <Kontakt key={section.id} section={section} first={first} ctx={ctx} />;
     case "cta":
-      return <Cta key={section.id} section={section} first={i === 0} basePath={ctx.basePath} />;
+      return <Cta key={section.id} section={section} first={first} basePath={ctx.basePath} />;
     case "fordeler":
-      return <Fordeler key={section.id} section={section} first={i === 0} />;
+      return <Fordeler key={section.id} section={section} first={first} />;
     case "kategorikort":
-      return <Kategorikort key={section.id} section={section} first={i === 0} basePath={ctx.basePath} />;
+      return <Kategorikort key={section.id} section={section} first={first} basePath={ctx.basePath} />;
     case "blogg":
-      return <Blogg key={section.id} section={section} first={i === 0} ctx={ctx} />;
+      return <Blogg key={section.id} section={section} first={first} ctx={ctx} />;
     case "bestill":
-      return <Bestill key={section.id} section={section} first={i === 0} ctx={ctx} />;
+      return <Bestill key={section.id} section={section} first={first} ctx={ctx} />;
     case "ansatte":
-      return <Ansatte key={section.id} section={section} first={i === 0} />;
+      return <Ansatte key={section.id} section={section} first={first} />;
     case "apningstider":
-      return <Apningstider key={section.id} section={section} first={i === 0} ctx={ctx} />;
+      return <Apningstider key={section.id} section={section} first={first} ctx={ctx} />;
     case "kart":
-      return <Kart key={section.id} section={section} first={i === 0} ctx={ctx} />;
+      return <Kart key={section.id} section={section} first={first} ctx={ctx} />;
     case "video":
-      return <Video key={section.id} section={section} first={i === 0} ctx={ctx} />;
+      return <Video key={section.id} section={section} first={first} ctx={ctx} />;
     case "filer":
-      return <Filer key={section.id} section={section} first={i === 0} ctx={ctx} />;
+      return <Filer key={section.id} section={section} first={first} ctx={ctx} />;
     case "nyhetsbrev":
-      return <Nyhetsbrev key={section.id} section={section} first={i === 0} ctx={ctx} />;
+      return <Nyhetsbrev key={section.id} section={section} first={first} ctx={ctx} />;
   }
 }

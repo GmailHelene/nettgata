@@ -3,6 +3,7 @@ import type { Db } from "@/db";
 import { aiSuggestions, bookings, emailLog, inquiries, newsletterDeliveries, newsletters, rateLimitEvents, visitDays, visitHashes, visitPages, visitSources } from "@/db/schema";
 import { osloDate } from "@/lib/oslo-time";
 import { expireUnconfirmed } from "@/lib/nyhetsbrev/subscribers";
+import { deleteUnverifiedAccounts } from "@/lib/selvbetjening/opprydding";
 
 /**
  * Sletting som personvernerklæringene lover (lib/legal). Kjøres hver natt etter sikkerhetskopien.
@@ -80,8 +81,12 @@ export async function runRetention(db: Db, now = new Date()) {
     .delete(newsletterDeliveries)
     .where(inArray(newsletterDeliveries.newsletterId, oldLetters))
     .returning({ id: newsletterDeliveries.newsletterId });
+  // Kontoer fra /studio/registrer som ikke er bekreftet innen sju dager. Ubetalte nettsteder uten aktivitet
+  // ryddes i cleanupInactiveSites, som trenger lageret og e-post, og kalles fra den nattlige jobben.
+  const unverifiedAccounts = await deleteUnverifiedAccounts(db, now);
   return {
     rateLimits: rateLimits.length,
+    unverifiedAccounts,
     inquiries: oldInquiries.length,
     aiSuggestions: oldSuggestions.length,
     bookings: oldBookings.length,

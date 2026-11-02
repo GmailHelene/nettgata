@@ -2,7 +2,7 @@ import { and, asc, desc, eq, ilike, inArray, ne, or, type SQL } from "drizzle-or
 import type { Db } from "@/db";
 import { orders, productCategories, productVariants, products } from "@/db/schema";
 import { csvKroner, toCsv } from "@/lib/csv";
-import { formatOsloDateTime } from "@/lib/oslo-time";
+import { formatOsloDateTime, osloDate } from "@/lib/oslo-time";
 import { paymentLabels, type PaymentMethod } from "./settings";
 import { carrierLabel } from "./tracking";
 
@@ -71,7 +71,11 @@ const statusText: Record<string, string> = {
   refunded: "Refundert",
 };
 
-export function ordersCsv(rows: (typeof orders.$inferSelect)[]): string {
+/**
+ * Kreditnotaene hentes for seg (creditNotesForOrders i lib/shop/credit-notes.ts) og gis inn her, så regnskapet ser
+ * hvilke ordre som er kreditert uten å slå opp hver ordre.
+ */
+export function ordersCsv(rows: (typeof orders.$inferSelect)[], credits: ReadonlyMap<string, { number: number; createdAt: Date }> = new Map()): string {
   return toCsv(
     [
       "Ordrenr",
@@ -93,6 +97,8 @@ export function ordersCsv(rows: (typeof orders.$inferSelect)[]): string {
       "Herav MVA (kr)",
       "Transportør",
       "Sporingsnummer",
+      "Kreditnota",
+      "Kreditert dato",
     ],
     rows.map((o) => [
       o.number,
@@ -114,6 +120,8 @@ export function ordersCsv(rows: (typeof orders.$inferSelect)[]): string {
       csvKroner(o.vatOre),
       o.trackingNumber ? carrierLabel(o.trackingCarrier) : "",
       o.trackingNumber,
+      credits.get(o.id)?.number,
+      credits.has(o.id) ? osloDate(credits.get(o.id)!.createdAt) : "",
     ]),
   );
 }

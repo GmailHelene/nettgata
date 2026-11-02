@@ -7,6 +7,7 @@ import { shopSettingsSchema, type ShopSettings } from "@/lib/shop/settings";
 import { PaymentError } from "./common";
 import { decryptPaymentSecret, encryptPaymentSecret } from "./crypto";
 import { klarnaClient, type KlarnaCredentials } from "./klarna";
+import { kustomClient, type KustomCredentials } from "./kustom";
 import { paymentEnvironments, providerNames, readStoredProvider, type OnlineProvider, type PaymentEnvironment, type StoredProvider } from "./state";
 import { vippsClient, type VippsCredentials } from "./vipps";
 
@@ -50,8 +51,25 @@ export const klarnaKeysSchema = z
     }
   });
 
+export const kustomKeysSchema = z
+  .object({
+    environment: environmentField,
+    username: keyField("API-brukernavnet"),
+    password: keyField("API-passordet"),
+  })
+  .superRefine((k, ctx) => {
+    // Kustom-passordet sier selv hvilket miljø det hører til (kco_test_api_ eller kco_live_api_).
+    if (k.environment === "production" && /^kco_test_/i.test(k.password)) {
+      ctx.addIssue({ code: "custom", path: ["password"], message: "Dette er et testpassord fra Kustom. Velg test, eller lim inn passordet for produksjon." });
+    }
+    if (k.environment === "test" && /^kco_live_/i.test(k.password)) {
+      ctx.addIssue({ code: "custom", path: ["password"], message: "Dette er et produksjonspassord fra Kustom. Velg produksjon, eller lim inn testpassordet." });
+    }
+  });
+
 export type VippsKeysInput = z.input<typeof vippsKeysSchema>;
 export type KlarnaKeysInput = z.input<typeof klarnaKeysSchema>;
+export type KustomKeysInput = z.input<typeof kustomKeysSchema>;
 
 /** Krypteringen er bundet til butikk, løsning og miljø. */
 const encryptionContext = (siteId: string, provider: OnlineProvider, environment: PaymentEnvironment) =>
@@ -78,10 +96,10 @@ export async function savePaymentKeys(db: Db, siteId: string, provider: OnlinePr
     environment = env;
     hint = keys.clientId.slice(-4);
   } else {
-    const parsed = klarnaKeysSchema.safeParse(input);
+    const parsed = (provider === "kustom" ? kustomKeysSchema : klarnaKeysSchema).safeParse(input);
     if (!parsed.success) throw new ShopError(parsed.error.issues[0].message);
     const { environment: env, ...keys } = parsed.data;
-    plain = JSON.stringify(keys satisfies KlarnaCredentials);
+    plain = JSON.stringify(keys satisfies KlarnaCredentials & KustomCredentials);
     environment = env;
     hint = keys.username.slice(-4);
   }
@@ -134,7 +152,8 @@ export async function updateShopSettings(db: Db, siteId: string, settings: ShopS
 
 export type ProviderAccess =
   | { provider: "vipps"; environment: PaymentEnvironment; credentials: VippsCredentials }
-  | { provider: "klarna"; environment: PaymentEnvironment; credentials: KlarnaCredentials };
+  | { provider: "klarna"; environment: PaymentEnvironment; credentials: KlarnaCredentials }
+  | { provider: "kustom"; environment: PaymentEnvironment; credentials: KustomCredentials };
 
 /**
  * Dekrypterer nøklene rett før et kall til Vipps eller Klarna. Bare på serveren, og resultatet skal aldri logges,
@@ -151,7 +170,7 @@ export async function loadCredentials(site: { id: string; shop: unknown }, provi
       return { provider, environment: stored.environment, credentials: keys };
     }
     const keys = z.object({ username: z.string().min(1), password: z.string().min(1) }).parse(plain);
-    return { provider, environment: stored.environment, credentials: keys };
+    return provider === "kustom" ? { provider, environment: stored.environment, credentials: keys } : { provider, environment: stored.environment, credentials: keys };
   } catch {
     console.error(`Betalingsnøklene for ${providerNames[provider]} kunne ikke leses for nettsted ${site.id}. De må legges inn på nytt.`);
     return null;
@@ -181,7 +200,7 @@ export function paymentSetupView(shop: unknown): Record<OnlineProvider, Provider
       ready: stored.testedAt !== null,
     };
   };
-  return { vipps: view("vipps"), klarna: view("klarna") };
+  return { vipps: view("vipps"), klarna: view("klarna"), kustom: view("kustom") };
 }
 
 // ---------- Test av tilkoblingen ----------
@@ -203,6 +222,7 @@ export async function testPaymentConnection(db: Db, siteId: string, provider: On
   } else {
     try {
       if (access.provider === "vipps") await vippsClient(access.environment, access.credentials).testConnection();
+      else if (access.provider === "kustom") await kustomClient(access.environment, access.credentials).testConnection();
       else await klarnaClient(access.environment, access.credentials).testConnection();
       ok = true;
       message = `Tilkoblingen til ${providerNames[provider]} virker.`;

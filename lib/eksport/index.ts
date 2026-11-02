@@ -1,7 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNotNull } from "drizzle-orm";
 import type { Db } from "@/db";
-import { auditLog, media, sites, users } from "@/db/schema";
+import { auditLog, inquiryImages, media, sites, users } from "@/db/schema";
 import { deliver, type EmailProvider } from "@/lib/email/send";
 import { emailParts } from "@/lib/email/templates";
 import { osloDate } from "@/lib/oslo-time";
@@ -9,6 +9,7 @@ import type { RateLimitRule } from "@/lib/rate-limit";
 import { getSecret } from "@/lib/secret";
 import { platformUrl, publicSiteUrl } from "@/lib/site-url";
 import { originalKey } from "@/lib/media-types";
+import { inquiryImageFileName } from "@/lib/henvendelser/bilder";
 import type { MediaStore } from "@/lib/storage";
 import { fileForPath, rewriteCss, rewriteHtml, SITE_DIR, type Asset } from "./html";
 import { buildDataFile, dataFilesFor, exportedPaths, mediaFileName, readme, type DataFile } from "./innhold";
@@ -141,8 +142,14 @@ export async function startExport(db: Db, store: MediaStore, site: Site, userId:
   if (existing?.status === "lager") return existing;
   if (existing) await deleteParts(store, existing);
 
-  const [mediaRows, paths, liveUrl] = await Promise.all([
+  const [mediaRows, imageRows, paths, liveUrl] = await Promise.all([
     db.select().from(media).where(eq(media.siteId, site.id)).orderBy(asc(media.createdAt)),
+    // Bilder fra kontaktskjemaet, bare de som hører til en henvendelse. Ligger privat i lageret og vises aldri på nettstedet.
+    db
+      .select({ id: inquiryImages.id, inquiryId: inquiryImages.inquiryId, key: inquiryImages.key })
+      .from(inquiryImages)
+      .where(and(eq(inquiryImages.siteId, site.id), isNotNull(inquiryImages.inquiryId)))
+      .orderBy(asc(inquiryImages.createdAt), asc(inquiryImages.id)),
     exportedPaths(db, site),
     publicSiteUrl(db, site),
   ]);
@@ -150,6 +157,7 @@ export async function startExport(db: Db, store: MediaStore, site: Site, userId:
   const items: ExportItem[] = [
     ...files.map((name) => ({ t: "data" as const, name })),
     ...mediaRows.map((m) => ({ t: "original" as const, key: m.key, file: mediaFileName(m) })),
+    ...imageRows.map((img) => ({ t: "original" as const, key: img.key, file: inquiryImageFileName(img) })),
     ...paths.map((path) => ({ t: "page" as const, path })),
     // Filene sidene trenger (CSS, fonter, bilder) legges til underveis, når sidene er lest. LES-MEG.txt flyttes sist.
     { t: "readme" as const },
@@ -234,7 +242,7 @@ async function processItem(deps: ExportDeps, site: Site, job: ExportJob, item: E
       return [{ name: `${SITE_DIR}${item.path}`, data: new Uint8Array(await res.arrayBuffer()) }];
     }
     case "readme":
-      return [{ name: "LES-MEG.txt", data: readme({ site, createdAt: new Date(job.createdAt), files: dataFilesFor(site), pages: job.pages.length - job.skipped.length, skipped: job.skipped }) }];
+      return [{ name: "LES-MEG.txt", data: readme({ site, createdAt: new Date(job.createdAt), files: dataFilesFor(site), pages: job.pages.length - job.skipped.length, skipped: job.skipped, inquiryImages: job.items.filter((i) => i.t === "original" && i.file.startsWith("henvendelser/")).length }) }];
   }
 }
 

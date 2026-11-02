@@ -8,6 +8,7 @@ import {
   bookingStaff,
   bookingStaffServices,
   inquiries,
+  inquiryImages,
   media,
   orderLines,
   orders,
@@ -21,10 +22,12 @@ import {
 import { readAnswers } from "@/lib/content/form-fields";
 import { csvKroner, toCsv } from "@/lib/csv";
 import { readBookingSettings } from "@/lib/egen-booking/settings";
+import { inquiryImageFileName } from "@/lib/henvendelser/bilder";
 import { HELP_CONTACT_EMAIL } from "@/lib/hjelp/artikler";
 import { formatOsloDateTime } from "@/lib/oslo-time";
 import { subscribersCsv } from "@/lib/nyhetsbrev/subscribers";
 import { listOrders, ordersCsv, parseOrderQuery, productsCsv } from "@/lib/shop/admin";
+import { creditNotesForOrders } from "@/lib/shop/credit-notes";
 import { customersCsv } from "@/lib/shop/customers";
 import { readShopSettings } from "@/lib/shop/settings";
 import { readSiteInfo } from "@/lib/site-info";
@@ -160,8 +163,10 @@ export async function buildDataFile(db: Db, site: Site, name: DataFile): Promise
     }
     case "tabeller/varer.csv":
       return text(await productsCsv(db, site.id));
-    case "tabeller/ordre.csv":
-      return text(ordersCsv(await listOrders(db, site.id, parseOrderQuery({}), 100_000)));
+    case "tabeller/ordre.csv": {
+      const rows = await listOrders(db, site.id, parseOrderQuery({}), 100_000);
+      return text(ordersCsv(rows, await creditNotesForOrders(db, site.id, rows.map((o) => o.id))));
+    }
     case "tabeller/ordrelinjer.csv": {
       const rows = await db
         .select({ number: orders.number, line: orderLines })
@@ -180,9 +185,20 @@ export async function buildDataFile(db: Db, site: Site, name: DataFile): Promise
       return text(await customersCsv(db, site.id));
     case "tabeller/henvendelser.csv": {
       const rows = await db.select().from(inquiries).where(eq(inquiries.siteId, site.id)).orderBy(desc(inquiries.createdAt));
+      // Bildene ligger i mappen henvendelser/, og kolonnen «Bilder» sier hvilke filer som hører til hver henvendelse.
+      const images = await db
+        .select({ id: inquiryImages.id, inquiryId: inquiryImages.inquiryId, key: inquiryImages.key })
+        .from(inquiryImages)
+        .where(and(eq(inquiryImages.siteId, site.id), isNotNull(inquiryImages.inquiryId)))
+        .orderBy(asc(inquiryImages.createdAt), asc(inquiryImages.id));
+      const imageFiles = (inquiryId: string) =>
+        images
+          .filter((i) => i.inquiryId === inquiryId)
+          .map(inquiryImageFileName)
+          .join("\n");
       return text(
         toCsv(
-          ["Dato", "Navn", "E-post", "Telefon", "Melding", "Svar i egne felt", "Side", "Lest"],
+          ["Dato", "Navn", "E-post", "Telefon", "Melding", "Svar i egne felt", "Bilder", "Side", "Lest"],
           rows.map((q) => [
             formatOsloDateTime(q.createdAt),
             q.name,
@@ -192,6 +208,7 @@ export async function buildDataFile(db: Db, site: Site, name: DataFile): Promise
             readAnswers(q.answers)
               .map((a) => `${a.label}: ${a.value}`)
               .join("\n"),
+            imageFiles(q.id),
             q.pagePath,
             q.readAt ? "Ja" : "Nei",
           ]),
@@ -259,7 +276,7 @@ export async function exportedPaths(db: Db, site: Site): Promise<string[]> {
 }
 
 /** LES-MEG.txt. Skrives sist, så den kan nevne sider som ikke lot seg lagre. */
-export function readme(o: { site: Site; createdAt: Date; files: DataFile[]; pages: number; skipped: string[] }): Uint8Array {
+export function readme(o: { site: Site; createdAt: Date; files: DataFile[]; pages: number; skipped: string[]; inquiryImages?: number }): Uint8Array {
   const shop = o.site.kind === "nettbutikk";
   const has = (name: DataFile) => o.files.includes(name);
   const tables = [
@@ -297,6 +314,9 @@ export function readme(o: { site: Site; createdAt: Date; files: DataFile[]; page
     "bilder/ og filer/",
     "  Bildene i den størrelsen de ble lagret i, og PDF-filene slik de ble lastet opp.",
     "",
+    ...(o.inquiryImages
+      ? ["henvendelser/", "  Bilder som er lagt ved i kontaktskjemaet. Kolonnen «Bilder» i henvendelser.csv viser hvilken henvendelse hvert bilde hører til.", ""]
+      : []),
     "tabeller/",
     "  Regneark (CSV) som åpnes i Excel, Numbers og Google Regneark:",
     ...tables.map((t) => `  ${t}`),

@@ -20,6 +20,7 @@ import {
 } from "@/lib/shop/catalog";
 import { saveDiscount, type DiscountInput } from "@/lib/shop/discounts";
 import { setCustomerNote } from "@/lib/shop/customers";
+import { CreditNoteError, retryCreditNote } from "@/lib/shop/credit-notes";
 import { notifyOrderPlaced, notifyOrderShipped } from "@/lib/email/notify";
 import { getEmailProvider } from "@/lib/email/send";
 import { updateShopSettings } from "@/lib/payments/config";
@@ -203,6 +204,21 @@ export async function saveStaffNoteAction(siteId: string, orderId: string, note:
     revalidatePath(`/studio/nettsted/${site.id}/ordre/${orderId}`);
     return { ok: true, message: "Notatet er lagret" };
   } catch (err) {
+    return toState(err);
+  }
+}
+
+/** Lager kreditnotaen som mangler på en kansellert eller refundert ordre. Eier og redaktør, som resten av ordrearbeidet. */
+export async function retryCreditNoteAction(siteId: string, orderId: string): Promise<ActionState> {
+  try {
+    const { site, user, role } = await requireSiteAccess(siteId);
+    if (role !== "owner" && role !== "editor") return { ok: false, message: "Bare eieren eller en redaktør kan lage kreditnota." };
+    const note = await retryCreditNote(await getDb(), site.id, orderId, user.id);
+    revalidatePath(`/studio/nettsted/${site.id}/ordre/${orderId}`);
+    return { ok: true, message: `Kreditnota nr. ${note.number} er laget` };
+  } catch (err) {
+    unstable_rethrow(err);
+    if (err instanceof CreditNoteError) return { ok: false, message: err.message };
     return toState(err);
   }
 }

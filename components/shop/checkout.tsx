@@ -19,6 +19,7 @@ const input = "w-full rounded-[var(--radius)] border border-[var(--c-muted)] bg-
 /** Kort forklaring under betalingsmåten i kassen. */
 const paymentNotes: Partial<Record<PaymentMethod, string>> = {
   klarna: "Kort, faktura eller delbetaling",
+  kustom: "Velg betalingsmåte i Kustom-kassen",
 };
 
 /**

@@ -1,6 +1,6 @@
 // Inngangen Cloudflare kjører: OpenNext sin Worker for alle sidene, videresending fra plattformens
-// ekstra adresser, og bakgrunnsjobbene (cron): domener, betalinger, svar til AI-teamet, nyhetsbrev, månedsrapporten
-// og «Last ned alt» hvert tiende minutt, sikkerhetskopi og AI-teamets nattkjøring (daglig og ukentlig) hver natt.
+// ekstra adresser, og bakgrunnsjobbene (cron): domener, betalinger, svar til AI-teamet, nyhetsbrev, månedsrapporten,
+// «Last ned alt» og rydding av bilder fra kontaktskjemaene hvert tiende minutt, sikkerhetskopi og AI-teamets nattkjøring (daglig og ukentlig) hver natt.
 // Se https://opennext.js.org/cloudflare/howtos/custom-worker
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore .open-next/worker.js lages av «opennextjs-cloudflare build»
@@ -37,7 +37,7 @@ const worker = {
     const secret = env.SESSION_SECRET?.trim();
     if (!secret) return;
     const key = await cronKey(secret);
-    const jobs = controller.cron === NIGHTLY ? ["sikkerhetskopi", "ai-natt"] : ["domener", "betaling", "ai", "nyhetsbrev", "manedsrapport", "eksport"];
+    const jobs = controller.cron === NIGHTLY ? ["sikkerhetskopi", "ai-natt"] : ["domener", "betaling", "ai", "nyhetsbrev", "manedsrapport", "eksport", "henvendelsesbilder"];
     for (const job of jobs) {
       ctx.waitUntil(
         env.WORKER_SELF_REFERENCE.fetch(`https://intern/api/cron/${job}`, { method: "POST", headers: { "x-cron-key": key } }).then(async (res) => {

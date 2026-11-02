@@ -75,6 +75,7 @@ export function plattformPersonvern(o: Valg = {}): PageContent {
     tekstSeksjon("konto", "Når du har konto i studioet", [
       "For kontoen lagrer jeg e-postadressen og navnet ditt. Passordet lagres bare som en hash som ikke kan leses tilbake. Slår du på tofaktor, lagres hemmeligheten kryptert. Hvem som har endret og publisert hva, logges, slik at du kan se historikken og gå tilbake til en tidligere versjon.",
       "Grunnlaget er avtalen med deg (artikkel 6 nr. 1 bokstav b). Kontoen og loggene slettes når abonnementet er slutt og perioden for nedlasting er over, slik vilkårene beskriver.",
+      "Lager du konto selv, lagrer jeg også når du godtok vilkårene og hvilken versjon du godtok. En konto der e-posten ikke er bekreftet, slettes etter sju dager. Har et nettsted uten abonnement ikke vært brukt i studioet på 60 dager, får du varsel på e-post. Logger du ikke inn eller velger abonnement innen 14 dager etter varselet, slettes nettstedet med sider, tekster og bilder.",
     ]),
 
     tekstSeksjon("kunde", "Når du er kunde", [
@@ -156,6 +157,7 @@ export function plattformVilkar(o: Valg = {}): PageContent {
     tekstSeksjon("data", "Dataene dine når avtalen slutter", [
       "Det du har lagt inn, er ditt. Du kan når som helst laste ned varer, kunder, ordre og rapporter som regneark (CSV) i studioet. Tekster og bilder sender jeg deg i vanlige filformater hvis du ber om det.",
       `Når abonnementet er slutt, er nettstedet ikke lenger publisert, men studioet er åpent for nedlasting i ${EKSPORT_DAGER} dager. Deretter sletter jeg dataene. Sikkerhetskopier slettes etter hvert som de blir eldre enn ${SIKKERHETSKOPI_DAGER} dager, så alt er borte senest ${EKSPORT_DAGER + SIKKERHETSKOPI_DAGER} dager etter at abonnementet sluttet.`,
+      "Du kan lage og forhåndsvise et nettsted gratis før du velger abonnement. Et slikt nettsted kan ikke publiseres, og det har plass til 200 MB bilder og filer. Har det ikke vært brukt i studioet på 60 dager, får du varsel på e-post, og det slettes 14 dager senere hvis du ikke logger inn eller velger abonnement.",
       "Du må selv ta vare på regnskapsmateriale som bokføringsloven krever, for eksempel salgsdokumentasjon. Nettgata er ikke et arkiv for regnskapet ditt, så last ned ordrene jevnlig eller send dem til regnskapssystemet ditt.",
       "Domenet er ditt hele tiden. Jeg hjelper deg med å peke det til et annet sted når du flytter.",
     ]),
@@ -164,7 +166,7 @@ export function plattformVilkar(o: Valg = {}): PageContent {
       "Du er ansvarlig for innholdet på nettstedet ditt, altså tekster, bilder, priser og varer. Du må ha rett til å bruke bildene og tekstene, og omtaler skal være ekte.",
       "Temaene og seksjonene i Nettgata er laget for å oppfylle kravene til universell utforming etter WCAG 2.0. Innholdet du legger inn selv, må også være universelt utformet. Det gjelder for eksempel alternativ tekst på bilder, tekst i bilder, lenketekster og dokumenter du laster opp.",
       "Overfor kundene dine er det du som er selger. Du har ansvaret for kjøpsvilkår, priser og førpriser, merverdiavgift, angrerett, reklamasjoner og bokføring. Nettgata hjelper med maler og automatikk, men den juridiske plikten er din.",
-      "Avtalene med Vipps MobilePay, Klarna, Posten Bring, Fiken og andre leverandører inngår du selv. Pengene fra salget går rett til deg, og gebyrene følger avtalene dine med dem. Jeg er ikke part i de avtalene og har ikke ansvar for tjenestene deres.",
+      "Avtalene med Vipps MobilePay, Klarna, Kustom, Posten Bring, Fiken og andre leverandører inngår du selv. Pengene fra salget går rett til deg, og gebyrene følger avtalene dine med dem. Jeg er ikke part i de avtalene og har ikke ansvar for tjenestene deres.",
       "Du er behandlingsansvarlig for personopplysningene om besøkende og kunder på nettstedet ditt. Personvernerklæringen Nettgata lager, bygger på valgene dine i studioet. Les den, og si fra hvis noe ikke stemmer.",
       "Pass på passordene og hvem som har tilgang til studioet, og slå på tofaktor. Tror du at noen uvedkommende har kommet seg inn, sier du fra til meg med en gang.",
       "Du kan ikke bruke Nettgata til ulovlig innhold, til å selge varer det er forbudt å selge, eller til å sende spam.",
@@ -182,7 +184,7 @@ export function plattformVilkar(o: Valg = {}): PageContent {
     tekstSeksjon("ansvar", "Ansvarsbegrensning", [
       "Jeg er ansvarlig for direkte tap som skyldes at jeg ikke har levert det avtalen sier. Jeg er ikke ansvarlig for indirekte tap, som tapt salg eller fortjeneste, tapte data utover det sikkerhetskopiene dekker, eller krav fra andre mot deg.",
       "Samlet ansvar i et kalenderår er begrenset til det du har betalt for abonnementet de siste tolv månedene. Begrensningene gjelder ikke hvis jeg har opptrådt grovt uaktsomt eller med vilje.",
-      "Jeg er ikke ansvarlig for feil eller stans hos Vipps MobilePay, Klarna, Posten Bring, domeneforhandleren din eller andre tjenester du har egne avtaler med. Det samme gjelder forhold utenfor min kontroll som jeg ikke med rimelighet kunne forutse eller unngå.",
+      "Jeg er ikke ansvarlig for feil eller stans hos Vipps MobilePay, Klarna, Kustom, Posten Bring, domeneforhandleren din eller andre tjenester du har egne avtaler med. Det samme gjelder forhold utenfor min kontroll som jeg ikke med rimelighet kunne forutse eller unngå.",
       "Krav må du sette fram skriftlig innen rimelig tid etter at du oppdaget feilen.",
     ]),
 
@@ -251,7 +253,7 @@ export function plattformDatabehandleravtale(o: Valg = {}): PageContent {
       "Du gir meg en generell tillatelse til å bruke underleverandørene under. Hver av dem har en databehandleravtale med meg som gir minst samme vern som denne avtalen.",
       "Vil jeg ta i bruk en ny underleverandør eller bytte ut en, sier jeg fra på e-post minst 30 dager før. Du kan protestere. Finner vi ikke en løsning, kan du si opp abonnementet før endringen og få tilbake det du har betalt for tiden etterpå.",
       ...UNDERLEVERANDORER.map(underleverandorAvsnitt),
-      "Vipps MobilePay, Klarna og Posten Bring er ikke underleverandører. Butikken har egne avtaler med dem, og de er selv behandlingsansvarlige for opplysningene de får.",
+      "Vipps MobilePay, Klarna, Kustom og Posten Bring er ikke underleverandører. Butikken har egne avtaler med dem, og de er selv behandlingsansvarlige for opplysningene de får.",
       "Fiken er heller ikke underleverandør. Kobler du til Fiken, sender jeg bestillingene dit fordi du har bedt om det, og hvordan Fiken behandler dem, følger av avtalen du har med Fiken.",
     ]),
 

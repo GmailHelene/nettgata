@@ -35,6 +35,7 @@ import { listCatalog } from "@/lib/shop/catalog";
 import { readShopSettings } from "@/lib/shop/settings";
 import { browse, isRefinedQuery, parseBrowseQuery, resultSummary } from "@/lib/shop/browse";
 import { embeddedServices } from "@/lib/embeds";
+import { usesInquiryImages } from "@/lib/henvendelser/bilder";
 import { siteIcons } from "@/lib/favicon";
 import { findRedirect } from "@/lib/redirects";
 import { GENERATED_PATHS, generatedLegalPage } from "@/lib/legal/kundesider";
@@ -384,7 +385,9 @@ export default async function PublicPage(props: Props) {
     const newsletter = at === GENERATED_PATHS.personvern && (await usesNewsletter(db, site.id, published));
     // Kart og video fra Google nevnes bare når de er i bruk.
     const embeds = embeddedServices(published);
-    const generated = generatedLegalPage(site, at, { bookingHosts, ownBooking, newsletter, embeds }) ?? (at === "/" ? comingSoonPage(site.name) : null);
+    // Bilder i kontaktskjemaet nevnes bare når et publisert skjema har bildefeltet.
+    const inquiryImages = usesInquiryImages(published);
+    const generated = generatedLegalPage(site, at, { bookingHosts, ownBooking, newsletter, embeds, inquiryImages }) ?? (at === "/" ? comingSoonPage(site.name) : null);
     if (!generated) notFound();
     const legalCtx = await buildRenderContext(db, site, at, false, basePath);
     return <PageRenderer content={generated} theme={site.theme} ctx={legalCtx} />;

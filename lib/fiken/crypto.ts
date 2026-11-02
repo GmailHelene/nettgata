@@ -1,7 +1,7 @@
 import { getSecret } from "@/lib/secret";
 
 /**
- * Kryptering av butikkenes API-nøkkel til Fiken. Samme mønster som Vipps- og Klarna-nøklene (lib/payments/crypto.ts):
+ * Kryptering av butikkenes nøkler til Fiken (tilgangs- og fornyelsesnøkkelen fra OAuth2, lagret sammen som JSON). Samme mønster som Vipps- og Klarna-nøklene (lib/payments/crypto.ts):
  * AES-GCM med en nøkkel avledet fra SESSION_SECRET med HKDF, men med egen etikett, så nøkkelen aldri er den samme som
  * for betalingsnøklene eller tofaktor. Byttes SESSION_SECRET, må butikkene koble til Fiken på nytt.
  *

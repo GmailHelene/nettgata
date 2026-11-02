@@ -331,9 +331,13 @@ export function newInquiryEmail(o: {
   inquiry: { name: string; email: string | null; phone: string | null; message: string; pagePath: string | null; answers?: { label: string; value: string }[] };
   siteUrl: string;
   studioUrl: string;
+  /** Bilder lagt ved i skjemaet. Selve bildene sendes aldri på e-post, de ses bare i innboksen i studioet. */
+  imageCount?: number;
 }): Rendered {
   const { shop, inquiry } = o;
   const answers = inquiry.answers ?? [];
+  const images = o.imageCount ?? 0;
+  const imageLine = images ? `${images} ${images === 1 ? "bilde" : "bilder"} vedlagt, se ${images === 1 ? "det" : "dem"} i innboksen.` : "";
   const subject = `Ny henvendelse fra ${inquiry.name}`;
   const host = o.siteUrl.replace(/^https?:\/\//, "");
   const reply = inquiry.email
@@ -360,8 +364,9 @@ export function newInquiryEmail(o: {
           )
           .join("")}</table>`
       : "",
+    imageLine ? paragraph(`<strong>${esc(imageLine)}</strong>`) : "",
     paragraph(esc(reply)),
-    button(o.studioUrl, "Se alle henvendelser"),
+    button(o.studioUrl, images ? "Se bildene i innboksen" : "Se alle henvendelser"),
   ].join("");
 
   const text = [
@@ -372,6 +377,7 @@ export function newInquiryEmail(o: {
     "",
     inquiry.message,
     ...(answers.length ? ["", ...answers.map((a) => `${a.label}: ${a.value.replace(/\s*\n\s*/g, " / ")}`)] : []),
+    ...(imageLine ? ["", imageLine] : []),
     "",
     reply,
     `Alle henvendelser: ${o.studioUrl}`,

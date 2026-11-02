@@ -36,17 +36,28 @@ export function youtubeEmbedUrl(id: string): string {
   return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`;
 }
 
+/**
+ * Nøkkelen til Googles Maps Embed API, eller tom. Settes som vanlig variabel (GOOGLE_MAPS_EMBED_KEY under «vars» i
+ * wrangler.jsonc), ikke som hemmelighet: den står uansett i kartadressen som den besøkende laster. Derfor er den
+ * begrenset til Maps Embed API i Google Cloud, se docs/FUNKSJONSKART.md.
+ */
+export function mapsEmbedKey(): string {
+  return process.env.GOOGLE_MAPS_EMBED_KEY?.trim() ?? "";
+}
+
 /** Lenker til kartet. Brukes både før og etter at kartet er åpnet, så adressen alltid kan slås opp. */
-export function mapLinks(address: string) {
+export function mapLinks(address: string, embedKey = mapsEmbedKey()) {
   const q = encodeURIComponent(address);
   return {
     google: `https://www.google.com/maps/search/?api=1&query=${q}`,
     osm: `https://www.openstreetmap.org/search?query=${q}`,
-    // Udokumentert adresse, men den eneste som virker med bare adressen og uten API-nøkkel (sjekket 2. november 2026).
-    // Googles dokumenterte Maps Embed API (google.com/maps/embed/v1/place) krever nøkkel og faktureringskonto, og
-    // OpenStreetMap sin innbygging (export/embed.html) trenger koordinater, som vi ikke har uten geokoding.
-    // Slutter den å virke, viser rammen en feil, og lenkene under kartet virker fortsatt.
-    embed: `https://maps.google.com/maps?q=${q}&output=embed`,
+    // Med nøkkel brukes Googles dokumenterte Maps Embed API, som er gratis. Uten nøkkel brukes den udokumenterte
+    // adressen, den eneste som virker med bare adressen (sjekket 2. november 2026). OpenStreetMap sin innbygging
+    // (export/embed.html) trenger koordinater, som vi ikke har uten geokoding.
+    // Slutter kartet å virke, viser rammen en feil, og lenkene under kartet virker fortsatt.
+    embed: embedKey
+      ? `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(embedKey)}&q=${q}`
+      : `https://maps.google.com/maps?q=${q}&output=embed`,
   };
 }
 

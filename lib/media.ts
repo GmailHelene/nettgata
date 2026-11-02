@@ -16,6 +16,7 @@ import {
 } from "@/lib/media-types";
 import type { MediaStore } from "@/lib/storage";
 import { readSiteLayout } from "@/lib/site-layout";
+import { assertStorageRoom, LimitError } from "@/lib/selvbetjening/grenser";
 
 export class MediaError extends Error {}
 
@@ -149,6 +150,16 @@ export async function deleteMedia(db: Db, store: MediaStore, input: { siteId: st
   await db.insert(auditLog).values({ siteId: input.siteId, userId: input.userId, action: "media.deleted", detail: { key: row.key } });
 }
 
+/** Grensen for lagring på ubetalte nettsteder (lib/selvbetjening/grenser.ts), som en vanlig feil ved opplasting. */
+async function roomFor(db: Db, siteId: string, bytes: number) {
+  try {
+    await assertStorageRoom(db, siteId, bytes);
+  } catch (err) {
+    if (err instanceof LimitError) throw new MediaError(err.message);
+    throw err;
+  }
+}
+
 /**
  * Validerer og lagrer et bilde, med de mindre utgavene nettleseren har laget. Returnerer stien som brukes
  * i innholdet. En mindre utgave som ikke er gyldig, hoppes over: bilderuten svarer da med originalen.
@@ -170,6 +181,7 @@ export async function saveImage(
   if (input.bytes.byteLength > MAX_IMAGE_BYTES) throw new MediaError("Bildet er større enn 5 MB");
   const contentType = sniffImageType(input.bytes);
   if (!contentType) throw new MediaError("Filtypen støttes ikke. Bruk JPG, PNG, WebP, GIF eller AVIF.");
+  await roomFor(db, input.siteId, input.bytes.byteLength);
 
   const id = crypto.randomUUID();
   const key = `${input.siteId}/${id}.${imageTypes[contentType]}`;
@@ -214,6 +226,7 @@ export async function saveFile(db: Db, store: MediaStore, input: { siteId: strin
   if (input.bytes.byteLength === 0) throw new MediaError("Filen er tom");
   if (input.bytes.byteLength > MAX_FILE_BYTES) throw new MediaError("Filen er større enn 10 MB");
   if (!sniffPdf(input.bytes)) throw new MediaError("Bare PDF-filer kan lastes opp her.");
+  await roomFor(db, input.siteId, input.bytes.byteLength);
 
   const id = crypto.randomUUID();
   const key = `${input.siteId}/${id}.pdf`;

@@ -3,8 +3,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { setDbForTests, type Db } from "@/db";
 import { demoTheme } from "@/db/demo";
 import { createPgliteDb } from "@/db/pglite";
-import { creditNotes, orderLines, orders, organizations, sites, users } from "@/db/schema";
-import { createCreditNote, creditAmounts, creditNoteForOrder } from "@/lib/shop/credit-notes";
+import { auditLog, creditNotes, orderLines, orders, organizations, sites, users } from "@/db/schema";
+import { listOrders, ordersCsv, parseOrderQuery } from "@/lib/shop/admin";
+import { createCreditNote, creditAmounts, creditNoteForOrder, creditNotesForOrders, needsCreditNote, retryCreditNote } from "@/lib/shop/credit-notes";
 import { setOrderStatus } from "@/lib/shop/orders";
 import { periodReport, reportCsv } from "@/lib/shop/reports";
 
@@ -159,5 +160,59 @@ describe("kreditnota i salgs- og MVA-rapporten", () => {
     await db.update(orders).set({ status: "refunded" }).where(eq(orders.id, o.id));
     const report = await periodReport(db, siteId, "2026-10-01", "2026-10-31");
     expect(report).toMatchObject({ orders: 0, totalOre: 0, creditNotes: 0 });
+  });
+});
+
+describe("kreditnota som mangler", () => {
+  it("«Lag kreditnota» lager den som feilet, og bare én, uansett hvor mange ganger det trykkes", async () => {
+    const o = await order(mixed);
+    // Som om kreditnotaen feilet: ordren er refundert, men ingen kreditnota ble laget.
+    await db.update(orders).set({ status: "refunded" }).where(eq(orders.id, o.id));
+    expect(needsCreditNote({ status: "refunded", paidAt: o.paidAt })).toBe(true);
+    expect(await creditNoteForOrder(db, siteId, o.id)).toBeNull();
+
+    const [a, b] = await Promise.all([retryCreditNote(db, siteId, o.id, userId), retryCreditNote(db, siteId, o.id, userId)]);
+    expect(a.id).toBe(b.id);
+    expect(a).toMatchObject({ number: 1, reason: "refundert", totalOre: -o.totalOre });
+    expect((await retryCreditNote(db, siteId, o.id, userId)).id).toBe(a.id);
+    expect(await db.select().from(creditNotes)).toHaveLength(1);
+    const actions = (await db.select().from(auditLog)).map((r) => r.action);
+    expect(actions.filter((x) => x === "creditnote.created")).toHaveLength(1);
+    expect(actions).toContain("creditnote.retry");
+  });
+
+  it("kansellert ordre får grunnen «kansellert», og ubetalte eller aktive ordre får ingen", async () => {
+    const o = await order(mixed);
+    await db.update(orders).set({ status: "cancelled" }).where(eq(orders.id, o.id));
+    expect((await retryCreditNote(db, siteId, o.id, userId)).reason).toBe("kansellert");
+
+    const unpaid = await order({ ...mixed, status: "pending_payment" });
+    await db.update(orders).set({ status: "cancelled" }).where(eq(orders.id, unpaid.id));
+    await expect(retryCreditNote(db, siteId, unpaid.id, userId)).rejects.toThrow(/trenger ingen kreditnota/);
+    const active = await order(mixed);
+    await expect(retryCreditNote(db, siteId, active.id, userId)).rejects.toThrow(/trenger ingen kreditnota/);
+    expect(needsCreditNote({ status: "paid", paidAt: new Date() })).toBe(false);
+  });
+});
+
+describe("kreditnota i ordreeksporten", () => {
+  it("har kolonnene Kreditnota og Kreditert dato, fylt ut bare for krediterte ordre", async () => {
+    const keep = await order(mixed);
+    const o = await order(mixed);
+    await setOrderStatus(db, siteId, o.id, "refunded", userId);
+    const note = (await creditNoteForOrder(db, siteId, o.id))!;
+    const rows = await listOrders(db, siteId, parseOrderQuery({}));
+    const credits = await creditNotesForOrders(db, siteId, rows.map((r) => r.id));
+    expect(credits.size).toBe(1);
+
+    const lines = ordersCsv(rows, credits).replace(/^﻿/, "").trim().split("\r\n").map((l) => l.split(";"));
+    const header = lines[0];
+    expect(header.slice(-2)).toEqual(["Kreditnota", "Kreditert dato"]);
+    const byNumber = new Map(lines.slice(1).map((l) => [l[0], l]));
+    const date = note.createdAt.toLocaleDateString("sv-SE", { timeZone: "Europe/Oslo" });
+    expect(byNumber.get(String(o.number))!.slice(-2)).toEqual(["1", date]);
+    expect(byNumber.get(String(keep.number))!.slice(-2)).toEqual(["", ""]);
+    // Uten kreditnotaer er kolonnene der, men tomme.
+    expect(ordersCsv(rows).split("\r\n")[0]).toContain("Kreditnota;Kreditert dato");
   });
 });

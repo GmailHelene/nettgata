@@ -17,10 +17,12 @@ import type { CatalogProduct } from "@/lib/shop/catalog";
 import { readSiteLayout } from "@/lib/site-layout";
 import {
   assertFetchableUrl,
+  assertSitemapFetchAllowed,
   collectOldPaths,
   fetchSitemapText,
   isPublicHost,
   parseSitemapXml,
+  SITEMAP_LIMIT_MESSAGE,
   SitemapError,
   suggestRedirects,
 } from "@/lib/sitemap-import";
@@ -195,6 +197,16 @@ describe("import av gamle adresser fra sitemap", () => {
     await expect(fetchSitemapText("https://gammel.no/sitemap.xml", { fetchImpl: lying })).rejects.toThrow("for stor");
     const broken = async () => new Response("nei", { status: 404 });
     await expect(fetchSitemapText("https://gammel.no/sitemap.xml", { fetchImpl: broken })).rejects.toThrow("404");
+  });
+
+  it("henting fra nettet er begrenset til ti per nettsted i timen, med en tydelig melding", async () => {
+    const now = new Date("2026-11-02T10:00:00Z");
+    for (let i = 0; i < 10; i++) await assertSitemapFetchAllowed(db, siteId, now);
+    await expect(assertSitemapFetchAllowed(db, siteId, now)).rejects.toThrow(SITEMAP_LIMIT_MESSAGE);
+    await expect(assertSitemapFetchAllowed(db, siteId, now)).rejects.toBeInstanceOf(SitemapError);
+    // Et annet nettsted har sin egen grense, og etter en time er det åpent igjen.
+    await assertSitemapFetchAllowed(db, "00000000-0000-0000-0000-000000000000", now);
+    await assertSitemapFetchAllowed(db, siteId, new Date(now.getTime() + 61 * 60 * 1000));
   });
 
   it("følger en indeks ett nivå ned og hopper over indekser i indeksen", async () => {

@@ -2,6 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { inquiries } from "@/db/schema";
 import { readAnswers } from "@/lib/content/form-fields";
+import { canViewInquiryImages, imagesFor, inquiryImageSrc } from "@/lib/henvendelser/bilder";
 import { requireSiteAccess } from "@/lib/session";
 import { HelpLink } from "@/components/studio/help";
 import { deleteInquiryAction, markInquiryReadAction } from "../../../site-actions";
@@ -9,9 +10,15 @@ import { SiteNav } from "../site-nav";
 
 export default async function InquiriesPage({ params }: { params: Promise<{ siteId: string }> }) {
   const { siteId } = await params;
-  const { site } = await requireSiteAccess(siteId);
+  const { site, role } = await requireSiteAccess(siteId);
   const db = await getDb();
   const rows = await db.select().from(inquiries).where(eq(inquiries.siteId, site.id)).orderBy(desc(inquiries.createdAt)).limit(100);
+  const images = await imagesFor(
+    db,
+    site.id,
+    rows.map((q) => q.id),
+  );
+  const showImages = canViewInquiryImages(role);
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-12">
@@ -49,6 +56,29 @@ export default async function InquiriesPage({ params }: { params: Promise<{ site
                   ))}
                 </dl>
               )}
+              {(images.get(q.id)?.length ?? 0) > 0 &&
+                (showImages ? (
+                  <ul className="mt-3 flex flex-wrap gap-3 border-t pt-3" aria-label={`Bilder fra ${q.name}`}>
+                    {images.get(q.id)!.map((imageId, i, all) => (
+                      <li key={imageId}>
+                        {/* Åpner bildet i full størrelse. Ruten sjekker tilgangen og lagres ikke i noen cache. */}
+                        <a href={inquiryImageSrc(imageId)} className="block rounded outline-offset-2 focus-visible:outline-2 focus-visible:outline-blue-700">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={inquiryImageSrc(imageId)}
+                            alt={all.length > 1 ? `Bilde fra ${q.name}, ${i + 1} av ${all.length}` : `Bilde fra ${q.name}`}
+                            loading="lazy"
+                            className="size-28 rounded border object-cover"
+                          />
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 border-t pt-3 text-sm text-neutral-700">
+                    {images.get(q.id)!.length} {images.get(q.id)!.length === 1 ? "bilde" : "bilder"} lagt ved. Bare eier og redaktør kan se bildene.
+                  </p>
+                ))}
               <div className="mt-3 flex gap-4">
                 {!q.readAt && (
                   <form action={markInquiryReadAction.bind(null, site.id, q.id)}>
@@ -64,7 +94,8 @@ export default async function InquiriesPage({ params }: { params: Promise<{ site
         </ul>
       )}
       <p className="mt-8 text-sm text-neutral-600">
-        Henvendelser er personopplysninger. Slett dem når saken er ferdig, og senest etter 12 måneder.{" "}
+        Henvendelser er personopplysninger. Slett dem når saken er ferdig, og senest etter 12 måneder. Bilder som er lagt ved, slettes
+        sammen med henvendelsen.{" "}
         <HelpLink slug="skjemafelt">Slik spør du om mer i skjemaet</HelpLink>
       </p>
     </main>

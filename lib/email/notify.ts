@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import type { Db } from "@/db";
-import { inquiries, orderLines, orders, sites } from "@/db/schema";
+import { inquiries, inquiryImages, orderLines, orders, sites } from "@/db/schema";
 import { notifyAddress, readNotificationSettings } from "@/lib/notifications";
 import { readShopSettings } from "@/lib/shop/settings";
 import { trackingUrl } from "@/lib/shop/tracking";
@@ -137,11 +137,13 @@ export async function notifyInquiry(db: Db, provider: EmailProvider, inquiryId: 
   const shop = shopInfo(site);
   const owner = notifyAddress(settings, shop.email);
   if (!settings.newInquiry || !owner) return;
+  const [{ imageCount }] = await db.select({ imageCount: count() }).from(inquiryImages).where(eq(inquiryImages.inquiryId, inquiry.id));
   const email = newInquiryEmail({
     shop,
     inquiry: { name: inquiry.name, email: inquiry.email, phone: inquiry.phone, message: inquiry.message, pagePath: inquiry.pagePath, answers: readAnswers(inquiry.answers) },
     siteUrl: await publicSiteUrl(db, site),
     studioUrl: `${platformUrl()}/studio/nettsted/${site.id}/henvendelser`,
+    imageCount,
   });
   await deliver(
     db,

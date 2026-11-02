@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * Fiken-koblingen for nettbutikken: betalte ordre sendes til butikkens egen Fiken-konto som salg.
- * Oppsettet ligger i sites.shop.fiken. API-nøkkelen ligger kryptert i secret (lib/fiken/crypto.ts), resten er ikke hemmelig.
+ * Oppsettet ligger i sites.shop.fiken. Nøklene fra OAuth2 ligger kryptert i secret (lib/fiken/crypto.ts), resten er ikke hemmelig.
  *
  * Denne filen er ren og uten hemmeligheter, så studioets klientkomponenter kan bruke typene og navnene herfra.
  */
@@ -46,14 +46,33 @@ export const fikenSettingsSchema = z.object({
 });
 export type FikenSettings = z.infer<typeof fikenSettingsSchema>;
 
+/** Et selskap brukeren har tilgang til i Fiken, slik det vises når eieren velger selskap. */
+export const fikenCompanyOptionSchema = z.object({
+  slug: z.string().regex(companySlugPattern),
+  name: z.string().max(200),
+  organizationNumber: z.string().max(20).nullable(),
+  vatRegistered: z.boolean(),
+  hasApiAccess: z.boolean(),
+  testCompany: z.boolean(),
+});
+export type FikenCompanyOption = z.infer<typeof fikenCompanyOptionSchema>;
+
 export const storedFikenSchema = z.object({
-  /** Kryptert API-nøkkel, formatet v1:iv:ciphertext. Dekrypteres bare på serveren rett før et kall. */
+  /** Koblet til med OAuth2. Gamle koblinger med personlig API-nøkkel (før 2. november 2026) leses ikke lenger. */
+  auth: z.literal("oauth"),
+  /** Tilfeldig ID per tilkobling. Oppdateringer fra en sending eller test gjelder bare tilkoblingen de startet på. */
+  connectionId: z.string().min(8).max(64),
+  /** Kryptert tilgangs- og fornyelsesnøkkel (lib/fiken/crypto.ts), formatet v1:iv:ciphertext. Dekrypteres bare på serveren. */
   secret: z.string().startsWith("v1:"),
-  companySlug: z.string().regex(companySlugPattern),
-  companyName: z.string().max(200),
+  /** Når tilgangsnøkkelen går ut, millisekunder siden 1970. Den fornyes litt før. */
+  expiresAt: z.number(),
+  /** Null til eieren har valgt selskap, når brukeren har flere selskaper i Fiken. */
+  companySlug: z.string().regex(companySlugPattern).nullable(),
+  companyChoices: z.array(fikenCompanyOptionSchema).max(100).default([]),
+  companyName: z.string().max(200).default(""),
   organizationNumber: z.string().max(20).nullable().default(null),
   /** Fra company.vatType i Fiken. Et selskap som ikke er MVA-registrert, fører alt salg uten MVA. */
-  vatRegistered: z.boolean(),
+  vatRegistered: z.boolean().default(true),
   /** Testselskap i Fiken. Bare da sendes ordre som er betalt i testmiljøet til Vipps eller Klarna. */
   testCompany: z.boolean().default(false),
   bankAccounts: z.array(account).max(100).default([]),
@@ -63,19 +82,12 @@ export const storedFikenSchema = z.object({
   /** Når testen sist lyktes. Null betyr ikke testet, eller at siste test eller sending stoppet på tilgangen. */
   testedAt: z.string().nullable().default(null),
   lastError: z.string().nullable().default(null),
+  /** Fiken godtok ikke fornyelsen (tilgangen er trukket tilbake eller utløpt). Eieren må koble til på nytt. */
+  needsReconnect: z.boolean().default(false),
   /** Sperre mens ordre sendes (millisekunder siden 1970), så to sendinger aldri går samtidig. */
   lockUntil: z.number().optional(),
 });
 export type StoredFiken = z.infer<typeof storedFikenSchema>;
-
-/**
- * Fiken tillater ikke personlige API-nøkler i tredjepartsløsninger, og krever OAuth2 når en løsning kobler til på
- * vegne av kundene sine (api.fiken.no/api/v2/docs, lest 1. november 2026). Til OAuth2 er bygget, er koblingen bare
- * for plattformadmin, som tester med sitt eget selskap. Både studiosiden og handlingene sjekker dette.
- */
-export function fikenAvailableTo(user: { isPlatformAdmin: boolean }): boolean {
-  return user.isPlatformAdmin;
-}
 
 export const fikenClosedMessage = "Fiken-koblingen er ikke åpnet for butikkene ennå.";
 
@@ -85,8 +97,8 @@ export function readStoredFiken(shop: unknown): StoredFiken | null {
   return parsed.success ? parsed.data : null;
 }
 
-/** Det studioet får vite. Aldri nøkkelen, heller ikke kryptert. */
-export type FikenView = Omit<StoredFiken, "secret" | "lockUntil">;
+/** Det studioet får vite. Aldri nøklene, heller ikke krypterte. */
+export type FikenView = Omit<StoredFiken, "auth" | "connectionId" | "secret" | "expiresAt" | "lockUntil">;
 
 /** Feltene plukkes ut ett for ett, så et nytt hemmelig felt aldri blir med av seg selv. */
 export function fikenView(shop: unknown): FikenView | null {
@@ -94,6 +106,7 @@ export function fikenView(shop: unknown): FikenView | null {
   if (!s) return null;
   return {
     companySlug: s.companySlug,
+    companyChoices: s.companyChoices,
     companyName: s.companyName,
     organizationNumber: s.organizationNumber,
     vatRegistered: s.vatRegistered,
@@ -104,15 +117,6 @@ export function fikenView(shop: unknown): FikenView | null {
     savedAt: s.savedAt,
     testedAt: s.testedAt,
     lastError: s.lastError,
+    needsReconnect: s.needsReconnect,
   };
 }
-
-/** Et selskap brukeren har tilgang til i Fiken, slik det vises når eieren velger selskap. */
-export type FikenCompanyOption = {
-  slug: string;
-  name: string;
-  organizationNumber: string | null;
-  vatRegistered: boolean;
-  hasApiAccess: boolean;
-  testCompany: boolean;
-};

@@ -15,6 +15,7 @@ export const formFieldTypes = [
   { value: "dato", label: "Dato" },
   { value: "telefon", label: "Telefon" },
   { value: "epost", label: "E-post" },
+  { value: "bilder", label: "Bilder (opptil 5)" },
 ] as const;
 export type FormFieldType = (typeof formFieldTypes)[number]["value"];
 
@@ -60,6 +61,8 @@ export function readFormFields(props: Record<string, unknown>): FormField[] {
     const type = typeof v.felttype === "string" && types.has(v.felttype) ? (v.felttype as FormFieldType) : "tekst";
     const options = type === "valg" && typeof v.valg === "string" ? choiceOptions(v.valg) : [];
     if (!label || (type === "valg" && options.length === 0)) continue;
+    // Ett bildefelt per skjema. Et felt til ville delt de samme fem bildene, så det hoppes over.
+    if (type === "bilder" && fields.some((f) => f.type === "bilder")) continue;
     fields.push({ label, type, required: v.pakrevd === "ja", options });
   }
   return fields;
@@ -79,12 +82,21 @@ export function formFieldProblems(props: Record<string, unknown>): string[] {
     if (v.felttype === "valg" && (typeof v.valg !== "string" || choiceOptions(v.valg).length === 0)) {
       problems.push(`Felt ${i + 1}: skriv minst ett valg i valglisten`);
     }
+    if (v.felttype === "bilder" && raw.slice(0, i).some((f) => (f as Record<string, unknown> | null)?.felttype === "bilder")) {
+      problems.push(`Felt ${i + 1}: skjemaet kan bare ha ett felt for bilder`);
+    }
   });
   return problems;
 }
 
 /** Navnet på feltet i skjemaet. Bygger på plassen i listen, fordi feltene ikke har egen id. */
 export const formFieldName = (index: number) => `felt-${index}`;
+
+/** Bildefeltet i skjemaet, hvis det har ett. Det kan bare være ett (se readFormFields). */
+export function imageFormField(fields: FormField[]): { field: FormField; index: number } | null {
+  const index = fields.findIndex((f) => f.type === "bilder");
+  return index === -1 ? null : { field: fields[index], index };
+}
 
 const MAX_ANSWER: Record<FormFieldType, number> = {
   tekst: 200,
@@ -94,6 +106,8 @@ const MAX_ANSWER: Record<FormFieldType, number> = {
   dato: 10,
   telefon: 30,
   epost: 120,
+  // Bildefeltet sender id-ene til bildene, ikke tekst. De sjekkes i lib/henvendelser/bilder.ts.
+  bilder: 0,
 };
 
 /** Zod-skjema for ett svar. Tom streng betyr ikke svart. */
@@ -137,6 +151,7 @@ export function parseFormAnswers(
 ): { ok: true; answers: FormAnswer[] } | { ok: false; message: string; field: string } {
   const answers: FormAnswer[] = [];
   for (const [i, field] of fields.entries()) {
+    if (field.type === "bilder") continue;
     const name = formFieldName(i);
     const parsed = answerSchema(field).safeParse(values[name] ?? "");
     if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message, field: name };

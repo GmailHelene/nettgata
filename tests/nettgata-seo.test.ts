@@ -159,10 +159,20 @@ describe("nettgata.no: strukturerte data", () => {
 });
 
 describe("nettgata.no: innholdet på sidene", () => {
-  it("har nøyaktig én h1 per side, utenom miniatyrene av kundesider (skjult for skjermlesere)", () => {
+  it("har nøyaktig én h1 per side, også med miniatyrene av kundesider", () => {
     for (const r of routes()) {
-      // Miniatyrene er ekte sider fra bransjepakkene, og deres overskrifter har temaets klasse ng-h1.
-      expect(html(r).match(/<h1(?![^>]*ng-h1)[\s>]/g), JSON.stringify(r.kind)).toHaveLength(1);
+      expect(html(r).match(/<h1[\s>]/g), JSON.stringify(r.kind)).toHaveLength(1);
+    }
+  });
+
+  it("forsiden og /temaer har én h1, og miniatyrene har samme utseende som før, men som h2", () => {
+    for (const path of [[], ["temaer"]]) {
+      const markup = html(platformRoute(path)!);
+      expect(markup.match(/<h1[\s>]/g), path.join("/") || "forsiden").toHaveLength(1);
+      // Heltens overskrift i miniatyren beholder temaets klasse ng-h1, men er h2, inne i data-nosnippet.
+      expect(markup).toMatch(/<h2 class="ng-h ng-h1">/);
+      expect(markup).not.toMatch(/<h1 class="ng-h/);
+      expect(markup).toContain("data-nosnippet");
     }
   });
 

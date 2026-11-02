@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
+import { preload } from "react-dom";
 import { heading, signType, StreetSign } from "@/components/brand";
 import { PageRenderer } from "@/components/sections";
 import { bransjeLabel, genres, lowerLabel } from "@/lib/genres";
@@ -105,6 +106,8 @@ const nav = [
 
 /** `leadHref`: skjemaet ligger nederst på de fleste sidene. Der det ikke gjør det (vilkår og personvern), går knappen til forsiden. */
 export function PlatformChrome({ env, children, leadHref = "#kom-i-gang" }: { env: PlatformEnv; children: ReactNode; leadHref?: string }) {
+  // Archivo er salgssidens font for både overskrifter og brødtekst. Forhåndslastes bare her, ikke på kundesidene (app/fonts.ts).
+  preload("/fonts/archivo-latin.woff2", { as: "font", type: "font/woff2", crossOrigin: "anonymous" });
   return (
     <div className="flex min-h-screen flex-col bg-white font-[family-name:var(--font-archivo)] text-[#1b232b] [&_:focus-visible]:outline-2 [&_:focus-visible]:outline-offset-2 [&_:focus-visible]:outline-[#173b6c]">
       <a href="#innhold" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-white focus:p-3">
@@ -353,6 +356,18 @@ function Street({ shops, width, vacant = true, inset = true, label }: { shops: S
 
 const facts = "Fra 199 kr i måneden eks. mva · Ingen bindingstid · Svar innen én virkedag";
 
+/**
+ * Selvbetjening ved siden av skjemaet: kunden lager konto og bygger selv. Å bygge og forhåndsvise er gratis,
+ * publisering krever abonnement (lib/publishing.ts), og det trengs ikke kort for å starte.
+ */
+function TrialLink() {
+  return (
+    <Link href="/studio/registrer" className={buttonGhost}>
+      Prøv gratis, betal når du publiserer
+    </Link>
+  );
+}
+
 /** Forsiden: overskrift og gata. */
 function StreetHero() {
   return (
@@ -374,6 +389,7 @@ function StreetHero() {
             <a href="#kom-i-gang" className={button}>
               Få nettside
             </a>
+            <TrialLink />
             <Link href="/temaer" className={buttonGhost}>
               Se temaene
             </Link>
@@ -431,6 +447,7 @@ function Hero({
             <a href="#kom-i-gang" className={button}>
               Få nettside
             </a>
+            <TrialLink />
             <Link href="/temaer" className={buttonGhost}>
               Se temaene
             </Link>
@@ -726,6 +743,13 @@ function LeadSection({ env, need, bransje, title, intro }: { env: PlatformEnv; n
           <p className={`mt-4 text-lg leading-relaxed ${muted}`}>
             {intro ?? "Du hører fra meg innen én virkedag, på e-post. Jeg går gjennom hva du trenger sammen med deg, og du får se nettsiden din før du bestemmer deg."}
           </p>
+          <p className={`mt-6 ${muted}`}>
+            Vil du heller bygge selv? Det er gratis å lage og forhåndsvise nettstedet, og du trenger ikke kort for å starte. Abonnementet velger du
+            når nettstedet skal publiseres.
+          </p>
+          <div className="mt-4">
+            <TrialLink />
+          </div>
         </div>
         <div className="rounded-2xl bg-white p-6 shadow-[0_24px_60px_-30px_rgb(23_59_108/0.35)] ring-1 ring-[#1b232b]/15 sm:p-8">
           <LeadForm source={`/${bransje ? `bransjer/${bransje}` : need === "nettbutikk" ? "nettbutikk" : ""}`} need={need} bransje={bransje ? bransjeLabel({ pack: bransje, keywords: [] }) : ""} sendTo={env.sendTo} />

@@ -112,7 +112,8 @@ export async function acceptInvitation(
     if (who.password.length > 200) throw new InvitationError("Passordet er for langt");
     const [user] = await db
       .insert(users)
-      .values({ email: invitation.email, name, passwordHash: await bcrypt.hash(who.password, 12) })
+      // Lenken kom til denne adressen, så e-posten regnes som bekreftet.
+      .values({ email: invitation.email, name, passwordHash: await bcrypt.hash(who.password, 12), emailVerifiedAt: now })
       .returning({ id: users.id });
     userId = user.id;
   }

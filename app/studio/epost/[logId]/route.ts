@@ -10,7 +10,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ log
   const { logId } = await params;
   if (!/^[0-9a-f-]{36}$/.test(logId)) return new Response("Ikke funnet", { status: 404 });
   const [row] = await (await getDb()).select({ siteId: emailLog.siteId }).from(emailLog).where(eq(emailLog.id, logId)).limit(1);
-  if (!row || !(await checkSiteAccess(row.siteId))) return new Response("Ikke funnet", { status: 404 });
+  if (!row?.siteId || !(await checkSiteAccess(row.siteId))) return new Response("Ikke funnet", { status: 404 });
   const preview = emailPreview(logId);
   if (!preview) return new Response("Forhåndsvisningen ligger bare i minnet til utviklingsserveren startes på nytt.", { status: 404 });
   return new Response(preview.html, { headers: { "content-type": "text/html; charset=utf-8" } });

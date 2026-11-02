@@ -17,11 +17,12 @@ export const GENERATED_PATHS = { personvern: "/personvern", angrerett: "/angrere
  * ownBooking er sant når egen timebestilling er i bruk (usesOwnBooking i lib/egen-booking/store.ts).
  * newsletter er sant når nyhetsbrevet er i bruk (usesNewsletter i lib/nyhetsbrev/subscribers.ts).
  * embeds sier om de publiserte sidene har kart eller video som lastes ved trykk (embeddedServices i lib/embeds.ts).
+ * inquiryImages er sant når et publisert kontaktskjema har felt for bilder (usesInquiryImages i lib/henvendelser/bilder.ts).
  */
 export function generatedLegalPage(
   site: SiteLike,
   path: string,
-  extra: { bookingHosts?: readonly string[]; ownBooking?: boolean; newsletter?: boolean; embeds?: { kart?: boolean; video?: boolean } } = {},
+  extra: { bookingHosts?: readonly string[]; ownBooking?: boolean; newsletter?: boolean; embeds?: { kart?: boolean; video?: boolean }; inquiryImages?: boolean } = {},
 ): PageContent | null {
   const butikk = { navn: site.name, info: readSiteInfo(site.info) };
   const shop = site.kind === "nettbutikk";
@@ -37,6 +38,7 @@ export function generatedLegalPage(
       egenBooking: extra.ownBooking,
       nyhetsbrev: extra.newsletter,
       innebygd: extra.embeds,
+      bilderISkjema: extra.inquiryImages,
     });
   }
   if (path === GENERATED_PATHS.angrerett && shop) return lagAngrerettside({ butikk, betalingsmater });

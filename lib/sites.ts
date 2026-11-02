@@ -70,6 +70,8 @@ export type CreateSiteInput = {
   ownerId: string;
   slug?: string;
   publish?: boolean;
+  /** Laget av kunden selv i veiviseren. Da gjelder grensene og oppryddingen i lib/selvbetjening. */
+  selfServe?: boolean;
 };
 
 /** Oppretter organisasjon, nettsted og alle sidene i bransjepakken som kladd. */
@@ -98,6 +100,7 @@ export async function createSiteFromPack(db: Db, input: CreateSiteInput) {
       theme,
       info: info.data,
       layout: pack.layout ?? {},
+      selfServe: input.selfServe ?? false,
     })
     .returning();
 

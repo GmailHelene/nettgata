@@ -8,7 +8,7 @@ import { bringSetupView } from "@/lib/bring/config";
 import { bringProductIds, bringProducts } from "@/lib/bring/products";
 import { cartWeight, formatWeight } from "@/lib/bring/weight";
 import { requireSiteAccess } from "@/lib/session";
-import { creditNoteForOrder, creditReasonLabel } from "@/lib/shop/credit-notes";
+import { creditNoteForOrder, creditReasonLabel, needsCreditNote } from "@/lib/shop/credit-notes";
 import { formatNok } from "@/lib/shop/money";
 import { paymentLabels, type PaymentMethod } from "@/lib/shop/settings";
 import { carrierLabel, trackingUrl } from "@/lib/shop/tracking";
@@ -17,7 +17,7 @@ import { orderStatusLabel } from "../order-status";
 import { LabelPrintHelp } from "@/components/studio/label-print-help";
 import { BringLabelForm } from "./bring-label";
 import { OrderActions } from "./order-actions";
-import { StaffNoteForm, TrackingForm } from "./order-extras";
+import { CreditNoteRetry, StaffNoteForm, TrackingForm } from "./order-extras";
 
 /** Hvor fraktprisen i kassen kom fra, sagt så butikkeieren forstår det. */
 function bringPriceNote(b: OrderBring): string {
@@ -99,7 +99,7 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
         siteId={site.id}
         orderId={order.id}
         status={order.status}
-        online={order.paymentMethod === "vipps" || order.paymentMethod === "klarna"}
+        online={order.paymentMethod === "vipps" || order.paymentMethod === "klarna" || order.paymentMethod === "kustom"}
         owner={role === "owner"}
       />
 
@@ -169,6 +169,22 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
         </section>
       )}
 
+      {!creditNote && needsCreditNote(order) && (
+        <section aria-labelledby="kreditnota-mangler" className="mt-6 rounded-lg border border-amber-300 bg-amber-50 p-5">
+          <h2 id="kreditnota-mangler" className="font-semibold">
+            Kreditnotaen mangler
+          </h2>
+          <p className="mb-3 mt-1 text-sm text-neutral-800">
+            Ordren ble betalt og så {order.status === "cancelled" ? "kansellert" : "refundert"}, men kreditnotaen ble ikke laget. Regnskapet trenger den.
+          </p>
+          {role === "owner" || role === "editor" ? (
+            <CreditNoteRetry siteId={site.id} orderId={order.id} />
+          ) : (
+            <p className="text-sm text-neutral-800">Eieren eller en redaktør kan lage den.</p>
+          )}
+        </section>
+      )}
+
       <section className="mt-6 grid gap-6 rounded-lg border bg-white p-5 sm:grid-cols-2">
         <div>
           <h2 className="mb-2 font-semibold">Kunde</h2>
@@ -207,7 +223,7 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
           )}
           <p className="mt-2 text-sm text-neutral-600">
             Betaling: {paymentLabels[order.paymentMethod as PaymentMethod] ?? order.paymentMethod}
-            {/^(vipps|klarna):test:/.test(order.paymentRef ?? "") && " (testmiljø, ingen ekte penger)"}
+            {/^(vipps|klarna|kustom):test:/.test(order.paymentRef ?? "") && " (testmiljø, ingen ekte penger)"}
           </p>
         </div>
         {order.note && (

@@ -1,14 +1,14 @@
 import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import type { Db } from "@/db";
-import { auditLog, orderLines, orders, sites } from "@/db/schema";
+import { auditLog, creditNotes, orderLines, orders, sites } from "@/db/schema";
 import { addDays, parseOsloDate } from "@/lib/oslo-time";
 import { parsePaymentRef } from "@/lib/payments/common";
 import { ShopError } from "@/lib/shop/catalog";
 import { reportPresets } from "@/lib/shop/reports";
 import { FikenError, createSale, findSalesByNumber } from "./client";
-import { loadFikenToken, markFikenProblem } from "./config";
+import { fikenAccessToken, markFikenProblem, requireCompany } from "./config";
 import { saleFromOrder } from "./mapping";
-import { fikenMethods, readStoredFiken, type FikenMethod } from "./state";
+import { fikenMethods, type FikenMethod } from "./state";
 
 /**
  * Sender betalte og sendte ordre til Fiken som salg, én ordre om gangen.
@@ -88,17 +88,11 @@ export async function sendOrdersToFiken(
 ): Promise<FikenSendResult> {
   const period = fikenPeriods(opts.now ?? new Date()).find((p) => p.key === periodKey);
   if (!period) throw new ShopError("Velg denne eller forrige måned");
-  const [site] = await db
-    .select({ id: sites.id, shop: sites.shop })
-    .from(sites)
-    .where(and(eq(sites.id, siteId), eq(sites.kind, "nettbutikk")))
-    .limit(1);
-  const stored = site ? readStoredFiken(site.shop) : null;
-  if (!site || !stored) throw new ShopError("Fiken er ikke koblet til. Lim inn API-nøkkelen først.");
+  // Tilgangsnøkkelen fra OAuth2. Går den snart ut, fornyes den her, før sperren og før første kall.
+  const { token, stored } = await fikenAccessToken(db, siteId);
+  const companySlug = requireCompany(stored);
   const accounts = stored.settings.paymentAccounts;
   if (!fikenMethods.some((m) => accounts[m])) throw new ShopError("Velg minst én betalingsmåte under «Hvilke ordre som sendes», og lagre valgene.");
-  const token = await loadFikenToken(site);
-  if (!token) throw new ShopError("Nøkkelen til Fiken kunne ikke leses. Koble til Fiken på nytt.");
 
   const lock = await claimLock(db, siteId, Date.now());
   if (lock === null) throw new ShopError("Ordrene sendes til Fiken akkurat nå. Vent litt og last siden på nytt.");
@@ -159,7 +153,7 @@ export async function sendOrdersToFiken(
         siteId,
         userId,
         action: "order.fiken_sent",
-        detail: { orderId: o.id, number: o.number, saleId, companySlug: stored.companySlug, amountOre: o.totalOre, ...(recovered && { recovered: true }) },
+        detail: { orderId: o.id, number: o.number, saleId, companySlug: companySlug, amountOre: o.totalOre, ...(recovered && { recovered: true }) },
       });
 
     let networkFailures = 0;
@@ -175,7 +169,7 @@ export async function sendOrdersToFiken(
         if (uncertainIds.has(o.id)) {
           // Forrige forsøk fikk ikke svar. Finnes salget allerede i Fiken, er ordren sendt, og vi sender den ikke igjen.
           await pause();
-          const found = await findSalesByNumber(token, stored.companySlug, sale.saleNumber);
+          const found = await findSalesByNumber(token, companySlug, sale.saleNumber);
           const same = found.find((f) => f.date === sale.date && f.grossOre === o.totalOre);
           if (same) {
             await logSent(o, same.saleId, true);
@@ -186,7 +180,7 @@ export async function sendOrdersToFiken(
           if (found.length > 0) throw new ShopError(`Fiken har allerede et salg med nummer ${sale.saleNumber} som ikke stemmer med ordren. Sjekk salget i Fiken.`);
         }
         await pause();
-        const { saleId } = await createSale(token, stored.companySlug, sale);
+        const { saleId } = await createSale(token, companySlug, sale);
         await logSent(o, saleId, false);
         result.sent.push({ orderId: o.id, number: o.number, saleId });
         networkFailures = 0;
@@ -195,7 +189,7 @@ export async function sendOrdersToFiken(
         if (err instanceof FikenError && err.info.stop) {
           result.stopped = err.message;
           result.remaining += batch.length - i;
-          if ([401, 403, 404].includes(err.info.status)) await markFikenProblem(db, siteId, stored.secret, err.message);
+          if ([401, 403, 404].includes(err.info.status)) await markFikenProblem(db, siteId, stored.connectionId, err.message);
           break;
         }
         if (!(err instanceof ShopError)) console.error("Sending av ordre til Fiken feilet", err instanceof Error ? err.name : "ukjent feil");
@@ -260,8 +254,12 @@ export function describeSendResult(r: FikenSendResult): { ok: boolean; message: 
 
 export type FikenOverview = {
   lastBatch: { at: string; sent: number; failed: number } | null;
-  /** Ordre som er sendt til Fiken og senere kansellert eller refundert. Dem må eieren lage kreditnota for i Fiken. */
-  needsCredit: { number: number; status: string; saleId: string | null }[];
+  /**
+   * Ordre som er sendt til Fiken og senere kansellert eller refundert. Kreditnotaen fra Nettgata sendes ikke til Fiken:
+   * kreditnota-kallene i Fiken API v2 krever en faktura laget i Fiken (invoiceId), og salget vi sender er «Annet salg».
+   * Negative salg er ikke beskrevet i spesifikasjonen. Eieren fører derfor kreditnotaen selv i Fiken.
+   */
+  needsCredit: { number: number; status: string; saleId: string | null; creditNoteNumber: number | null }[];
 };
 
 export async function fikenOverview(db: Db, siteId: string, now = new Date()): Promise<FikenOverview> {
@@ -273,9 +271,15 @@ export async function fikenOverview(db: Db, siteId: string, now = new Date()): P
     .limit(1);
   const since = new Date(now.getTime() - 92 * 86_400_000);
   const needsCredit = await db
-    .select({ number: orders.number, status: orders.status, saleId: sql<string | null>`${auditLog.detail} ->> 'saleId'` })
+    .select({
+      number: orders.number,
+      status: orders.status,
+      saleId: sql<string | null>`${auditLog.detail} ->> 'saleId'`,
+      creditNoteNumber: creditNotes.number,
+    })
     .from(auditLog)
     .innerJoin(orders, sql`${orders.id}::text = ${auditLog.detail} ->> 'orderId'`)
+    .leftJoin(creditNotes, and(eq(creditNotes.orderId, orders.id), eq(creditNotes.siteId, siteId)))
     .where(
       and(
         eq(auditLog.siteId, siteId),

@@ -9,12 +9,22 @@ Kort utviklerdokumentasjon. Skrevet 01.11.2026. Plan godkjent av Helene samme da
   - tittel og beskrivelse for Google
   - ny tekst i ett tekstfelt i én seksjon
   - utkast til blogginnlegg
-  - innlegg til Facebook eller Instagram, som kunden kopierer selv fordi Meta-publisering er «Senere»
+  - innlegg til Facebook eller Instagram, som kunden kopierer selv fordi Meta-publisering er «Senere» (se «Del på Facebook» under)
   - tips til butikken, der ingenting endres
 - **Godkjenn** skriver endringen inn i **kladden**, aldri rett til det publiserte nettstedet. Kunden publiserer selv og kan gå tilbake til en tidligere versjon som vanlig. Et blogginnlegg blir en upublisert kladd under `/blogg`.
 - **Utdatert:** har kunden endret teksten etter at forslaget ble laget, brukes ikke forslaget. Det kunden har skrevet, beholdes, og forslaget merkes «utdatert».
 - **«Lag nye forslag nå»** i studioet kan brukes 3 ganger i døgnet. Disse kjøringene går direkte mot API-et, ikke via Batch API.
 - **Studioet:** fanen AI-teamet (`/studio/nettsted/<id>/ai-teamet`) har et merke med antall nye forslag. Alle med tilgang til nettstedet kan godkjenne, på samme måte som alle kan redigere sider.
+
+## «Kopier tekst» og «Del på Facebook» (02.11.2026)
+
+Ved hvert innleggsforslag, både før og etter Godkjenn. Knappene står utenfor skjemaene for Godkjenn og Avvis, så de rører ikke den flyten.
+
+- **Kopier tekst:** teksten legges på utklippstavlen, og «Teksten er kopiert.» vises i et `role="status"`-felt som skjermlesere leser opp. Feiler kopieringen, står det at kunden kan merke og kopiere teksten selv.
+- **Del på Facebook** (bare når kanalen er Facebook): en vanlig lenke til `https://www.facebook.com/sharer/sharer.php?u=<adressen>` som åpnes i ny fane, og som kopierer teksten i samme trykk. Meldingen er «Teksten er kopiert. Lim den inn i Facebook.» Facebook fyller ikke inn tekst selv, så kopieringen er det som gjør at det virker. Lenken er en `<a>` og ikke `window.open`, så nettleseren ikke stopper fanen som et sprettoppvindu. Skjermlesere får «(åpnes i ny fane)».
+- **Adressen** er siden forslaget gjelder hvis den er publisert, ellers forsiden, slik besøkende ser den (`publicSiteUrl`: eget domene, ellers gratisadressen). Innleggsforslag har i dag ingen side, så det blir forsiden. Bygges i `lib/ai/share.ts`, som bare godtar http og https.
+- **Instagram:** bare «Kopier tekst» og et tips om å lime inn i et nytt innlegg i appen. Instagram har ingen delingslenke.
+- Ingen Meta-app, ingen API, ingen sporing og ingen piksel. Tester: `tests/ai-del.test.ts`.
 
 ## Hvem som får det
 
@@ -131,5 +141,5 @@ Skal tillegget skjules igjen, settes `ADDON_AVAILABLE = false`. Da kan det ikke 
 ## Ikke med ennå
 
 - Effektmåling i neste rapport.
-- Publisering rett til Facebook og Instagram.
+- Publisering rett til Facebook og Instagram (lagt på is 01.11: Meta-kontoene må ryddes først). Til da: «Del på Facebook» over.
 - Nyhetsbrev, alt-tekst på bilder (AI-en ser ikke bildene) og helsesjekk av skjema og lenker.

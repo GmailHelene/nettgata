@@ -12,7 +12,9 @@ import { listSuggestions, type Suggestion } from "@/lib/ai/suggestions";
 import { ADDON } from "@/lib/billing/plans";
 import { sectionRegistry } from "@/lib/content/registry";
 import { pageContentSchema } from "@/lib/content/types";
+import { facebookShareUrl, sharePageUrl } from "@/lib/ai/share";
 import { formatOsloDay } from "@/lib/oslo-time";
+import { publicSiteUrl } from "@/lib/site-url";
 import { requireSiteAccess } from "@/lib/session";
 import { formatNok } from "@/lib/shop/money";
 import { SiteNav } from "../site-nav";
@@ -29,6 +31,8 @@ const KIND_LABELS: Record<string, string> = {
   sosialt_innlegg: "Sosiale medier",
   tips: "Tips",
 };
+const needsShareUrl = (open: Suggestion[]) => open.some((s) => s.kind === "sosialt_innlegg");
+
 const STATUS_LABELS: Record<string, string> = { godkjent: "Godkjent", avvist: "Avvist", utdatert: "Ikke brukt, teksten var endret" };
 
 type PageInfo = { title: string; sections: Map<string, string> };
@@ -58,7 +62,12 @@ export default async function AiTeamPage({ params }: { params: Promise<{ siteId:
   const capOk = active ? await underCap(db, site.id) : weekly ? await underCap(db, site.id, new Date(), "ukentlig") : true;
   const spent = user.isPlatformAdmin ? await spentThisMonth(db, site.id) : 0;
 
-  const pageRows = await db.select({ id: pages.id, title: pages.title, draft: pages.draft }).from(pages).where(eq(pages.siteId, site.id));
+  const pageRows = await db
+    .select({ id: pages.id, title: pages.title, draft: pages.draft, path: pages.path, publishedVersionId: pages.publishedVersionId })
+    .from(pages)
+    .where(eq(pages.siteId, site.id));
+  // Til «Del på Facebook»: adressen besøkende ser nettstedet på.
+  const siteUrl = needsShareUrl(open) ? await publicSiteUrl(db, site) : null;
   const pageInfo = new Map<string, PageInfo>(
     pageRows.map((p) => {
       const parsed = pageContentSchema.safeParse(p.draft);
@@ -67,6 +76,9 @@ export default async function AiTeamPage({ params }: { params: Promise<{ siteId:
   );
   const cards: CardData[] = open.map((s) => {
     const info = s.pageId ? pageInfo.get(s.pageId) : undefined;
+    // Siden innlegget gjelder hvis den er publisert, ellers forsiden.
+    const sharedPage = s.pageId ? pageRows.find((p) => p.id === s.pageId && p.publishedVersionId) : undefined;
+    const shareUrl = s.kind === "sosialt_innlegg" && siteUrl ? facebookShareUrl(sharePageUrl(siteUrl, sharedPage?.path ?? null)) : null;
     return {
       id: s.id,
       roleLabel: ROLE_LABELS[s.role] ?? s.role,
@@ -79,6 +91,7 @@ export default async function AiTeamPage({ params }: { params: Promise<{ siteId:
       value: s.proposal.value,
       ingress: s.proposal.ingress || null,
       channel: s.proposal.channel ?? null,
+      shareUrl,
       reason: s.reason,
       effect: s.effect,
     };

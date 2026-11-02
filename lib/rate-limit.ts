@@ -9,6 +9,11 @@ export const rules = {
   loginPerIp: { limit: 20, windowSeconds: 15 * 60 },
   inquiryPerIp: { limit: 5, windowSeconds: 10 * 60 },
   inquiryPerSite: { limit: 50, windowSeconds: 60 * 60 },
+  /** Bilder i tilbudsforespørsler. Fem per skjema, så seks skjemaer med fulle bildefelt per ti minutter fra samme adresse. */
+  inquiryImagePerIp: { limit: 30, windowSeconds: 10 * 60 },
+  inquiryImagePerSite: { limit: 300, windowSeconds: 60 * 60 },
+  /** Nøkler til bildeopplasting. Lages når den besøkende velger det første bildet. */
+  inquiryImageTokenPerIp: { limit: 20, windowSeconds: 10 * 60 },
   /** Timebestilling. En familie kan bestille flere timer på rad, men ikke fylle opp kalenderen. */
   bookingPerIp: { limit: 6, windowSeconds: 10 * 60 },
   bookingPerSite: { limit: 100, windowSeconds: 60 * 60 },
@@ -26,6 +31,22 @@ export const rules = {
   newsletterPerEmail: { limit: 3, windowSeconds: 24 * 60 * 60 },
   /** Bekreftelse og avmelding fra lenkene i e-postene. */
   newsletterLinkPerIp: { limit: 30, windowSeconds: 10 * 60 },
+  /** Henting av sitemap fra en annen nettside. Hver skanning kan bli opptil elleve forespørsler ut, så dette holdes lavt. */
+  sitemapFetchPerSite: { limit: 10, windowSeconds: 60 * 60 },
+  /** Registrering. Per adresse (som hash), så ingen kan fylle innboksen til en annen med bekreftelser. */
+  signupPerIp: { limit: 5, windowSeconds: 60 * 60 },
+  signupPerEmail: { limit: 3, windowSeconds: 24 * 60 * 60 },
+  /** «Send bekreftelsen på nytt». */
+  verifyResendPerIp: { limit: 10, windowSeconds: 60 * 60 },
+  verifyResendPerEmail: { limit: 3, windowSeconds: 60 * 60 },
+  /** «Glemt passord»: bestilling av lenke, og forsøk på å lagre nytt passord. */
+  resetPerIp: { limit: 10, windowSeconds: 60 * 60 },
+  resetPerEmail: { limit: 3, windowSeconds: 60 * 60 },
+  resetSubmitPerIp: { limit: 20, windowSeconds: 15 * 60 },
+  /** Bekreftelseslenker som trykkes. Lenken er signert, så dette stopper bare skript som prøver i hopetall. */
+  verifyLinkPerIp: { limit: 30, windowSeconds: 10 * 60 },
+  /** Oppslag i Brønnøysundregistrene fra veiviseren, for kunder. Plattformadmin har ingen grense. */
+  brregPerUser: { limit: 40, windowSeconds: 60 * 60 },
 } satisfies Record<string, RateLimitRule>;
 
 /**

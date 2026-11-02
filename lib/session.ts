@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/db";
 import { memberships, sites, users } from "@/db/schema";
 import { getSecret } from "@/lib/secret";
+import { touchSite, touchUserSites } from "@/lib/selvbetjening/aktivitet";
 
 const COOKIE = "sesjon";
 const AUDIENCE = "studio";
@@ -14,7 +15,7 @@ const MAX_AGE = 60 * 60 * 24 * 14;
  * Kort avtrykk av passordhashen, lagt i økten. Når passordet byttes (db/reset-password.ts eller ny invitasjon),
  * slutter alle gamle økter å virke, også en som er stjålet. Selve hashen havner aldri i informasjonskapselen.
  */
-async function passwordStamp(passwordHash: string): Promise<string> {
+export async function passwordStamp(passwordHash: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`nettgata-okt:${passwordHash}`));
   return Array.from(new Uint8Array(digest).slice(0, 8), (b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -29,6 +30,8 @@ export async function createSession(userId: string) {
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE}s`)
     .sign(getSecret());
+  // Innlogging teller som aktivitet, så ubetalte nettsteder ikke slettes mens eieren fortsatt bruker kontoen.
+  await touchUserSites(db, userId);
   (await cookies()).set(COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -90,12 +93,19 @@ export async function getCurrentUser() {
     if (!payload.sub) return null;
     const db = await getDb();
     const [row] = await db
-      .select({ id: users.id, email: users.email, name: users.name, isPlatformAdmin: users.isPlatformAdmin, passwordHash: users.passwordHash })
+      .select({
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        isPlatformAdmin: users.isPlatformAdmin,
+        passwordHash: users.passwordHash,
+        emailVerifiedAt: users.emailVerifiedAt,
+      })
       .from(users)
       .where(eq(users.id, payload.sub))
       .limit(1);
     if (!row || payload.pw !== (await passwordStamp(row.passwordHash))) return null;
-    return { id: row.id, email: row.email, name: row.name, isPlatformAdmin: row.isPlatformAdmin };
+    return { id: row.id, email: row.email, name: row.name, isPlatformAdmin: row.isPlatformAdmin, emailVerified: Boolean(row.emailVerifiedAt) };
   } catch {
     return null;
   }
@@ -123,7 +133,9 @@ export async function checkSiteAccess(siteId: string): Promise<SiteAccess | null
     .from(memberships)
     .where(and(eq(memberships.orgId, site.orgId), eq(memberships.userId, user.id)))
     .limit(1);
-  return membership ? { user, site, role: membership.role } : null;
+  if (!membership) return null;
+  await touchSite(db, site);
+  return { user, site, role: membership.role };
 }
 
 /**

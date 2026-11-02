@@ -2,6 +2,7 @@ import Link from "next/link";
 import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import { heading } from "@/components/brand";
 import { SiteHouse, VacantPlot, type SiteHouseData } from "@/components/studio/site-street";
+import { ResendOwnButton } from "@/components/studio/account-forms";
 import { StudioTopBar } from "@/components/studio/top-bar";
 import { ui } from "@/components/studio/ui";
 import { getDb } from "@/db";
@@ -13,6 +14,8 @@ import { publicSiteUrl } from "@/lib/site-url";
 
 export default async function StudioHome() {
   const user = await requireUser();
+  // Kunder med bekreftet e-post kan lage nettsteder selv (selvbetjening). Plattformadmin kan alltid.
+  const canCreate = user.isPlatformAdmin || user.emailVerified;
   const db = await getDb();
   const rows = user.isPlatformAdmin
     ? await db.select().from(sites).orderBy(asc(sites.name))
@@ -62,7 +65,7 @@ export default async function StudioHome() {
               {houses.length === 1 ? "Ett nettsted." : `${houses.length} nettsteder.`} Trykk på et hus for å redigere nettstedet.
             </p>
           </div>
-          {user.isPlatformAdmin && (
+          {canCreate && (
             <Link href="/studio/nytt" className={ui.button}>
               <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
                 <path d="M12 5v14M5 12h14" />
@@ -72,7 +75,17 @@ export default async function StudioHome() {
           )}
         </div>
 
-        {houses.length === 0 && !user.isPlatformAdmin ? (
+        {!canCreate && (
+          <div role="status" className={`${ui.card} mb-10 max-w-xl space-y-3 border-[#173b6c]/40 p-6`}>
+            <h2 className={`${heading} text-xl`}>Bekreft e-posten din</h2>
+            <p className={ui.muted}>
+              Jeg har sendt en lenke til {user.email}. Trykk på den, så kan du lage nettstedet ditt. Lenken virker i 48 timer, og kontoer som ikke er
+              bekreftet, slettes etter sju dager.
+            </p>
+            <ResendOwnButton />
+          </div>
+        )}
+        {houses.length === 0 && !canCreate ? (
           <div className={`${ui.card} max-w-xl p-6`}>
             <h2 className={`${heading} text-xl`}>Du har ingen nettsteder ennå</h2>
             <p className={`mt-2 ${ui.muted}`}>Har du fått en invitasjon på e-post, åpner du lenken i den, så dukker nettstedet opp her.</p>
@@ -84,7 +97,7 @@ export default async function StudioHome() {
                 <SiteHouse site={site} index={i} />
               </li>
             ))}
-            {user.isPlatformAdmin && (
+            {canCreate && (
               <li>
                 <VacantPlot index={houses.length} />
               </li>

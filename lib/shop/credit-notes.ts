@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, lt, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { auditLog, creditNotes, orderLines, orders, type CreditNoteLine, type CreditNoteVat } from "@/db/schema";
 import { allocateDiscount } from "./discounts";
@@ -100,6 +100,44 @@ export async function createCreditNote(db: Db, siteId: string, orderId: string, 
     if (raced) return raced;
   }
   throw new CreditNoteError("Kreditnotaen kunne ikke lages akkurat nå. Prøv igjen.");
+}
+
+/** En ordre som ble betalt og så kansellert eller refundert, skal ha kreditnota. */
+export function needsCreditNote(order: Pick<OrderRow, "status" | "paidAt">): boolean {
+  return Boolean(order.paidAt) && (order.status === "cancelled" || order.status === "refunded");
+}
+
+/**
+ * «Lag kreditnota» på ordresiden, for når den ikke ble laget sammen med statusendringen (setOrderStatus logger feilen
+ * og går videre). Trygg å trykke flere ganger: finnes kreditnotaen alt, gis den som er, og ingen ny lages.
+ */
+export async function retryCreditNote(db: Db, siteId: string, orderId: string, userId: string | null): Promise<CreditNote> {
+  const [order] = await db
+    .select({ status: orders.status, paidAt: orders.paidAt })
+    .from(orders)
+    .where(and(eq(orders.id, orderId), eq(orders.siteId, siteId)))
+    .limit(1);
+  if (!order) throw new CreditNoteError("Fant ikke ordren");
+  if (!needsCreditNote(order)) throw new CreditNoteError("Ordren trenger ingen kreditnota. Bare betalte ordre som er kansellert eller refundert, får det.");
+  const existing = await creditNoteForOrder(db, siteId, orderId);
+  if (existing) return existing;
+  const note = await createCreditNote(db, siteId, orderId, order.status === "cancelled" ? "kansellert" : "refundert", userId);
+  await db.insert(auditLog).values({ siteId, userId, action: "creditnote.retry", detail: { orderId, creditNoteId: note.id, number: note.number } });
+  return note;
+}
+
+/** Kreditnota per ordre, for ordreeksporten. Bare de ordrene som er med, så eksporten ikke henter mer enn den trenger. */
+export async function creditNotesForOrders(db: Db, siteId: string, orderIds: string[]): Promise<Map<string, Pick<CreditNote, "number" | "createdAt">>> {
+  const result = new Map<string, Pick<CreditNote, "number" | "createdAt">>();
+  // Store eksporter deles opp, så antall parametre i spørringen holder seg langt under grensen i Postgres.
+  for (let i = 0; i < orderIds.length; i += 5000) {
+    const rows = await db
+      .select({ orderId: creditNotes.orderId, number: creditNotes.number, createdAt: creditNotes.createdAt })
+      .from(creditNotes)
+      .where(and(eq(creditNotes.siteId, siteId), inArray(creditNotes.orderId, orderIds.slice(i, i + 5000))));
+    for (const r of rows) result.set(r.orderId, { number: r.number, createdAt: r.createdAt });
+  }
+  return result;
 }
 
 /** Neste nummer i nettstedets serie, regnet ut inne i INSERT-setningen. */

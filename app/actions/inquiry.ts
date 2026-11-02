@@ -10,17 +10,8 @@ import { notifyInquiry } from "@/lib/email/notify";
 import { getEmailProvider } from "@/lib/email/send";
 import { clientKey, hit, rules } from "@/lib/rate-limit";
 import { getSecret } from "@/lib/secret";
-import { formFieldName, MAX_FORM_FIELDS, parseFormAnswers, readFormFields, type FormField } from "@/lib/content/form-fields";
-import { getPublishedPage } from "@/lib/publishing";
-import type { Db } from "@/db";
-
-/** De egne feltene i kontaktskjemaet slik de står på den publiserte siden. Ukjent side eller seksjon gir ingen felt. */
-async function publishedFormFields(db: Db, siteId: string, path: string, sectionId: string): Promise<FormField[]> {
-  if (!sectionId || sectionId.length > 64) return [];
-  const page = await getPublishedPage(db, siteId, path);
-  const section = page?.content.sections.find((s) => s.id === sectionId && s.type === "kontakt" && s.variant === "skjema" && !s.hidden);
-  return section ? readFormFields(section.props) : [];
-}
+import { formFieldName, imageFormField, MAX_FORM_FIELDS, parseFormAnswers } from "@/lib/content/form-fields";
+import { attachImages, createUploadToken, InquiryImageError, pendingImages, publishedFormFields } from "@/lib/henvendelser/bilder";
 
 /** `extra`: svarene i feltene kunden har lagt til selv, etter feltnavn («felt-0»). */
 type Values = { name: string; email: string; phone: string; message: string; extra?: Record<string, string> };
@@ -73,6 +64,27 @@ export async function submitInquiry(siteId: string, _prev: InquiryState, formDat
   const answers = parseFormAnswers(fields, values.extra ?? {});
   if (!answers.ok) return { ok: false, message: answers.message, values, field: answers.field };
 
+  // Bilder er lastet opp på forhånd (lib/henvendelser/bilder.ts). Skjemaet sender bare id-ene og nøkkelen.
+  const imageField = imageFormField(fields);
+  const imageIds = String(formData.get("bilder") ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  if (imageField && Number(formData.get("bilder-venter") ?? 0) > 0) {
+    return { ok: false, message: "Vent litt, bildene lastes fortsatt opp", values, field: formFieldName(imageField.index) };
+  }
+  const images =
+    imageField && imageIds.length
+      ? await pendingImages(db, { siteId: site.id, path: parsed.data.path, sectionId: String(formData.get("section") ?? ""), token: String(formData.get("bilde-nokkel") ?? ""), ids: imageIds })
+      : null;
+  if (imageField && imageIds.length && images?.ids.length !== new Set(imageIds).size) {
+    // Nøkkelen er for gammel, eller bildene er ryddet bort. Bedre å si fra enn å sende uten bildene.
+    return { ok: false, message: "Bildene kunne ikke sendes. Fjern dem og legg dem ved på nytt.", values, field: formFieldName(imageField.index) };
+  }
+  if (imageField?.field.required && !images) {
+    return { ok: false, message: `Legg ved minst ett bilde i «${imageField.field.label}»`, values, field: formFieldName(imageField.index) };
+  }
+
   const ipKey = await clientKey(await headers(), getSecret());
   const allowed =
     (await hit(db, `inquiry-ip:${ipKey}`, rules.inquiryPerIp)) && (await hit(db, `inquiry-site:${site.id}`, rules.inquiryPerSite));
@@ -92,8 +104,30 @@ export async function submitInquiry(siteId: string, _prev: InquiryState, formDat
       pagePath: path,
     })
     .returning({ id: inquiries.id });
-  await db.insert(auditLog).values({ siteId: site.id, action: "inquiry.received", detail: { inquiryId: row.id } });
+  const attached = images ? await attachImages(db, site.id, row.id, images) : 0;
+  await db.insert(auditLog).values({ siteId: site.id, action: "inquiry.received", detail: { inquiryId: row.id, ...(attached && { images: attached }) } });
   after(() => notifyInquiry(db, getEmailProvider(), row.id).catch((err) => console.error("Henvendelsesvarsel feilet", err)));
 
   return { ok: true, message: "Takk! Meldingen er sendt, og du får svar så snart som mulig." };
+}
+
+export type ImageTokenState = { ok: true; token: string } | { ok: false; message: string };
+
+/**
+ * Nøkkelen til bildeopplasting i kontaktskjemaet. Hentes når den besøkende velger det første bildet, ikke når
+ * siden lages, fordi sidene kan ligge lagret en stund. Gis bare når den publiserte siden har bildefeltet.
+ */
+export async function startInquiryImageUpload(siteId: string, path: string, sectionId: string): Promise<ImageTokenState> {
+  try {
+    const db = await getDb();
+    const ipKey = await clientKey(await headers(), getSecret());
+    if (!(await hit(db, `inquiry-image-token:${ipKey}`, rules.inquiryImageTokenPerIp))) {
+      return { ok: false, message: "Du har prøvd mange ganger på kort tid. Vent litt og prøv igjen." };
+    }
+    return { ok: true, token: await createUploadToken(db, { siteId, path: String(path).slice(0, 300), sectionId: String(sectionId).slice(0, 64) }) };
+  } catch (err) {
+    if (err instanceof InquiryImageError) return { ok: false, message: err.message };
+    console.error("Nøkkel til bildeopplasting feilet", err);
+    return { ok: false, message: "Bildene kan ikke lastes opp akkurat nå. Prøv igjen om litt." };
+  }
 }

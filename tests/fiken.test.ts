@@ -1,17 +1,20 @@
-import { and, eq, max } from "drizzle-orm";
+import { and, eq, max, sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setDbForTests, type Db } from "@/db";
 import { createPgliteDb } from "@/db/pglite";
 import { demoTheme } from "@/db/demo";
 import { auditLog, orderLines, orders, organizations, productVariants, sites, users } from "@/db/schema";
 import {
-  connectFikenAction,
+  chooseFikenCompanyAction,
   disconnectFikenAction,
   saveFikenSettingsAction,
   sendOrdersToFikenAction,
+  startFikenConnectAction,
   testFikenAction,
 } from "@/app/studio/nettsted/[siteId]/betaling/fiken-actions";
-import { connectFiken, loadFikenToken, removeFiken, saveFikenSettings, testFikenConnection } from "@/lib/fiken/config";
+import { chooseFikenCompany, fikenAccessToken, readFikenTokens, reconnectMessage, removeFiken, saveFikenSettings, testFikenConnection } from "@/lib/fiken/config";
+import { fikenCallback, fikenNotConfiguredMessage, startFikenConnect } from "@/lib/fiken/connect";
+import { consumeFikenState, createFikenState, fikenAvailableTo, STATE_TTL_MS, verifyFikenState } from "@/lib/fiken/oauth";
 import { saleFromOrder, type FikenSaleLine, type SaleOptions } from "@/lib/fiken/mapping";
 import { describeSendResult, fikenOverview, fikenPeriods, sendOrdersToFiken } from "@/lib/fiken/send";
 import { fikenClosedMessage, fikenView, readStoredFiken, type FikenMethod } from "@/lib/fiken/state";
@@ -30,8 +33,15 @@ vi.mock("@/lib/session", () => ({ requireSiteAccess: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 // Åpenbart falske nøkler. Ingen av dem skal havne i loggen, i revisjonsloggen eller i klartekst i sites.shop.
-const TOKEN = "fiken-test-nokkel-ikke-ekte-a1b2c3d4e5f6";
-const OTHER_TOKEN = "fiken-test-annen-nokkel-ikke-ekte-999";
+const TOKEN = "fiken-test-tilgang-ikke-ekte-a1b2c3d4e5f6";
+const NEW_TOKEN = "fiken-test-fornyet-tilgang-ikke-ekte-777";
+const REFRESH = "fiken-test-fornyelse-ikke-ekte-b7c8d9";
+const NEW_REFRESH = "fiken-test-ny-fornyelse-ikke-ekte-e1f2";
+const CLIENT_ID = "nettgata-test-klient";
+const CLIENT_SECRET = "fiken-test-klienthemmelighet-ikke-ekte-42";
+const SECRETS = [TOKEN, NEW_TOKEN, REFRESH, NEW_REFRESH, CLIENT_SECRET];
+
+const b64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
 type Call = { method: string; url: URL; headers: Record<string, string>; body: Record<string, unknown> | undefined };
 type FakeSale = { saleId: number; slug: string; body: Record<string, unknown> };
@@ -65,6 +75,14 @@ function fikenWorld() {
     loseResponseFor: new Set<string>(),
     /** Svarer alt med denne statusen, for å prøve feilmeldingene. */
     forceStatus: null as number | null,
+    /** OAuth2: kodene Fiken har gitt ut, med code_challenge fra innloggingen. Hver kode virker én gang. */
+    codes: new Map<string, string>(),
+    refreshToken: REFRESH,
+    /** Fornyelsesnøkler som er brukt eller trukket tilbake. */
+    deadRefresh: new Set<string>(),
+    expiresIn: 86157,
+    revoked: 0,
+    tokenCalls: [] as URLSearchParams[],
   };
   let nextSaleId = 7001;
 
@@ -84,9 +102,11 @@ function fikenWorld() {
   const fetchMock = vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
     const url = new URL(typeof input === "string" || input instanceof URL ? input : input.url);
     const headers = { ...((init.headers ?? {}) as Record<string, string>) };
-    const body = typeof init.body === "string" && init.body ? (JSON.parse(init.body) as Record<string, unknown>) : undefined;
+    const isApi = url.origin === "https://api.fiken.no";
+    const body = isApi && typeof init.body === "string" && init.body ? (JSON.parse(init.body) as Record<string, unknown>) : undefined;
     const method = init.method ?? "GET";
     calls.push({ method, url, headers, body });
+    if (url.origin === "https://fiken.no") return oauthEndpoint(url, method, headers, String(init.body ?? ""));
     if (url.origin !== "https://api.fiken.no" || !url.pathname.startsWith("/api/v2/")) return json(404, {});
     if (state.forceStatus) return json(state.forceStatus, { message: "Tvunget feil i testen" });
     if (headers.Authorization !== `Bearer ${state.validToken}`) return json(401, { error: "unauthorized", error_description: "Invalid token" });
@@ -123,7 +143,49 @@ function fikenWorld() {
     return json(404, {});
   });
 
-  return { calls, state, fetchMock, posts: () => calls.filter((c) => c.method === "POST") };
+
+  /** fiken.no/oauth/token og /oauth/revoke, slik dokumentasjonen beskriver dem. */
+  async function oauthEndpoint(url: URL, method: string, headers: Record<string, string>, rawBody: string): Promise<Response> {
+    if (method !== "POST") return json(405, {});
+    if (url.pathname === "/oauth/revoke") {
+      if (headers.Authorization !== `Bearer ${state.validToken}`) return json(401, {});
+      state.revoked++;
+      state.deadRefresh.add(state.refreshToken);
+      state.validToken = "trukket-tilbake";
+      return json(200, {});
+    }
+    if (url.pathname !== "/oauth/token") return json(404, {});
+    // Tokenendepunktet krever Basic-innlogging med client id og client secret.
+    if (headers.Authorization !== `Basic ${btoa(`${CLIENT_ID}:${CLIENT_SECRET}`)}`) return json(401, { error: "invalid_client" });
+    if (headers["Content-Type"] !== "application/x-www-form-urlencoded") return json(415, {});
+    const form = new URLSearchParams(rawBody);
+    state.tokenCalls.push(form);
+    const grant = form.get("grant_type");
+    if (grant === "authorization_code") {
+      const code = form.get("code") ?? "";
+      const challenge = state.codes.get(code);
+      state.codes.delete(code);
+      const verifier = form.get("code_verifier") ?? "";
+      const hashed = b64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
+      if (!challenge || hashed !== challenge || form.get("redirect_uri") !== "https://nettgata.no/studio/fiken/callback" || !form.get("state")) {
+        return json(400, { error: "invalid_grant", error_description: "The authorization code is invalid or expired." });
+      }
+      state.validToken = TOKEN;
+      state.refreshToken = REFRESH;
+      return json(200, { access_token: TOKEN, refresh_token: REFRESH, token_type: "bearer", expires_in: state.expiresIn });
+    }
+    if (grant === "refresh_token") {
+      const sent = form.get("refresh_token") ?? "";
+      if (sent !== state.refreshToken || state.deadRefresh.has(sent)) return json(400, { error: "invalid_grant", error_description: "Invalid refresh token" });
+      state.deadRefresh.add(sent);
+      state.validToken = NEW_TOKEN;
+      state.refreshToken = NEW_REFRESH;
+      return json(200, { access_token: NEW_TOKEN, refresh_token: NEW_REFRESH, token_type: "bearer", expires_in: state.expiresIn });
+    }
+    return json(400, { error: "unsupported_grant_type" });
+  }
+
+  return { calls, state, fetchMock, posts: () => calls.filter((c) => c.method === "POST" && c.url.origin === "https://api.fiken.no") };
 }
 
 describe("Fiken-koblingen", () => {
@@ -147,6 +209,8 @@ describe("Fiken-koblingen", () => {
 
     world = fikenWorld();
     vi.stubGlobal("fetch", world.fetchMock);
+    vi.stubEnv("FIKEN_CLIENT_ID", CLIENT_ID);
+    vi.stubEnv("FIKEN_CLIENT_SECRET", CLIENT_SECRET);
     logged = [];
     for (const level of ["log", "info", "warn", "error"] as const) {
       vi.spyOn(console, level).mockImplementation((...args: unknown[]) => {
@@ -159,17 +223,19 @@ describe("Fiken-koblingen", () => {
     // Nøkkelen skal aldri havne i loggen, i revisjonsloggen eller i klartekst i databasen, uansett hva testen gjorde.
     const audit = JSON.stringify(await db.select().from(auditLog));
     const shop = JSON.stringify((await siteRow()).shop);
-    for (const secret of [TOKEN, OTHER_TOKEN]) {
+    for (const secret of SECRETS) {
       expect(logged.join("\n")).not.toContain(secret);
       expect(audit).not.toContain(secret);
       expect(shop).not.toContain(secret);
     }
-    // Alle kall gikk til Fiken, og nøkkelen sto bare i Authorization-hodet.
+    // Alle kall gikk til Fiken, og nøklene sto bare i hodene eller i skjemaet til tokenendepunktet.
     for (const c of world.calls) {
-      expect(c.url.origin).toBe("https://api.fiken.no");
-      expect(JSON.stringify(c.body ?? {})).not.toContain(TOKEN);
+      expect(["https://api.fiken.no", "https://fiken.no"]).toContain(c.url.origin);
+      expect(c.url.search).not.toMatch(/token|secret/i);
+      for (const secret of SECRETS) expect(JSON.stringify(c.body ?? {})).not.toContain(secret);
     }
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -182,7 +248,25 @@ describe("Fiken-koblingen", () => {
     return db.select().from(auditLog).where(and(eq(auditLog.siteId, siteId), eq(auditLog.action, action)));
   }
 
-  const connect = (companySlug?: string) => connectFiken(db, siteId, { token: TOKEN, ...(companySlug && { companySlug }) }, userId);
+  const owner = () => ({ id: userId, isPlatformAdmin: false });
+  const isOwner = async () => true;
+
+  /** Eieren trykker «Koble til Fiken», logger inn hos Fiken og godtar. Fiken sender en kode tilbake til callback. */
+  async function authorize(code = `kode-${crypto.randomUUID()}`) {
+    const url = new URL(await startFikenConnect(siteId, userId));
+    world.state.codes.set(code, url.searchParams.get("code_challenge")!);
+    return { url, code, state: url.searchParams.get("state")! };
+  }
+
+  /** Hele tilkoblingen. Har brukeren flere selskaper, velges companySlug (eller det første). */
+  async function connect(companySlug?: string) {
+    const { code, state } = await authorize();
+    const done = await fikenCallback(db, { code, state, error: null }, owner(), isOwner);
+    if (done.result === "velg") await chooseFikenCompany(db, siteId, companySlug ?? world.state.companies[0].slug, userId);
+    else expect(done).toEqual({ siteId, result: "koblet" });
+    return done;
+  }
+
 
   async function enable(paymentAccounts: Partial<Record<FikenMethod, string>>) {
     const stored = readStoredFiken((await siteRow()).shop)!;
@@ -219,46 +303,64 @@ describe("Fiken-koblingen", () => {
     return order;
   }
 
-  it("kobler til og lagrer nøkkelen kryptert, aldri i klartekst og aldri i nettleseren", async () => {
+  it("kobler til med OAuth2 og lagrer nøklene kryptert, aldri i klartekst og aldri i nettleseren", async () => {
     world.state.companies.push({ name: "Ullstua Test", slug: "ullstua-test", organizationNumber: null, vatType: "bi-monthly", hasApiAccess: true, testCompany: true });
 
-    // To selskaper: eieren må velge, og ingenting er lagret før det.
-    const choose = await connectFiken(db, siteId, { token: `  ${TOKEN}\n` }, userId);
-    expect(choose).toEqual({
-      status: "choose",
-      companies: [
-        { slug: "ullstua-as", name: "Ullstua AS", organizationNumber: "999888777", vatRegistered: true, hasApiAccess: true, testCompany: false },
-        { slug: "ullstua-test", name: "Ullstua Test", organizationNumber: null, vatRegistered: true, hasApiAccess: true, testCompany: true },
-      ],
+    // Adressen eieren sendes til: authorize-endepunktet med kode, klient, callback, state og PKCE.
+    const { url, code, state } = await authorize();
+    expect(url.origin + url.pathname).toBe("https://fiken.no/oauth/authorize");
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      response_type: "code",
+      client_id: CLIENT_ID,
+      redirect_uri: "https://nettgata.no/studio/fiken/callback",
+      state,
+      code_challenge: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
+      code_challenge_method: "S256",
     });
-    expect(readStoredFiken((await siteRow()).shop)).toBeNull();
-    const [first] = world.calls;
-    expect(first.url.href).toBe("https://api.fiken.no/api/v2/companies?page=0&pageSize=100");
-    expect(first.headers).toMatchObject({ Authorization: `Bearer ${TOKEN}`, Accept: "application/json" });
-    expect(first.headers["X-Request-ID"]).toMatch(/^[0-9a-f-]{36}$/);
-    // Hvert kall har tidsavbrudd, så en treg Fiken ikke henger studioet.
-    expect(world.fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
+    expect(url.href).not.toContain(CLIENT_SECRET);
 
-    expect(await connect("ullstua-as")).toMatchObject({ status: "connected", company: { slug: "ullstua-as" } });
+    // To selskaper: nøklene lagres, men eieren må velge selskap før noe kan sendes.
+    expect(await fikenCallback(db, { code, state, error: null }, owner(), isOwner)).toEqual({ siteId, result: "velg" });
+    const [exchange] = world.state.tokenCalls;
+    expect(Object.fromEntries(exchange)).toEqual({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: "https://nettgata.no/studio/fiken/callback",
+      state,
+      code_verifier: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
+    });
+    const pending = fikenView((await siteRow()).shop)!;
+    expect(pending).toMatchObject({ companySlug: null, needsReconnect: false });
+    expect(pending.companyChoices.map((c) => c.slug)).toEqual(["ullstua-as", "ullstua-test"]);
+    await expect(sendOrdersToFiken(db, siteId, "maned", userId, { pauseMs: 0 })).rejects.toThrow(/Velg først hvilket selskap/);
+    await expect(chooseFikenCompany(db, siteId, "finnes-ikke", userId)).rejects.toThrow(/Fant ikke selskapet/);
+
+    const companiesCall = world.calls.find((c) => c.url.pathname === "/api/v2/companies")!;
+    expect(companiesCall.headers).toMatchObject({ Authorization: `Bearer ${TOKEN}`, Accept: "application/json" });
+    expect(companiesCall.headers["X-Request-ID"]).toMatch(/^[0-9a-f-]{36}$/);
+
+    expect(await chooseFikenCompany(db, siteId, "ullstua-as", userId)).toMatchObject({ slug: "ullstua-as" });
     const shop = (await siteRow()).shop;
-    expect(JSON.stringify(shop)).not.toContain(TOKEN);
+    for (const secret of SECRETS) expect(JSON.stringify(shop)).not.toContain(secret);
     const stored = readStoredFiken(shop)!;
     expect(stored.secret).toMatch(/^v1:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$/);
-    expect(stored).toMatchObject({ companySlug: "ullstua-as", companyName: "Ullstua AS", vatRegistered: true, testCompany: false, testedAt: expect.any(String), lastError: null });
+    expect(stored).toMatchObject({ auth: "oauth", companySlug: "ullstua-as", companyChoices: [], companyName: "Ullstua AS", vatRegistered: true, testCompany: false, lastError: null });
+    expect(stored.expiresAt).toBeGreaterThan(Date.now() + 86_000_000);
     // Forslaget: Vipps og Klarna til bankkontoene med samme navn. Faktura og betaling ved henting er av.
     expect(stored.settings).toEqual({ paymentAccounts: { vipps: "1920:10002", klarna: "1920:10003" }, incomeAccount: "3000", zeroVatIncomeAccount: "3100" });
-    expect(stored.incomeAccounts.map((a) => a.code)).toEqual(["3000", "3100"]);
-    expect((await audits("fiken.connected"))[0].detail).toEqual({ companySlug: "ullstua-as", testCompany: false });
+    expect((await audits("fiken.connected"))[0].detail).toEqual({ companies: 2 });
+    expect((await audits("fiken.company_chosen"))[0].detail).toEqual({ companySlug: "ullstua-as", testCompany: false });
 
-    // Bare serveren kan lese nøkkelen, og bare for denne butikken.
-    expect(await loadFikenToken({ id: siteId, shop })).toBe(TOKEN);
-    expect(await loadFikenToken({ id: crypto.randomUUID(), shop })).toBeNull();
+    // Bare serveren kan lese nøklene, og bare for denne butikken.
+    expect(await readFikenTokens(stored, siteId)).toEqual({ accessToken: TOKEN, refreshToken: REFRESH });
+    expect(await readFikenTokens(stored, crypto.randomUUID())).toBeNull();
 
-    // Det studioet og kassen får, har ingen nøkkel, verken i klartekst eller kryptert.
+    // Det studioet og kassen får, har ingen nøkler, verken i klartekst eller kryptert.
     for (const visible of [fikenView(shop), readShopSettings(shop)]) {
       const text = JSON.stringify(visible);
-      expect(text).not.toContain(TOKEN);
+      for (const secret of SECRETS) expect(text).not.toContain(secret);
       expect(text).not.toContain("v1:");
+      expect(text).not.toContain(stored.connectionId);
     }
     expect(fikenView(shop)).not.toHaveProperty("secret");
     expect(readShopSettings(shop)).not.toHaveProperty("fiken");
@@ -271,7 +373,7 @@ describe("Fiken-koblingen", () => {
     const after = (await siteRow()).shop;
     expect(readShopSettings(after).freeShippingOverOre).toBe(50000);
     expect(readStoredFiken(after)).toMatchObject({ companySlug: "ullstua-as" });
-    expect(await loadFikenToken({ id: siteId, shop: after })).toBe(TOKEN);
+    expect(await readFikenTokens(readStoredFiken(after)!, siteId)).toEqual({ accessToken: TOKEN, refreshToken: REFRESH });
   });
 
   it("lager én linje per MVA-sats, med rabatt og frakt fordelt som i kassen", () => {
@@ -482,28 +584,21 @@ describe("Fiken-koblingen", () => {
   });
 
   it("gir forståelige meldinger når Fiken sier nei", async () => {
-    // Feil nøkkel: ingenting lagres.
-    await expect(connectFiken(db, siteId, { token: OTHER_TOKEN }, userId)).rejects.toThrow(
-      "Fiken godtok ikke API-nøkkelen. Sjekk at hele nøkkelen er limt inn, og at den ikke er slettet i Fiken.",
-    );
-    expect(readStoredFiken((await siteRow()).shop)).toBeNull();
-    await expect(connectFiken(db, siteId, { token: "med mellomrom inni nøkkelen" }, userId)).rejects.toThrow(/mellomrom/);
-
-    // Nøkkelen slettes i Fiken etter at butikken er koblet til: sendingen stopper etter første forsøk, og feilen vises i studioet.
+    // Tilgangen trekkes tilbake i Fiken etter at butikken er koblet til: sendingen stopper etter første forsøk, og feilen vises i studioet.
     await connect();
     await enable({ "ved-henting": "1920:10001" });
     await insertOrder({ status: "paid", paymentMethod: "ved-henting" });
     await insertOrder({ status: "paid", paymentMethod: "ved-henting" });
     world.state.validToken = "slettet-i-fiken";
     const result = await send();
-    expect(result).toMatchObject({ sent: [], failed: [], remaining: 2, stopped: expect.stringMatching(/godtok ikke API-nøkkelen/) });
+    expect(result).toMatchObject({ sent: [], failed: [], remaining: 2, stopped: expect.stringMatching(/godtok ikke tilgangen/) });
     expect(world.posts()).toHaveLength(1);
     expect(describeSendResult(result)).toEqual({
       ok: false,
       message:
-        "Sendingen stoppet. Fiken godtok ikke API-nøkkelen. Sjekk at hele nøkkelen er limt inn, og at den ikke er slettet i Fiken.\n2 ordre er ikke sendt ennå.",
+        "Sendingen stoppet. Fiken godtok ikke tilgangen. Den kan være trukket tilbake i Fiken. Koble til Fiken på nytt.\n2 ordre er ikke sendt ennå.",
     });
-    expect(fikenView((await siteRow()).shop)).toMatchObject({ testedAt: null, lastError: expect.stringMatching(/godtok ikke API-nøkkelen/) });
+    expect(fikenView((await siteRow()).shop)).toMatchObject({ testedAt: null, lastError: expect.stringMatching(/godtok ikke tilgangen/) });
     expect(await audits("order.fiken_sent")).toHaveLength(0);
 
     // 403, 404 og 429 får hver sin forklaring.
@@ -535,41 +630,165 @@ describe("Fiken-koblingen", () => {
     await send();
     expect(await fikenOverview(db, siteId)).toMatchObject({ lastBatch: { sent: 1, failed: 0 }, needsCredit: [] });
     await setOrderStatus(db, siteId, order.id, "refunded", userId);
-    expect((await fikenOverview(db, siteId)).needsCredit).toEqual([{ number: order.number, status: "refunded", saleId: "7001" }]);
+    expect((await fikenOverview(db, siteId)).needsCredit).toEqual([{ number: order.number, status: "refunded", saleId: "7001", creditNoteNumber: 1 }]);
   });
 
-  it("bare eieren slipper til, og foreløpig bare når eieren er plattformadmin", async () => {
+  it("bare eieren slipper til, og kundene først når Fiken-appen er registrert", async () => {
     const site = await siteRow();
     const actAs = (role: "owner" | "editor" | "developer", isPlatformAdmin = false) =>
-      vi.mocked(requireSiteAccess).mockResolvedValue({ user: { id: userId, email: "eier@ullstua.no", name: null, isPlatformAdmin }, site, role });
+      vi.mocked(requireSiteAccess).mockResolvedValue({ user: { id: userId, email: "eier@ullstua.no", name: null, isPlatformAdmin, emailVerified: true }, site, role });
     const denied = { ok: false, message: "Bare eieren av butikken kan koble til Fiken og sende ordre dit." };
 
     for (const role of ["editor", "developer"] as const) {
       actAs(role);
-      expect(await connectFikenAction(siteId, { token: TOKEN })).toEqual(denied);
+      expect(await startFikenConnectAction(siteId)).toEqual(denied);
+      expect(await chooseFikenCompanyAction(siteId, "ullstua-as")).toEqual(denied);
       expect(await testFikenAction(siteId)).toEqual(denied);
       expect(await saveFikenSettingsAction(siteId, { paymentAccounts: { vipps: "1920:10001" } })).toEqual(denied);
       expect(await disconnectFikenAction(siteId)).toEqual(denied);
       expect(await sendOrdersToFikenAction(siteId, "maned")).toEqual(denied);
     }
-    // Personlige API-nøkler er ikke lov i tredjepartsløsninger. Til OAuth2 er på plass, slipper bare plattformadmin til.
+
+    // Uten FIKEN_CLIENT_ID og FIKEN_CLIENT_SECRET: kundene slipper ikke til, og admin får beskjed om at appen mangler.
+    vi.stubEnv("FIKEN_CLIENT_SECRET", "");
+    expect(fikenAvailableTo({ isPlatformAdmin: false })).toBe(false);
+    expect(fikenAvailableTo({ isPlatformAdmin: true })).toBe(true);
     actAs("owner");
     const closed = { ok: false, message: fikenClosedMessage };
-    expect(await connectFikenAction(siteId, { token: TOKEN })).toEqual(closed);
+    expect(await startFikenConnectAction(siteId)).toEqual(closed);
     expect(await sendOrdersToFikenAction(siteId, "maned")).toEqual(closed);
-
-    // Ingen kall til Fiken, og ingenting lagret.
+    actAs("owner", true);
+    expect(await startFikenConnectAction(siteId)).toEqual({ ok: false, message: fikenNotConfiguredMessage });
     expect(world.calls).toHaveLength(0);
     expect(readStoredFiken((await siteRow()).shop)).toBeNull();
 
-    actAs("owner", true);
-    expect(await connectFikenAction(siteId, { token: TOKEN })).toMatchObject({ ok: true, connected: true });
+    // Med begge satt er Fiken åpent for alle eiere.
+    vi.stubEnv("FIKEN_CLIENT_SECRET", CLIENT_SECRET);
+    expect(fikenAvailableTo({ isPlatformAdmin: false })).toBe(true);
+    actAs("owner");
+    const started = await startFikenConnectAction(siteId);
+    expect(started).toMatchObject({ ok: true, url: expect.stringMatching(/^https:\/\/fiken\.no\/oauth\/authorize\?/) });
+    const startUrl = new URL(started.url!);
+    world.state.codes.set("eierkode", startUrl.searchParams.get("code_challenge")!);
+    expect(await fikenCallback(db, { code: "eierkode", state: startUrl.searchParams.get("state"), error: null }, owner(), isOwner)).toEqual({ siteId, result: "koblet" });
     await insertOrder({ status: "paid", paymentMethod: "vipps", paymentRef: "vipps:production:eierordre1234" });
     expect(await sendOrdersToFikenAction(siteId, "maned")).toEqual({ ok: true, message: "1 ordre er sendt til Fiken." });
-    expect(world.posts()[0].body).toMatchObject({ paymentAccount: "1920:10002" });
+    // Eksporten bruker tilgangsnøkkelen fra OAuth2.
+    expect(world.posts()[0]).toMatchObject({ headers: { Authorization: `Bearer ${TOKEN}` }, body: { paymentAccount: "1920:10002" } });
 
     // Grensen for antall forsøk gjelder eieren også.
     for (let i = 0; i < 30; i++) await hit(db, `fiken-sending:${siteId}`, { limit: 30, windowSeconds: 3600 });
     expect(await sendOrdersToFikenAction(siteId, "maned")).toEqual({ ok: false, message: "Mange forsøk på kort tid. Vent litt og prøv igjen." });
+  });
+
+  it("state er signert, går ut etter ti minutter, gjelder én bruker og kan brukes én gang", async () => {
+    const now = Date.now();
+    const state = await createFikenState(siteId, userId, now);
+    const payload = await verifyFikenState(state, now);
+    expect(payload).toMatchObject({ siteId, userId, expiresAt: now + STATE_TTL_MS });
+
+    // Endret innhold eller signatur, eller laget med en annen hemmelighet: avvist.
+    const [body, sig] = state.split(".");
+    const forged = b64url(new TextEncoder().encode(JSON.stringify({ ...payload, siteId: crypto.randomUUID() })));
+    expect(await verifyFikenState(`${forged}.${sig}`, now)).toBeNull();
+    expect(await verifyFikenState(`${body}.${sig.slice(0, -2)}AA`, now)).toBeNull();
+    expect(await verifyFikenState(`${body}`, now)).toBeNull();
+    expect(await verifyFikenState("", now)).toBeNull();
+    // Utløpt.
+    expect(await verifyFikenState(state, now + STATE_TTL_MS + 1)).toBeNull();
+
+    // Én bruk.
+    expect(await consumeFikenState(db, payload!)).toBe(true);
+    expect(await consumeFikenState(db, payload!)).toBe(false);
+
+    // Hele flyten: en annen bruker kan ikke bruke state, en state kan ikke brukes to ganger, og «Avbryt» i Fiken lagrer ingenting.
+    const a = await authorize();
+    expect(await fikenCallback(db, { code: a.code, state: a.state, error: null }, { id: crypto.randomUUID(), isPlatformAdmin: true }, isOwner)).toEqual({
+      siteId: null,
+      result: "ingen-tilgang",
+    });
+    expect(await fikenCallback(db, { code: a.code, state: a.state, error: null }, owner(), async () => false)).toEqual({ siteId, result: "ingen-tilgang" });
+    expect(await fikenCallback(db, { code: null, state: a.state, error: "access_denied" }, owner(), isOwner)).toEqual({ siteId, result: "avbrutt" });
+    expect(await fikenCallback(db, { code: a.code, state: a.state, error: null }, owner(), isOwner)).toEqual({ siteId, result: "utlopt" });
+    expect(await fikenCallback(db, { code: a.code, state: "tull.tull", error: null }, owner(), isOwner)).toEqual({ siteId: null, result: "utlopt" });
+    expect(world.state.tokenCalls).toHaveLength(0);
+    expect(readStoredFiken((await siteRow()).shop)).toBeNull();
+
+    // Koden er ugyldig hos Fiken: ingenting lagres.
+    const b = await authorize();
+    world.state.codes.clear();
+    expect(await fikenCallback(db, { code: b.code, state: b.state, error: null }, owner(), isOwner)).toEqual({ siteId, result: "feil" });
+    expect(readStoredFiken((await siteRow()).shop)).toBeNull();
+  });
+
+  it("fornyer tilgangsnøkkelen før den går ut, og kobler fra når Fiken sier nei", async () => {
+    await connect();
+    await enable({ "ved-henting": "1920:10001" });
+    await insertOrder({ status: "paid", paymentMethod: "ved-henting" });
+
+    // Like før utløp: nøkkelen fornyes, de nye nøklene lagres kryptert, og salget sendes med den nye.
+    const before = readStoredFiken((await siteRow()).shop)!;
+    const soon = before.expiresAt - 60_000;
+    const { token } = await fikenAccessToken(db, siteId, soon);
+    expect(token).toBe(NEW_TOKEN);
+    expect(Object.fromEntries(world.state.tokenCalls.at(-1)!)).toEqual({ grant_type: "refresh_token", refresh_token: REFRESH });
+    const after = readStoredFiken((await siteRow()).shop)!;
+    expect(after.secret).not.toBe(before.secret);
+    expect(after.connectionId).toBe(before.connectionId);
+    expect(await readFikenTokens(after, siteId)).toEqual({ accessToken: NEW_TOKEN, refreshToken: NEW_REFRESH });
+    expect(await audits("fiken.token_refreshed")).toHaveLength(1);
+    expect((await send()).sent).toHaveLength(1);
+    expect(world.posts().at(-1)!.headers.Authorization).toBe(`Bearer ${NEW_TOKEN}`);
+
+    // Ikke utløpt: ingen nye kall til tokenendepunktet.
+    const calls = world.state.tokenCalls.length;
+    expect((await fikenAccessToken(db, siteId)).token).toBe(NEW_TOKEN);
+    expect(world.state.tokenCalls).toHaveLength(calls);
+
+    // Fiken svarer ikke på fornyelsen: forbigående, ingenting kobles fra.
+    const expiring = readStoredFiken((await siteRow()).shop)!.expiresAt - 60_000;
+    world.fetchMock.mockRejectedValueOnce(new DOMException("The operation was aborted due to timeout", "TimeoutError"));
+    await expect(fikenAccessToken(db, siteId, expiring)).rejects.toThrow("Fikk ikke kontakt med Fiken. Prøv igjen om litt.");
+    expect(fikenView((await siteRow()).shop)).toMatchObject({ needsReconnect: false });
+
+    // Tilgangen er trukket tilbake i Fiken: fornyelsen feiler, koblingen står som frakoblet, og studioet sier fra.
+    world.state.deadRefresh.add(NEW_REFRESH);
+    await expect(fikenAccessToken(db, siteId, expiring)).rejects.toThrow(reconnectMessage);
+    expect(fikenView((await siteRow()).shop)).toMatchObject({ needsReconnect: true, testedAt: null, lastError: reconnectMessage });
+    expect(await audits("fiken.needs_reconnect")).toHaveLength(1);
+    await expect(sendOrdersToFiken(db, siteId, "maned", userId, { pauseMs: 0 })).rejects.toThrow(reconnectMessage);
+    await expect(testFikenConnection(db, siteId, userId)).rejects.toThrow(reconnectMessage);
+
+    // Kobler til på nytt: valgene beholdes, og ingenting sendes to ganger.
+    await connect();
+    expect(fikenView((await siteRow()).shop)).toMatchObject({ needsReconnect: false, lastError: null, settings: { paymentAccounts: { "ved-henting": "1920:10001" } } });
+    expect(await send()).toMatchObject({ sent: [], alreadySent: 1 });
+  });
+
+  it("«Koble fra» trekker tilbake tilgangen hos Fiken og sletter nøklene", async () => {
+    await connect();
+    expect(await removeFiken(db, siteId, userId)).toEqual({ revoked: true });
+    expect(world.state.revoked).toBe(1);
+    const revoke = world.calls.find((c) => c.url.href === "https://fiken.no/oauth/revoke")!;
+    expect(revoke.headers.Authorization).toBe(`Bearer ${TOKEN}`);
+    expect(readStoredFiken((await siteRow()).shop)).toBeNull();
+    expect((await audits("fiken.disconnected"))[0].detail).toEqual({ revoked: true });
+
+    // Svarer ikke Fiken, slettes nøklene hos oss likevel.
+    await connect();
+    world.fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
+    expect(await removeFiken(db, siteId, userId)).toEqual({ revoked: false });
+    expect(readStoredFiken((await siteRow()).shop)).toBeNull();
+  });
+
+  it("gamle koblinger med personlig API-nøkkel leses ikke lenger", async () => {
+    await db
+      .update(sites)
+      .set({
+        shop: sql`${JSON.stringify({ fiken: { secret: "v1:abc:def", companySlug: "ullstua-as", companyName: "Ullstua AS", vatRegistered: true, savedAt: new Date().toISOString() } })}::jsonb`,
+      })
+      .where(eq(sites.id, siteId));
+    expect(readStoredFiken((await siteRow()).shop)).toBeNull();
+    await expect(send()).rejects.toThrow(/ikke koblet til/);
   });
 });

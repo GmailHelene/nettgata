@@ -118,6 +118,23 @@ describe("kart og video", () => {
     expect(video).toContain("Spill av video: Slik baker vi");
   });
 
+  it("bruker Maps Embed API når nøkkelen er satt, og den gamle adressen ellers", () => {
+    const address = "Storgata 1, 3340 Åmot";
+    expect(mapLinks(address, "").embed).toBe("https://maps.google.com/maps?q=Storgata%201%2C%203340%20%C3%85mot&output=embed");
+    expect(mapLinks(address, "AIza-test").embed).toBe("https://www.google.com/maps/embed/v1/place?key=AIza-test&q=Storgata%201%2C%203340%20%C3%85mot");
+    // Uten argument leses nøkkelen fra miljøet, slik Workeren får den fra «vars».
+    const before = process.env.GOOGLE_MAPS_EMBED_KEY;
+    try {
+      process.env.GOOGLE_MAPS_EMBED_KEY = " AIza-miljo ";
+      expect(mapLinks(address).embed).toContain("/maps/embed/v1/place?key=AIza-miljo&q=");
+      delete process.env.GOOGLE_MAPS_EMBED_KEY;
+      expect(mapLinks(address).embed).toContain("output=embed");
+    } finally {
+      if (before === undefined) delete process.env.GOOGLE_MAPS_EMBED_KEY;
+      else process.env.GOOGLE_MAPS_EMBED_KEY = before;
+    }
+  });
+
   it("godtar bare YouTube-lenker, og krever tittel for skjermlesere", () => {
     expect(youtubeId("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10")).toBe("dQw4w9WgXcQ");
     expect(youtubeId("https://youtu.be/dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
@@ -311,7 +328,7 @@ describe("bransjepakkene", () => {
     expect(types("rorlegger")).toContain("/om-oss:ansatte");
     expect(types("frisor")).toEqual(expect.arrayContaining(["/om-oss:ansatte", "/:apningstider"]));
     const kontakt = packs.rorlegger.pages({ name: "Test AS", city: "Åmot" }).find((p) => p.path === "/kontakt")!.content.sections[0];
-    expect(readFormFields(kontakt.props).map((f) => f.type)).toEqual(["tekst", "dato"]);
+    expect(readFormFields(kontakt.props).map((f) => f.type)).toEqual(["tekst", "dato", "bilder"]);
     expect(types("regnskap")).toContain("/om-oss:ansatte");
   });
 });

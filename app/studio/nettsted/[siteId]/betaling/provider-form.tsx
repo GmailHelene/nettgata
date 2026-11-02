@@ -56,6 +56,28 @@ const setup: Record<OnlineProvider, { name: string; intro: string; hintLabel: st
       </>
     ),
   },
+  kustom: {
+    name: "Kustom",
+    intro:
+      "Kustom er en ferdig kasse (tidligere Klarna Checkout) der kunden velger betalingsmåte inne i Kustom. Beløpet trekkes når du markerer ordren som sendt eller hentet.",
+    hintLabel: "API-brukernavn",
+    testLabel: "Test (Kustom playground)",
+    fields: [
+      { name: "username", label: "API-brukernavn" },
+      { name: "password", label: "API-passord", secret: true },
+    ],
+    help: (
+      <>
+        <p>Du trenger en avtale med Kustom for butikken.</p>
+        <ol className="mt-2 list-decimal space-y-1 pl-5">
+          <li>Logg inn i Kustom Portal. Testnøkler lager du i playground-portalen.</li>
+          <li>Gå til API-innstillingene (Developers, API) og trykk Generate new.</li>
+          <li>Du får et API-brukernavn og et API-passord. Testpassordet begynner med kco_test_api_.</li>
+          <li>Lim inn begge her med en gang. Kustom viser passordet bare én gang.</li>
+        </ol>
+      </>
+    ),
+  },
 };
 
 function when(iso: string): string {

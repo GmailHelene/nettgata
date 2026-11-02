@@ -5,16 +5,18 @@ import { readyProviders, type ReadyProviders } from "@/lib/payments/state";
 
 /**
  * Betalingsmåter. Vipps og Klarna krever butikkens egen avtale, og vises i kassen først når nøklene er lagt inn
- * og koblingen er testet under Betaling i studioet. Klarna dekker kort, faktura og delbetaling.
+ * og koblingen er testet under Betaling i studioet. Klarna dekker kort, faktura og delbetaling. Kustom (tidligere
+ * Klarna Checkout) er en egen kasse der kunden velger betalingsmåte inne i Kustom.
  * «kort» er fra før Klarna kom. Den vises aldri, men står her så gamle innstillinger fortsatt kan leses.
  * «test» finnes bare utenfor produksjon, så hele kjøpsflyten kan prøves uten ekte penger.
  */
-export const paymentMethods = ["vipps", "klarna", "kort", "faktura", "ved-henting", "test"] as const;
+export const paymentMethods = ["vipps", "klarna", "kustom", "kort", "faktura", "ved-henting", "test"] as const;
 export type PaymentMethod = (typeof paymentMethods)[number];
 
 export const paymentLabels: Record<PaymentMethod, string> = {
   vipps: "Vipps",
   klarna: "Klarna",
+  kustom: "Kustom",
   kort: "Kort",
   faktura: "Faktura",
   "ved-henting": "Betal ved henting",
@@ -29,11 +31,11 @@ export const paymentInstructions: Partial<Record<PaymentMethod, string>> = {
 };
 
 /** Kunden sendes videre til Vipps eller Klarna og betaler der. Om ordren er betalt, avgjøres alltid av Vipps eller Klarna. */
-export const onlinePaymentMethods = ["vipps", "klarna"] as const satisfies readonly PaymentMethod[];
+export const onlinePaymentMethods = ["vipps", "klarna", "kustom"] as const satisfies readonly PaymentMethod[];
 export type OnlinePaymentMethod = (typeof onlinePaymentMethods)[number];
 
 export function isOnlinePayment(method: string): method is OnlinePaymentMethod {
-  return method === "vipps" || method === "klarna";
+  return method === "vipps" || method === "klarna" || method === "kustom";
 }
 
 const shippingOptionSchema = z.object({
