@@ -285,7 +285,7 @@ export const helpArticles: HelpArticle[] = [
     summary: "Meldinger fra skjemaet havner i studioet, og du kan få varsel på e-post.",
     steps: [
       "Gå til «Henvendelser». Nye meldinger er merket med rød kant.",
-      "Svar på e-post eller telefon fra lenkene på meldingen.",
+      "Trykk på e-postadressen i meldingen for å svare.",
       "Trykk «Merk som lest», og «Slett» når saken er ferdig.",
     ],
     notes: [
