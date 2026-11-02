@@ -14,7 +14,8 @@ const CACHE = "public, max-age=86400";
  */
 export async function GET(request: Request) {
   const host = request.headers.get("host") ?? "";
-  if (isPlatformHost(host)) return new Response("Not found", { status: 404 });
+  // Plattformens egne adresser (nettgata.no og studioet) bruker gateskiltet i public/nettgata.
+  if (isPlatformHost(host)) return Response.redirect(new URL("/nettgata/favicon.ico", request.url), 308);
   const db = await getDb();
   const site = await resolveSiteByHost(db, host);
   if (!site) return new Response("Not found", { status: 404 });

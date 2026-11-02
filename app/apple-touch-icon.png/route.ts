@@ -9,7 +9,7 @@ import { getMediaStore } from "@/lib/storage";
  */
 export async function GET(request: Request) {
   const host = request.headers.get("host") ?? "";
-  if (isPlatformHost(host)) return new Response("Not found", { status: 404 });
+  if (isPlatformHost(host)) return Response.redirect(new URL("/nettgata/ikon-180.png", request.url), 308);
   const site = await resolveSiteByHost(await getDb(), host);
   const favicon = site ? readSiteLayout(site.layout).favicon : null;
   const object = favicon ? await (await getMediaStore()).get(favicon.src.replace(/^\/media\//, "")) : null;
