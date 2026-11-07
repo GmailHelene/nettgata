@@ -129,14 +129,20 @@ export function ShopSettingsForm({ siteId, initial, pages }: { siteId: string; i
       <label className="block max-w-md">
         <span className="mb-1 block text-sm font-medium">Siden med kjøpsvilkår</span>
         <select value={termsPath} onChange={(e) => setTermsPath(e.target.value)} className={inputClass}>
-          {!termsPage && <option value={termsPath}>{termsPath} (finnes ikke)</option>}
+          {!pages.some((p) => p.path === "/kjopsvilkar") && <option value="/kjopsvilkar">Kjøpsvilkår laget av Nettgata (/kjopsvilkar)</option>}
+          {!termsPage && termsPath !== "/kjopsvilkar" && <option value={termsPath}>{termsPath} (finnes ikke)</option>}
           {pages.map((p) => (
             <option key={p.path} value={p.path}>
               {p.title} ({p.path})
             </option>
           ))}
         </select>
-        {(!termsPage || !termsPage.published) && (
+        {termsPath === "/kjopsvilkar" && !termsPage && (
+          <span className="mt-2 block text-sm text-neutral-700">
+            Nettgata lager vilkårene fra opplysningene under Innstillinger. De må ha org.nr., adresse, e-post og telefon før kassen åpner.
+          </span>
+        )}
+        {termsPage && !termsPage.published && (
           <span role="alert" className="mt-2 block text-sm text-red-800">
             Butikken tar ikke imot bestillinger før kjøpsvilkårene er publisert.
           </span>

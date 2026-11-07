@@ -19,6 +19,7 @@ import { assertUsable, describeDiscount, discountAmount, findDiscount, type Disc
 import { bringQuoteOptions, cartTotals, createOrder, freeShippingApplies, priceLines, setOrderStatus, shippingFor, type CheckoutInput } from "@/lib/shop/orders";
 import { availablePaymentMethods, checkoutShippingOptions, paymentLabels, readShopSettings } from "@/lib/shop/settings";
 import { kasseTekster } from "@/lib/legal/angrerett";
+import { hasCheckoutTerms } from "@/lib/legal/kundesider";
 import { readSiteInfo } from "@/lib/site-info";
 
 const itemsSchema = z.array(z.object({ variantId: z.string().uuid(), quantity: z.number().int().min(1).max(99) })).max(50);
@@ -140,7 +141,7 @@ export async function placeOrder(siteId: string, input: CheckoutInput): Promise<
   }
 
   // Uten publiserte kjøpsvilkår kan butikken ikke ta imot bestillinger (angrerettloven og ehandelsloven).
-  if (!(await getPublishedPage(ctx.db, ctx.site.id, ctx.settings.termsPath))) {
+  if (!(await hasCheckoutTerms(ctx.site, ctx.settings.termsPath, (p) => getPublishedPage(ctx.db, ctx.site.id, p)))) {
     return { ok: false, message: "Butikken tar ikke imot bestillinger akkurat nå. Prøv igjen senere." };
   }
 

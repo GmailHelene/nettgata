@@ -11,6 +11,7 @@ import { ShopError } from "@/lib/shop/catalog";
 import { createOrder, type CheckoutInput } from "@/lib/shop/orders";
 import { isOnlinePayment, readShopSettings } from "@/lib/shop/settings";
 import { paymentOrigin, returnUrl, startPayment } from "./service";
+import { hasCheckoutTerms } from "@/lib/legal/kundesider";
 import { readyProviders, type ReadyProviders } from "./state";
 
 async function shopSite(siteId: string) {
@@ -39,7 +40,7 @@ export async function placeOrderWithOnlinePayment(siteId: string, input: Checkou
     return { ok: false, message: "Mange bestillinger på kort tid. Vent litt og prøv igjen." };
   }
   // Uten publiserte kjøpsvilkår kan butikken ikke ta imot bestillinger (angrerettloven og ehandelsloven).
-  if (!(await getPublishedPage(db, site.id, settings.termsPath))) {
+  if (!(await hasCheckoutTerms(site, settings.termsPath, (p) => getPublishedPage(db, site.id, p)))) {
     return { ok: false, message: "Butikken tar ikke imot bestillinger akkurat nå. Prøv igjen senere." };
   }
 

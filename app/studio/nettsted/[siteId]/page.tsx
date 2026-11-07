@@ -15,6 +15,9 @@ import { hasActiveSubscription } from "@/lib/billing/state";
 import { orderStatusLabel } from "./ordre/order-status";
 import { SalesChart } from "./sales-chart";
 import { SiteLinks } from "./site-links";
+import { hasCheckoutTerms } from "@/lib/legal/kundesider";
+import { juridiskeMangler } from "@/lib/legal/felles";
+import { readSiteInfo } from "@/lib/site-info";
 import { SiteNav } from "./site-nav";
 
 type Task = { text: string; href: string; tone?: "warning" };
@@ -74,6 +77,10 @@ export default async function OverviewPage({ params }: { params: Promise<{ siteI
     lowStockAt: number;
   } | null = null;
 
+  // Opplysningene loven krever på nettstedet (ehandelsloven § 8, angrerettloven § 8). Uten dem blir de juridiske sidene ufullstendige.
+  for (const text of juridiskeMangler({ navn: site.name, info: readSiteInfo(site.info) }, { nettbutikk: isShop })) {
+    tasks.push({ text, href: `${base}/innstillinger`, tone: "warning" });
+  }
   if (isShop) {
     const settings = readShopSettings(site.shop);
     const [sales, top, low, counts, recent, terms] = await Promise.all([
@@ -82,10 +89,10 @@ export default async function OverviewPage({ params }: { params: Promise<{ siteI
       lowStock(db, site.id, settings.lowStockAt),
       orderCounts(db, site.id),
       db.select().from(orders).where(eq(orders.siteId, site.id)).orderBy(desc(orders.createdAt)).limit(5),
-      getPublishedPage(db, site.id, settings.termsPath),
+      hasCheckoutTerms(site, settings.termsPath, (p) => getPublishedPage(db, site.id, p)),
     ]);
     shop = { sales, top, low, recent, lowStockAt: settings.lowStockAt };
-    if (!terms) tasks.push({ text: "Kassen er stengt til kjøpsvilkårene er publisert", href: `${base}/sider`, tone: "warning" });
+    if (!terms) tasks.push({ text: "Kassen er stengt til kjøpsvilkårene er på plass. Fyll ut org.nr., adresse, e-post og telefon under Innstillinger, så lager Nettgata vilkårene for deg", href: `${base}/innstillinger`, tone: "warning" });
     // Klar til åpning: uten e-post får kundene ingen ordrebekreftelse, og angreskjemaet skal komme på e-post.
     if (getEmailProvider().name === "logg") {
       tasks.push({ text: "E-post er ikke slått på ennå, så kundene får ingen ordrebekreftelse. Ikke åpne butikken før dette er på plass", href: `${base}/innstillinger`, tone: "warning" });

@@ -116,27 +116,7 @@ export const nettbutikk: Pack = {
         ],
       },
     },
-    {
-      // Plassholder med vilje: vilkårene skal bygge på Forbrukertilsynets mal og godkjennes av butikken.
-      // Kassen er stengt til denne siden er publisert.
-      path: "/kjopsvilkar",
-      title: "Kjøpsvilkår",
-      showInMenu: false,
-      content: {
-        seo: { title: `Kjøpsvilkår | ${name}`.slice(0, 70) },
-        sections: [
-          {
-            id: "vilkar",
-            type: "tekst",
-            variant: "standard",
-            props: {
-              overskrift: "Kjøpsvilkår",
-              brodtekst: `IKKE PUBLISER FØR DETTE ER ERSTATTET.\n\nLim inn Forbrukertilsynets standard salgsbetingelser for forbrukerkjøp av varer over Internett, fylt ut med butikkens navn, org.nr., kontaktinformasjon, betaling, frakt og angreskjema. Malen ligger her: ${TERMS_TEMPLATE_URL}`,
-            },
-          },
-        ],
-      },
-    },
+    // Kjøpsvilkårene lages automatisk på /kjopsvilkar (lib/legal/angrerett.ts, lagKjopsvilkar) fra butikkens opplysninger.
   ],
 };
 

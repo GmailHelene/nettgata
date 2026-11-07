@@ -9,6 +9,7 @@ import { readSiteInfo } from "@/lib/site-info";
 import { bransjeKeyword } from "@/lib/seo/auto";
 import { readSiteLayout } from "@/lib/site-layout";
 import { listCatalog } from "@/lib/shop/catalog";
+import { GENERATED_PATHS } from "@/lib/legal/kundesider";
 import { loadPublicSetup } from "@/lib/egen-booking/store";
 
 type Site = typeof sites.$inferSelect;
@@ -65,6 +66,12 @@ export async function buildRenderContext(
     .orderBy(asc(pages.sortOrder), asc(pages.path));
   // I en nettbutikk står «Alle varer» alltid i menyen, rett etter forsiden.
   if (shop && !nav.some((n) => n.path === "/produkter")) nav.splice(nav[0]?.path === "/" ? 1 : 0, 0, { path: "/produkter", title: "Alle varer" });
+  // Forsiden står alltid først i en butikk, så menyen vises selv før andre sider er publisert.
+  if (shop && !nav.some((n) => n.path === "/")) nav.unshift({ path: "/", title: "Forside" });
+  // Alle sidene som kan åpnes nå, også de som ikke står i menyen. Lenker i bunnteksten til andre sider skjules.
+  const pathConditions = [eq(pages.siteId, site.id)];
+  if (!preview) pathConditions.push(isNotNull(pages.publishedVersionId));
+  const pagePaths = (await db.select({ path: pages.path }).from(pages).where(and(...pathConditions))).map((p) => p.path);
   return {
     site: {
       id: site.id,
@@ -74,6 +81,7 @@ export async function buildRenderContext(
       keyword: bransjeKeyword(site.industryPack),
     },
     nav,
+    paths: [...pagePaths, ...Object.values(GENERATED_PATHS).filter((p) => shop || p === GENERATED_PATHS.personvern), ...(shop ? ["/produkter", "/handlekurv"] : [])],
     path,
     preview,
     basePath,

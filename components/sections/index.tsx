@@ -938,6 +938,8 @@ export type RenderContext = {
   /** `keyword`: bransjeordet til titler og strukturerte data (lib/seo/auto.ts). */
   site: { id: string; name: string; info: SiteInfo; schemaType: string; keyword?: string };
   nav: { path: string; title: string }[];
+  /** Adressene som finnes på nettstedet nå. Mangler den, vises alle lenker. */
+  paths?: string[];
   path: string;
   preview: boolean;
   /** Tom på eget domene, "/vis/<slug>" når nettstedet vises via plattformens adresse. */
@@ -973,7 +975,7 @@ function SiteHeader({ ctx }: { ctx: RenderContext }) {
             </p>
             {layout.topLinks.length > 0 && (
               <ul className="hidden gap-5 md:flex">
-                {layout.topLinks.map((l) => (
+                {layout.topLinks.filter((l) => linkExists(ctx, l.href)).map((l) => (
                   <li key={l.label}>
                     <a href={siteHref(ctx.basePath, l.href)} className="hover:underline">
                       {l.label}
@@ -1034,6 +1036,16 @@ function SiteHeader({ ctx }: { ctx: RenderContext }) {
   );
 }
 
+/**
+ * Lenker til en side som ikke finnes (ennå), for eksempel en kladd, skjules. Eksterne lenker, ankre og
+ * undersider av sider som finnes (som /produkter/kopp) vises alltid.
+ */
+function linkExists(ctx: RenderContext, href: string): boolean {
+  if (!ctx.paths || !href.startsWith("/")) return true;
+  const path = href.split(/[?#]/)[0].replace(/\/+$/, "") || "/";
+  return ctx.paths.some((p) => p === path || (p !== "/" && path.startsWith(`${p}/`)));
+}
+
 function SiteFooter({ ctx }: { ctx: RenderContext }) {
   const { info, name } = ctx.site;
   const { layout } = ctx;
@@ -1061,7 +1073,10 @@ function SiteFooter({ ctx }: { ctx: RenderContext }) {
             </ul>
           </div>
         )}
-        {layout.footerColumns.map((col) => (
+        {layout.footerColumns
+          .map((col) => ({ ...col, links: col.links.filter((l) => linkExists(ctx, l.href)) }))
+          .filter((col) => col.links.length > 0)
+          .map((col) => (
           <div key={col.title}>
             <h2 className="mb-3 font-semibold">{col.title}</h2>
             <ul className="space-y-2">
@@ -1122,6 +1137,13 @@ function SiteFooter({ ctx }: { ctx: RenderContext }) {
                 Personvern
               </a>
             </li>
+            {ctx.shop && (
+              <li>
+                <a href={siteHref(ctx.basePath, "/kjopsvilkar")} className="hover:text-[var(--c-text)] hover:underline">
+                  Kjøpsvilkår
+                </a>
+              </li>
+            )}
             {ctx.shop && (
               <li>
                 <a href={siteHref(ctx.basePath, "/angrerett")} className="hover:text-[var(--c-text)] hover:underline">

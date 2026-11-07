@@ -2,13 +2,14 @@ import type { PageContent } from "@/lib/content/types";
 import { availablePaymentMethods, readShopSettings } from "@/lib/shop/settings";
 import { aiTeamActive } from "@/lib/ai/access";
 import { readSiteInfo } from "@/lib/site-info";
-import { lagAngrerettside } from "./angrerett";
+import { lagAngrerettside, lagKjopsvilkar } from "./angrerett";
+import { juridiskeMangler } from "./felles";
 import { lagPersonvernerklaering } from "./personvern";
 
 type SiteLike = { name: string; kind: "nettside" | "nettbutikk"; info: unknown; shop: unknown; billing?: unknown };
 
 /** Sidene alle kundenettsteder får automatisk, med lenke i bunnteksten. En egen side med samme adresse vinner. */
-export const GENERATED_PATHS = { personvern: "/personvern", angrerett: "/angrerett" } as const;
+export const GENERATED_PATHS = { personvern: "/personvern", angrerett: "/angrerett", kjopsvilkar: "/kjopsvilkar" } as const;
 
 /**
  * Personvernerklæringen (alle) og angrerettsiden (nettbutikker), laget fra nettstedets egne opplysninger og valg.
@@ -42,5 +43,21 @@ export function generatedLegalPage(
     });
   }
   if (path === GENERATED_PATHS.angrerett && shop) return lagAngrerettside({ butikk, betalingsmater });
+  if (path === GENERATED_PATHS.kjopsvilkar && shop) return lagKjopsvilkar({ butikk, betalingsmater });
   return null;
+}
+
+/**
+ * Har butikken kjøpsvilkår kassen kan lenke til? En publisert egen side på termsPath holder alltid. Står termsPath
+ * på standardadressen, holder de automatiske vilkårene, men bare når navn, adresse, e-post, org.nr. og telefon er
+ * fylt ut, fordi vilkårene ellers mangler opplysninger loven krever.
+ */
+export async function hasCheckoutTerms(
+  site: SiteLike,
+  termsPath: string,
+  findPublished: (path: string) => Promise<unknown>,
+): Promise<boolean> {
+  if (await findPublished(termsPath)) return true;
+  if (site.kind !== "nettbutikk" || termsPath !== GENERATED_PATHS.kjopsvilkar) return false;
+  return juridiskeMangler({ navn: site.name, info: readSiteInfo(site.info) }, { nettbutikk: true }).length === 0;
 }

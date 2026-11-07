@@ -277,3 +277,37 @@ export function ordrebekreftelseTekster(input: AngrerettInput): Ordrebekreftelse
     tekst: [overskrift, ...avsnittListe, ["Angreskjema", ...skjema].join("\n")].join("\n\n"),
   };
 }
+
+/**
+ * Siden /kjopsvilkar for nettbutikker. Bygger på de samme opplysningene som angrerettsiden, så de to aldri sier
+ * noe forskjellig: avtalen først, så bestilling, selger, angrerett, reklamasjon og klage.
+ * En egen side på samme adresse vinner, så butikken kan skrive egne vilkår når den vil.
+ */
+export function lagKjopsvilkar(input: AngrerettInput): PageContent {
+  const v = input.butikk;
+  const angrerett = lagAngrerettside({ ...input, utkast: false });
+  const etter = (id: string) => angrerett.sections.filter((s) => s.id === id);
+  const avtalen = tekstSeksjon("vilkar", "Kjøpsvilkår", [
+    `Disse vilkårene gjelder når du som forbruker handler på nett hos ${v.navn}.`,
+    "Avtalen består av vilkårene her, det som står om varen og prisen i nettbutikken, og ordrebekreftelsen du får på e-post. Forbrukerkjøpsloven, angrerettloven og ehandelsloven gjelder i tillegg. Gir de deg flere rettigheter enn det som står her, er det loven som gjelder.",
+    "Står det noe annet i ordrebekreftelsen enn her, gjelder ordrebekreftelsen, så lenge den ikke gir deg dårligere rettigheter enn loven.",
+    `Sist endret ${norskDato(input.oppdatert ?? TEKSTVERSJON)}.`,
+  ]);
+  const seksjoner: Section[] = [
+    avtalen,
+    ...etter("for-du-bestiller"),
+    ...etter("selger"),
+    tekstSeksjon("vilkar-angrerett", "Angrerett", [
+      "Du har 14 dagers angrerett, regnet fra dagen etter at du har fått varen. Angreskjemaet og alt om retur står også på siden Angrerett og retur.",
+    ]),
+    ...angrerett.sections.filter((s) => ["angre-slik", "angre-retur", "angre-penger", "angre-unntak"].includes(s.id)),
+    ...etter("reklamasjon"),
+    ...etter("klage"),
+  ];
+  return lagSide({
+    tittel: `Kjøpsvilkår | ${v.navn}`,
+    beskrivelse: `Kjøpsvilkårene hos ${v.navn}: bestilling, betaling, levering, angrerett, retur og reklamasjon.`,
+    seksjoner,
+    utkast: input.utkast,
+  });
+}
