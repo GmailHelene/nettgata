@@ -243,6 +243,33 @@ export const helpArticles: HelpArticle[] = [
     related: ["omdirigeringer", "bilder"],
   },
   {
+    slug: "google-bedriftsprofil",
+    title: "Synlig i Google Maps: bedriftsprofil",
+    category: "synlighet",
+    summary: "Bedriftsprofilen gjør at du dukker opp i Google Maps og i kartet når folk søker lokalt. Den er gratis.",
+    intro: [
+      "Når noen søker «frisør Vikersund» eller «rørlegger Drammen», viser Google et kart med bedrifter øverst. Der kommer du bare med hvis du har en bedriftsprofil hos Google. Profilen er gratis, og du lager den selv hos Google.",
+      "Profilen gjelder bedrifter som møter kundene sine, i et lokale eller hjemme hos kunden. Selger du bare på nett, kan du ikke ha profil.",
+    ],
+    steps: [
+      "Sjekk først at navn, adresse, telefon og åpningstider er riktige under «Innstillinger» her i studioet. Skriv dem helt likt hos Google, så Google ser at det er samme bedrift.",
+      "Gå til business.google.com og logg inn med Google-kontoen bedriften skal eie profilen med. Bruk gjerne en konto som tilhører bedriften, ikke en ansatt.",
+      "Søk opp bedriftsnavnet. Finnes bedriften allerede, gjør du krav på den. Ellers lager du en ny.",
+      "Velg kategori, for eksempel «Frisør» eller «Rørlegger». Den første kategorien betyr mest.",
+      "Har du et lokale kundene kommer til, skriv adressen. Kjører du ut til kundene, velg at du ikke har lokale, og skriv stedene du dekker.",
+      "Skriv adressen til nettstedet ditt i feltet for nettsted.",
+      "Bekreft bedriften. Google bestemmer hvordan: video av lokalet eller bilen, telefon, e-post eller brev i posten. Følg det Google ber om.",
+      "Legg inn åpningstider og noen gode bilder, gjerne av lokalet, arbeidet ditt og deg selv.",
+    ],
+    notes: [
+      "Det kan ta noen dager før profilen vises etter at den er bekreftet.",
+      "Når profilen er bekreftet, finner du en lenke for å be om anmeldelser. Send den til fornøyde kunder. Gi aldri rabatt eller gaver mot anmeldelser, det bryter Googles regler.",
+      "Endrer du åpningstider, gjør det både her og hos Google.",
+      "Videobekreftelsen er ofte det tyngste steget. Ta opp skilt, lokale eller firmabil, og vis at du har tilgang til noe bare eieren har, for eksempel nøkler eller utstyr.",
+    ],
+    related: ["seo", "domene"],
+  },
+  {
     slug: "omdirigeringer",
     title: "Flytt fra en gammel nettside",
     category: "synlighet",
