@@ -3,7 +3,7 @@ import { lagKjopsvilkar } from "@/lib/legal/angrerett";
 import { sideSomTekst } from "@/lib/legal/felles";
 import { generatedLegalPage, hasCheckoutTerms } from "@/lib/legal/kundesider";
 
-const info = { orgnr: "927889404", email: "post@krok.no", phone: "900 00 000", street: "Storgata 1", postalCode: "3370", city: "Vikersund" };
+const info = { orgnr: "927889404", email: "post@krok.no", phone: "900 00 000", street: "Storgata 1", postalCode: "3370", city: "Vikersund", openingHours: [], specialHours: [] };
 const butikk = { name: "Kari sin krok", kind: "nettbutikk" as const, info, shop: {} };
 
 describe("kjøpsvilkår laget av Nettgata", () => {
