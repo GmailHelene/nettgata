@@ -41,10 +41,10 @@ export default async function PaymentPage({
   return (
     <main className="mx-auto max-w-3xl px-5 py-12">
       <SiteNav siteId={site.id} name={site.name} shop active="betaling" />
-      <h2 className="mb-2 text-xl font-bold">Betaling med Vipps og Klarna</h2>
+      <h2 className="mb-2 text-xl font-bold">Betaling med Vipps og Kustom</h2>
       <p className="mb-6 text-neutral-700">
-        Kundene betaler rett til butikken din. Du har egen avtale med Vipps og Klarna, og pengene går til kontoen din, aldri via Nettgata. Lim inn
-        nøklene du har fått, så tester vi at de virker før betalingsmåten vises i kassen. <HelpLink slug="vipps-klarna" />
+        Kundene betaler rett til butikken din. Du har egen avtale med Vipps eller Kustom, og pengene går til kontoen din, aldri via Nettgata. Lim inn
+        nøklene du har fått, så tester vi at de virker før betalingsmåten vises i kassen. Kustom-kassen har kort, Vipps og Klarna i én løsning. <HelpLink slug="vipps-klarna" />
       </p>
       {!canEdit && (
         <p className="mb-6 rounded-md bg-neutral-100 p-3 text-sm text-neutral-800">
@@ -54,7 +54,8 @@ export default async function PaymentPage({
 
       <div className="space-y-6">
         <ProviderForm siteId={site.id} provider="vipps" view={view.vipps} canEdit={canEdit} />
-        <ProviderForm siteId={site.id} provider="klarna" view={view.klarna} canEdit={canEdit} />
+        {/* Klarna Payments vises bare for butikker som allerede har koblet det til. Nye butikker bruker Kustom, som har Vipps og Klarna i samme kasse. */}
+        {view.klarna && <ProviderForm siteId={site.id} provider="klarna" view={view.klarna} canEdit={canEdit} />}
         <ProviderForm siteId={site.id} provider="kustom" view={view.kustom} canEdit={canEdit} />
       </div>
 
