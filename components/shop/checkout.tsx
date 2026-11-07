@@ -161,6 +161,8 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
   }
 
   const shipping = data.shippingOptions.find((o) => o.code === shippingCode);
+  // Betaling ved henting gir ingen mening når varene sendes. Står ingen andre måter igjen, kan ikke ordren sendes.
+  const visiblePayments = data.paymentMethods.filter((m) => !(shipping?.requiresAddress && m.code === "ved-henting"));
 
   const applyCode = () => {
     setCodeError(null);
@@ -362,7 +364,12 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
               Butikken tar ikke imot betaling akkurat nå. Prøv igjen senere.
             </p>
           )}
-          {data.paymentMethods.filter((m) => !(shipping?.requiresAddress && m.code === "ved-henting")).map((m) => {
+          {data.paymentMethods.length > 0 && visiblePayments.length === 0 && (
+            <p role="alert" className="font-medium">
+              Med denne leveringsmåten kan du ikke betale på nett ennå. Velg å hente varene selv, så betaler du ved henting.
+            </p>
+          )}
+          {visiblePayments.map((m) => {
             const testMode = isOnlinePayment(m.code) && online[m.code]?.environment === "test";
             const note = [paymentNotes[m.code], testMode && "Testmiljø, ingen ekte penger trekkes"].filter(Boolean).join(". ");
             return (
@@ -414,7 +421,7 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
           </p>
         )}
         <button
-          disabled={busy || preview || data.paymentMethods.length === 0}
+          disabled={busy || preview || visiblePayments.length === 0}
           aria-describedby={onlineLabel ? "betaling-videre" : undefined}
           className="w-full rounded-[var(--radius)] bg-[var(--c-primary)] px-6 py-4 text-lg font-semibold text-[var(--c-on-primary)] disabled:opacity-60"
         >
