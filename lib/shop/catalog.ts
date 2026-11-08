@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Db } from "@/db";
-import { productCollections, auditLog, productCategories, productVariants, products, variantPriceHistory, type ProductImage } from "@/db/schema";
+import { productCollections, auditLog, productCategories, productVariants, products, variantPriceHistory, type ProductImage, type ProductOption } from "@/db/schema";
 import { imageFocusSchema } from "@/lib/content/fields";
 import { mediaSrcPattern } from "@/lib/media-types";
 import { vatRates } from "./money";
@@ -36,6 +36,16 @@ const imageSchema = z
 const optionSchema = z.object({
   name: z.string().trim().min(1, "Valget må ha et navn, f.eks. Størrelse").max(40),
   values: z.array(z.string().trim().min(1).max(40)).min(1, "Valget må ha minst én verdi").max(30),
+  /** Bilde og fargeprikk per verdi. Lagres i samme jsonb som valgene, så det trengs ingen migrering. */
+  media: z
+    .record(
+      z.string().max(40),
+      z.object({
+        image: z.string().regex(mediaSrcPattern).optional(),
+        color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Fargen må være en gyldig fargekode").optional(),
+      }),
+    )
+    .optional(),
 });
 
 const variantSchema = z.object({
@@ -78,6 +88,10 @@ export const productInputSchema = z
     for (const o of p.options) {
       if (names.has(o.name.toLowerCase())) ctx.addIssue({ code: "custom", message: `Valget «${o.name}» finnes to ganger` });
       names.add(o.name.toLowerCase());
+      for (const [value, media] of Object.entries(o.media ?? {})) {
+        if (!o.values.includes(value)) ctx.addIssue({ code: "custom", message: `«${value}» er ikke en verdi i ${o.name}` });
+        if (media.image && !p.images.some((i) => i.src === media.image)) ctx.addIssue({ code: "custom", message: `Bildet for «${value}» er ikke et av varens bilder` });
+      }
     }
     const combos = new Set<string>();
     for (const v of p.variants) {
@@ -245,7 +259,7 @@ export type CatalogProduct = {
   slug: string;
   description: string;
   images: ProductImage[];
-  options: { name: string; values: string[] }[];
+  options: ProductOption[];
   vatRate: number;
   categoryId: string | null;
   /** Adressene til samlingene varen står i. Mangler i eksempelvarene. */

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { CatalogProduct } from "@/lib/shop/catalog";
 import { addToCart } from "./cart-store";
+import { VARIANT_IMAGE_EVENT } from "./gallery";
 import { Price } from "./price";
 
 export function AddToCart({ siteId, product, cartHref }: { siteId: string; product: CatalogProduct; cartHref: string }) {
@@ -22,6 +23,12 @@ export function AddToCart({ siteId, product, cartHref }: { siteId: string; produ
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+
+  // Har det valgte alternativet eget bilde, bytter galleriet til det.
+  useEffect(() => {
+    const image = product.options.map((o, i) => o.media?.[selected[i]]?.image).find(Boolean);
+    if (image) window.dispatchEvent(new CustomEvent(VARIANT_IMAGE_EVENT, { detail: image }));
+  }, [product.options, selected]);
 
   const variant = product.variants.find((v) => v.optionValues.every((value, i) => value === selected[i]));
   const soldOut = !variant || (variant.stock !== null && variant.stock <= 0);
@@ -44,6 +51,7 @@ export function AddToCart({ siteId, product, cartHref }: { siteId: string; produ
             {option.values.map((value) => {
               const candidate = product.variants.find((v) => v.optionValues.every((x, j) => (j === i ? x === value : x === selected[j])));
               const unavailable = !candidate || (candidate.stock !== null && candidate.stock <= 0);
+              const color = option.media?.[value]?.color;
               return (
                 <label
                   key={value}
@@ -60,6 +68,8 @@ export function AddToCart({ siteId, product, cartHref }: { siteId: string; produ
                     }}
                     className="sr-only"
                   />
+                  {/* Fargen vises i tillegg til navnet, så valget ikke avhenger av å se forskjell på farger. */}
+                  {color && <span aria-hidden="true" className="mr-2 inline-block h-4 w-4 rounded-full align-[-2px] ring-1 ring-black/25" style={{ backgroundColor: color }} />}
                   {value}
                   {unavailable && <span className="sr-only"> (utsolgt)</span>}
                 </label>

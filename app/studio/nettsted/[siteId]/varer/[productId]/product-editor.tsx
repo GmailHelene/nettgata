@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { FormStatus } from "@/components/studio/form-status";
 import { ImageInput, SiteIdContext } from "@/components/studio/image-input";
 import { inputClass } from "@/components/studio/info-fields";
+import type { ProductOptionMedia } from "@/db/schema";
 import type { ImageValue } from "@/lib/content/fields";
 import type { ProductInput } from "@/lib/shop/catalog";
 import { parseNok } from "@/lib/shop/money";
@@ -13,7 +14,7 @@ import { archiveProductAction, saveProductAction } from "../../../../shop-action
 
 /** weight er variantens egen vekt i gram. Tom betyr samme vekt som varen. */
 type VariantRow = { id?: string; optionValues: string[]; sku: string; gtin: string; price: string; stock: string; weight: string; loadedStock?: number | null };
-type OptionRow = { name: string; values: string };
+type OptionRow = { name: string; values: string; media: ProductOptionMedia };
 
 const gramsText = (grams: number | null | undefined) => (grams === null || grams === undefined ? "" : String(grams));
 
@@ -36,6 +37,17 @@ const keyOf = (values: string[]) => values.join(" / ");
 const splitValues = (text: string) => [...new Set(text.split(",").map((v) => v.trim()).filter(Boolean))];
 
 /** Alle kombinasjoner av valgene: Størrelse S, M og Farge Blå, Rød gir fire varianter. */
+/** Bare verdier som fortsatt finnes, og bilder som fortsatt ligger på varen, blir lagret. */
+function cleanMedia(option: OptionRow, images: ImageValue[]): ProductOptionMedia {
+  const media: ProductOptionMedia = {};
+  for (const value of splitValues(option.values)) {
+    const item = option.media[value];
+    const image = item?.image && images.some((i) => i.src === item.image) ? item.image : undefined;
+    if (image || item?.color) media[value] = { ...(image && { image }), ...(item?.color && { color: item.color }) };
+  }
+  return media;
+}
+
 function combinations(options: { values: string[] }[]): string[][] {
   return options.reduce<string[][]>((acc, o) => acc.flatMap((combo) => o.values.map((v) => [...combo, v])), [[]]);
 }
@@ -71,7 +83,7 @@ export function ProductEditor({
   const [collectionIds, setCollectionIds] = useState<string[]>(initial.collectionIds ?? (initial.categoryId ? [initial.categoryId] : []));
   const [vatRate, setVatRate] = useState(initial.vatRate);
   const [status, setStatus] = useState(initial.status);
-  const [options, setOptions] = useState<OptionRow[]>((initial.options ?? []).map((o) => ({ name: o.name, values: o.values.join(", ") })));
+  const [options, setOptions] = useState<OptionRow[]>((initial.options ?? []).map((o) => ({ name: o.name, values: o.values.join(", "), media: o.media ?? {} })));
   const [weight, setWeight] = useState(gramsText(initial.weightGrams));
   const [variants, setVariants] = useState<VariantRow[]>(
     initial.variants.map((v) => ({
@@ -154,7 +166,7 @@ export function ProductEditor({
         name,
         description,
         images,
-        options: options.map((o) => ({ name: o.name.trim(), values: splitValues(o.values) })),
+        options: options.map((o) => ({ name: o.name.trim(), values: splitValues(o.values), media: cleanMedia(o, images) })),
         vatRate,
         status,
         categoryId: collectionIds[0] ?? null,
@@ -312,7 +324,8 @@ export function ProductEditor({
             Bare hvis varen finnes i flere utgaver. For eksempel Størrelse: S, M, L. Variantene lages automatisk, og pris og lager står i tabellen over.
           </p>
           {options.map((o, i) => (
-            <div key={i} className="grid items-end gap-2 sm:grid-cols-[12rem_1fr_auto]">
+            <div key={i} className="space-y-3">
+            <div className="grid items-end gap-2 sm:grid-cols-[12rem_1fr_auto]">
               <label className="block">
                 <span className="mb-1 block text-sm font-medium">Navn på valget</span>
                 <input value={o.name} onChange={(e) => applyOptions(options.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} className={inputClass} />
@@ -325,9 +338,42 @@ export function ProductEditor({
                 Fjern
               </button>
             </div>
+            {splitValues(o.values).length > 0 && (
+              <details className="rounded-md border p-3" open={Object.keys(o.media).length > 0}>
+                <summary className="cursor-pointer text-sm font-medium">Bilde og farge for {o.name.trim() || "dette valget"} (valgfritt)</summary>
+                <p className="mt-2 text-sm text-neutral-600">Velg hvilket av varens bilder som skal vises når kunden velger alternativet. Fargen vises som en prikk ved navnet.</p>
+                <ul className="mt-3 space-y-2">
+                  {splitValues(o.values).map((value) => {
+                    const item = o.media[value] ?? {};
+                    const set = (patch: { image?: string; color?: string }) =>
+                      setOptions(options.map((x, j) => (j === i ? { ...x, media: { ...x.media, [value]: { ...item, ...patch } } } : x)));
+                    return (
+                      <li key={value} className="flex flex-wrap items-center gap-3">
+                        <span className="w-28 truncate text-sm font-medium">{value}</span>
+                        <select aria-label={`Bilde for ${value}`} value={item.image ?? ""} onChange={(e) => set({ image: e.target.value || undefined })} className={`${inputClass} max-w-xs`}>
+                          <option value="">Ikke noe eget bilde</option>
+                          {images.map((img, n) => (
+                            <option key={img.src} value={img.src}>
+                              Bilde {n + 1}{img.alt ? `: ${img.alt}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                        <input type="color" aria-label={`Farge for ${value}`} value={item.color ?? "#ffffff"} onChange={(e) => set({ color: e.target.value })} className="h-10 w-12 cursor-pointer rounded border" />
+                        {item.color && (
+                          <button type="button" className="text-sm underline" onClick={() => set({ color: undefined })}>
+                            Fjern farge
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </details>
+            )}
+            </div>
           ))}
           {options.length < 3 && (
-            <button type="button" className="text-sm underline" onClick={() => setOptions([...options, { name: "", values: "" }])}>
+            <button type="button" className="text-sm underline" onClick={() => setOptions([...options, { name: "", values: "", media: {} }])}>
               + Legg til valg (størrelse, farge, materiale)
             </button>
           )}

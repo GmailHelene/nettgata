@@ -310,7 +310,9 @@ export const productCollections = pgTable(
   (t) => [primaryKey({ columns: [t.productId, t.categoryId] }), index("product_collections_category_idx").on(t.categoryId)],
 );
 
-export type ProductOption = { name: string; values: string[] };
+/** media: bilde (adressen til et av varens bilder) og fargeprikk per verdi, f.eks. { "Blå": { image: "/media/...", color: "#1d4ed8" } }. */
+export type ProductOptionMedia = Record<string, { image?: string; color?: string }>;
+export type ProductOption = { name: string; values: string[]; media?: ProductOptionMedia };
 /** focus er fokuspunktet i prosent (se lib/media-types). Lagres i jsonb, så det trengs ingen migrering. */
 export type ProductImage = { src: string; alt: string; decorative?: boolean; focus?: { x: number; y: number } };
 

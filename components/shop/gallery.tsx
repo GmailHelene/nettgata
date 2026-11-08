@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ProductImage } from "@/db/schema";
 import { focusStyle, mediaSrcSet } from "@/lib/media-types";
 
@@ -11,9 +11,26 @@ const sizes = {
   thumb: "(min-width: 1024px) 82px, calc(10vw - 10px)",
 };
 
+/** Sendes av kjøpsknappen når kunden velger en farge med eget bilde. Detail er adressen til bildet. */
+export const VARIANT_IMAGE_EVENT = "nettgata:variantbilde";
+
 /** Stort bilde med miniatyrer under. På mobil kan bildene sveipes sideveis. */
 export function Gallery({ images }: { images: ProductImage[] }) {
   const [active, setActive] = useState(0);
+  const mobileList = useRef<HTMLUListElement>(null);
+
+  useEffect(() => {
+    const show = (e: Event) => {
+      const index = images.findIndex((img) => img.src === (e as CustomEvent<string>).detail);
+      if (index < 0) return;
+      setActive(index);
+      const list = mobileList.current;
+      if (list) list.scrollTo({ left: index * list.clientWidth, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    };
+    window.addEventListener(VARIANT_IMAGE_EVENT, show);
+    return () => window.removeEventListener(VARIANT_IMAGE_EVENT, show);
+  }, [images]);
+
   // Uten bilder: ingen stor grå boks på mobil, der den skjøv pris og kjøpsknapp ut av syne. På PC holder den plassen i oppsettet.
   if (images.length === 0) return <div role="img" aria-label="Bilde kommer" className="ng-art hidden aspect-square w-full rounded-[var(--radius)] md:block" />;
   const current = images[Math.min(active, images.length - 1)];
@@ -21,7 +38,7 @@ export function Gallery({ images }: { images: ProductImage[] }) {
   return (
     <div className="space-y-3">
       {/* Mobil: sveip mellom bildene. */}
-      <ul className="-mx-5 flex snap-x snap-mandatory overflow-x-auto md:hidden">
+      <ul ref={mobileList} className="-mx-5 flex snap-x snap-mandatory overflow-x-auto md:hidden">
         {images.map((img, i) => (
           <li key={i} className="w-full shrink-0 snap-center px-5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
