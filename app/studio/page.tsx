@@ -57,6 +57,14 @@ export default async function StudioHome() {
     <>
       <StudioTopBar email={user.email} active="nettsteder" />
       <main className={`${ui.page} pb-20 pt-10 sm:pt-14`}>
+        {user.adminNeeds2fa && (
+          <p role="alert" className="mb-8 rounded-lg border border-amber-300 bg-amber-50 p-4">
+            <strong className="font-semibold">Admintilgangen er av til tofaktor er slått på.</strong> Du ser bare dine egne nettsteder til da.{" "}
+            <Link href="/studio/konto" className="underline">
+              Slå på tofaktor under Konto
+            </Link>
+          </p>
+        )}
         <div className="mb-10 flex flex-wrap items-end justify-between gap-x-6 gap-y-5">
           <div>
             <p className={ui.eyebrow}>Gata di</p>

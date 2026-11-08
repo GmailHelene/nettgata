@@ -100,12 +100,23 @@ export async function getCurrentUser() {
         isPlatformAdmin: users.isPlatformAdmin,
         passwordHash: users.passwordHash,
         emailVerifiedAt: users.emailVerifiedAt,
+        totpEnabledAt: users.totpEnabledAt,
       })
       .from(users)
       .where(eq(users.id, payload.sub))
       .limit(1);
     if (!row || payload.pw !== (await passwordStamp(row.passwordHash))) return null;
-    return { id: row.id, email: row.email, name: row.name, isPlatformAdmin: row.isPlatformAdmin, emailVerified: Boolean(row.emailVerifiedAt) };
+    // Plattformadmin ser alle nettsteder og alle kunders data. I produksjon gjelder admintilgangen derfor bare med
+    // tofaktor slått på. Uten er brukeren en vanlig bruker til tofaktor er satt opp under Konto.
+    const adminNeeds2fa = row.isPlatformAdmin && !row.totpEnabledAt && process.env.NODE_ENV === "production";
+    return {
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      isPlatformAdmin: row.isPlatformAdmin && !adminNeeds2fa,
+      ...(adminNeeds2fa && { adminNeeds2fa: true as const }),
+      emailVerified: Boolean(row.emailVerifiedAt),
+    };
   } catch {
     return null;
   }

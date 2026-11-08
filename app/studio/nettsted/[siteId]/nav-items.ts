@@ -96,6 +96,7 @@ export const navGroups: NavGroup[] = [
           { label: "Regnskap (Fiken)", href: "/innstillinger/regnskap", shopOnly: true, feature: "fiken" },
           { label: "Domene", href: "/domene" },
           { label: "Last ned alt", href: "/innstillinger/eksport" },
+          { label: "Logg", href: "/innstillinger/logg" },
           { label: "Abonnement", href: "/abonnement" },
         ],
       },
