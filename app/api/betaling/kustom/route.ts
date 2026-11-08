@@ -10,7 +10,7 @@ const escape = (text: string) => text.replace(/[&<>"']/g, (c) => `&#${c.charCode
  * html_snippet da kjører som det er, uten å måtte lages på nytt i nettleseren. Snutten hentes fersk fra Kustom hver
  * gang og lagres aldri. Er ordren betalt, kansellert eller fullført hos Kustom, sendes kunden til kvitteringen.
  *
- * Butikksidene har ingen Content-Security-Policy i dag. Får de det, må denne siden tillate *.kustom.co i script-src og frame-src.
+ * Butikksidene har bare frame-ancestors i Content-Security-Policy i dag. Får de script-src, må denne siden tillate *.kustom.co i script-src og frame-src.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);

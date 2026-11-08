@@ -14,3 +14,8 @@ next-env.d.ts
 
 # Lokale innstillinger for Claude Code (tillatelser), ikke delt.
 .claude/settings.local.json
+
+# Lokale notater som kan inneholde hemmeligheter. Skal aldri i git.
+/stripe_backup_code.txt
+/deploy4.txt
+/npmci.txt

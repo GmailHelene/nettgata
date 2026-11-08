@@ -814,7 +814,7 @@ function Landing({ env }: { env: PlatformEnv }) {
         <ul className="grid gap-x-10 gap-y-9 md:grid-cols-3">
           {[
             ["Sier du opp, tar du med deg alt", "Last ned sidene, tekstene, bildene, varene og ordrene når du vil. Domenet står i ditt navn hele tiden."],
-            ["Vi tar ingenting av salget", "Pengene går rett til deg. I nettbutikken betaler du bare gebyret til Vipps eller kortleverandøren."],
+            ["Jeg tar ingenting av salget", "Pengene går rett til deg. I nettbutikken betaler du bare gebyret til Vipps eller kortleverandøren."],
             ["Du snakker med Helene, ikke en chatbot", "Du får skriftlig svar innen én virkedag fra hun som har laget Nettgata."],
           ].map(([title, text]) => (
             <li key={title} className="border-t-2 border-[#1b232b] pt-4">

@@ -171,7 +171,7 @@ function Hero({ section, isFirst, h1, basePath }: { section: Section; isFirst: b
     // Mørk hinne over bildet sikrer lesbar hvit tekst uansett hva bildet viser.
     return (
       <section className="ng-hero-dark relative isolate overflow-hidden py-[calc(7rem*var(--space,1))] text-center text-white md:py-[calc(10rem*var(--space,1))]">
-        <Img value={bilde} eager={isFirst} sizes={imageSizes.full} className="absolute inset-0 -z-20 h-full w-full object-cover" />
+        <Img value={bilde} eager={isFirst && h1} sizes={imageSizes.full} className="absolute inset-0 -z-20 h-full w-full object-cover" />
         <div className="absolute inset-0 -z-10 bg-black/60" />
         <Container>{text}</Container>
       </section>
@@ -182,7 +182,7 @@ function Hero({ section, isFirst, h1, basePath }: { section: Section; isFirst: b
       <section className="py-[calc(4rem*var(--space,1))] md:py-[calc(6rem*var(--space,1))]">
         <Container className="grid items-center gap-10 md:grid-cols-2">
           {text}
-          <Img value={bilde} eager={isFirst} sizes={imageSizes.half} className="ng-feature aspect-[4/3] w-full object-cover" />
+          <Img value={bilde} eager={isFirst && h1} sizes={imageSizes.half} className="ng-feature aspect-[4/3] w-full object-cover" />
         </Container>
       </section>
     );
