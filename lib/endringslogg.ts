@@ -56,6 +56,7 @@ const labels: Record<string, string> = {
   "page.restored": "Tidligere versjon hentet tilbake",
   "page.duplicated": "Side kopiert",
   "page.deleted": "Side slettet",
+  "page.path_changed": "Adressen til en side endret",
   "media.uploaded": "Bilde lastet opp",
   "media.deleted": "Bilde slettet",
   "site.settings_updated": "Firma og kontakt endret",

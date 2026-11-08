@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useId, useMemo, useRef, useState, useTransition } from "react";
 import type { RenderContext } from "@/components/sections";
 import { FormStatus } from "@/components/studio/form-status";
 import { PreviewFrame, type Device } from "@/components/studio/preview-frame";
@@ -43,6 +43,9 @@ export function DesignStudio({
   ctx: RenderContext;
 }) {
   const [view, setView] = useState<View>("temaer");
+  // Fanene følger ARIA-mønsteret for faner: piltastene flytter mellom dem, og bare den valgte er i tab-rekkefølgen.
+  const tabsId = useId();
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [saved, setSaved] = useState(initial);
   const [theme, setTheme] = useState(initial);
   const [state, setState] = useState<ActionState>(null);
@@ -82,13 +85,26 @@ export function DesignStudio({
               ["temaer", "Temaer"],
               ["tilpass", "Tilpass"],
             ] as const
-          ).map(([key, label]) => (
+          ).map(([key, label], i, all) => (
             <button
               key={key}
+              ref={(el) => {
+                tabRefs.current[key] = el;
+              }}
+              id={`${tabsId}-${key}`}
               type="button"
               role="tab"
               aria-selected={view === key}
+              aria-controls={`${tabsId}-panel`}
+              tabIndex={view === key ? 0 : -1}
               onClick={() => setView(key)}
+              onKeyDown={(e) => {
+                if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+                e.preventDefault();
+                const next = all[(i + (e.key === "ArrowRight" ? 1 : all.length - 1)) % all.length][0];
+                setView(next);
+                tabRefs.current[next]?.focus();
+              }}
               className="px-4 py-2 aria-selected:bg-[#173b6c] aria-selected:text-white"
             >
               {label}
@@ -99,6 +115,7 @@ export function DesignStudio({
 
       <FormStatus state={state} />
 
+      <div role="tabpanel" id={`${tabsId}-panel`} aria-labelledby={`${tabsId}-${view}`}>
       {view === "temaer" ? (
         <ThemeGallery
           recommended={recommended}
@@ -125,6 +142,7 @@ export function DesignStudio({
           onReset={() => setTheme(saved)}
         />
       )}
+      </div>
     </div>
   );
 }

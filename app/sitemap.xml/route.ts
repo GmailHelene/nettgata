@@ -20,12 +20,17 @@ export async function GET(request: Request) {
   const { site } = match;
 
   // lastmod er når siden sist ble publisert. Varene får bildene sine med, så de kan dukke opp i bildesøk.
-  const rows: { path: string; updated: Date; images?: string[] }[] = await db
-    .select({ path: pages.path, updated: pageVersions.createdAt })
-    .from(pages)
-    .innerJoin(pageVersions, eq(pages.publishedVersionId, pageVersions.id))
-    .where(and(eq(pages.siteId, site.id), isNotNull(pages.publishedVersionId)))
-    .orderBy(asc(pages.sortOrder));
+  // Sider eieren har skjult fra Google (seo.noindex), står ikke i sitemapen.
+  const rows: { path: string; updated: Date; images?: string[] }[] = (
+    await db
+      .select({ path: pages.path, updated: pageVersions.createdAt, content: pageVersions.content })
+      .from(pages)
+      .innerJoin(pageVersions, eq(pages.publishedVersionId, pageVersions.id))
+      .where(and(eq(pages.siteId, site.id), isNotNull(pages.publishedVersionId)))
+      .orderBy(asc(pages.sortOrder))
+  )
+    .filter((r) => !r.content.seo?.noindex)
+    .map(({ path, updated }) => ({ path, updated }));
   if (site.kind === "nettbutikk") {
     const items = await db
       .select({ slug: products.slug, updated: products.updatedAt, images: products.images })

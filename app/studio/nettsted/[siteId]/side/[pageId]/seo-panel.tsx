@@ -29,6 +29,7 @@ export function SeoPanel({
   keyword,
   place,
   shop,
+  pathEditor,
 }: {
   open: boolean;
   onToggle: () => void;
@@ -41,6 +42,8 @@ export function SeoPanel({
   keyword?: string;
   place?: string;
   shop?: boolean;
+  /** Feltet for adressen (path-editor.tsx). Lagres for seg, ikke i kladden. */
+  pathEditor?: React.ReactNode;
 }) {
   const seo = content.seo ?? {};
   const input = { pageTitle, siteName, content, path, keyword, place, shop };
@@ -138,6 +141,20 @@ export function SeoPanel({
               Vises når siden deles på Facebook, LinkedIn og i meldinger. Uten eget bilde brukes det første bildet på siden.
             </p>
           </div>
+
+          {path !== "/" && (
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-1" checked={Boolean(seo.noindex)} onChange={(e) => onChange({ ...seo, noindex: e.target.checked || undefined })} />
+              <span>
+                <span className="font-medium">Ikke vis siden i Google</span>
+                <span className="block text-xs text-neutral-600">
+                  For takkesider, interne sider og gamle kampanjer. Siden kan fortsatt åpnes med lenken. Gjelder når du publiserer.
+                </span>
+              </span>
+            </label>
+          )}
+
+          {pathEditor}
         </div>
       )}
     </section>

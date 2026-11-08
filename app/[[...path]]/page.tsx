@@ -268,7 +268,8 @@ async function pageMetadata(props: Props): Promise<Metadata> {
   const auto = pageSeo({ ...seoContext(site), pageTitle: page.title, content: page.content, path: at });
   return {
     ...sharing(auto.title, auto.description, seo.image ?? firstContentImage(page.content), at.startsWith("/blogg/") ? "article" : "website"),
-    ...indexing,
+    // Eieren har valgt «Ikke vis i Google» for siden. Lenkene på den kan fortsatt følges.
+    ...(seo.noindex ? { robots: { index: false, follow: true } } : indexing),
   };
 }
 

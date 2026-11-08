@@ -13,7 +13,7 @@ import type { Theme } from "@/lib/theme";
 import { lookupOrgnr, type BrregCompany } from "@/lib/brreg";
 import { parseRedirectList, type Redirect } from "@/lib/redirects";
 import { assertSitemapFetchAllowed, collectOldPaths, SitemapError, suggestRedirects, type ImportRow } from "@/lib/sitemap-import";
-import { createPage, createPost, deletePage, duplicatePage, movePage, publishAll, setPageInMenu, updateSiteSettings, updateSiteTheme } from "@/lib/pages";
+import { changePagePath, createPage, createPost, deletePage, duplicatePage, movePage, publishAll, setPageInMenu, updateSiteSettings, updateSiteTheme } from "@/lib/pages";
 import { assertCanPublish, PublishingError } from "@/lib/publishing";
 import { requireSiteAccess, requireUser } from "@/lib/session";
 import { pingPublished } from "@/lib/seo/publish";
@@ -153,6 +153,23 @@ export async function createPostAction(siteId: string, _prev: ActionState, formD
     return toState(err);
   }
   redirect(target);
+}
+
+/** Ny adresse for en side, med videresending fra den gamle når siden er publisert (lib/pages.ts). */
+export async function changePagePathAction(siteId: string, pageId: string, path: string): Promise<ActionState & { path?: string }> {
+  try {
+    const { user, site } = await requireSiteAccess(siteId);
+    const r = await changePagePath(await getDb(), site.id, pageId, path, user.id);
+    revalidatePath(`/studio/nettsted/${site.id}`, "layout");
+    return {
+      ok: true,
+      path: r.to,
+      message: r.redirected ? `Adressen er nå ${r.to}. Den gamle adressen ${r.from} sender besøkende hit.` : `Adressen er nå ${r.to}.`,
+    };
+  } catch (err) {
+    const state = toState(err);
+    return state ?? { ok: false, message: "Noe gikk galt. Prøv igjen." };
+  }
 }
 
 export async function deletePageAction(siteId: string, pageId: string): Promise<ActionState> {

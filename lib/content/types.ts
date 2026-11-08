@@ -50,6 +50,8 @@ export const pageContentSchema = z.object({
     .object({
       title: z.string().max(70, "Tittelen for Google kan ha maks 70 tegn").optional(),
       description: z.string().max(170, "Beskrivelsen for Google kan ha maks 170 tegn").optional(),
+      // Siden vises på nettstedet, men ikke i Google (noindex) og ikke i sitemapen. For takkesider, kampanjer og lignende.
+      noindex: z.boolean().optional(),
       // Bildet som vises når siden deles. Uten det brukes det første bildet på siden.
       image: z
         .object({ src: z.string().regex(mediaSrcPattern, "Delingsbildet er ugyldig"), alt: z.string().trim().max(200).default("") })

@@ -50,6 +50,36 @@ export async function createPage(db: Db, siteId: string, input: { title: string;
 }
 
 /**
+ * Ny adresse for en side. Er siden publisert, legges en videresending (301) fra den gamle adressen inn, så lenker,
+ * bokmerker og plasseringen i Google følger med. Forsiden har alltid «/» og kan ikke flyttes.
+ */
+export async function changePagePath(db: Db, siteId: string, pageId: string, wanted: string, userId: string): Promise<{ from: string; to: string; redirected: boolean }> {
+  const [page] = await db.select().from(pages).where(and(eq(pages.id, pageId), eq(pages.siteId, siteId))).limit(1);
+  if (!page) throw new PublishingError("Fant ikke siden");
+  if (page.path === "/") throw new PublishingError("Forsiden har alltid adressen /, så den kan ikke endres.");
+  const path = normalizePath(wanted.trim().toLowerCase());
+  if (path === page.path) return { from: page.path, to: path, redirected: false };
+  if (!isValidPagePath(path)) throw new PublishingError("Adressen kan bare inneholde små bokstaver, tall og bindestrek, for eksempel /om-oss");
+  const [taken] = await db.select({ id: pages.id }).from(pages).where(and(eq(pages.siteId, siteId), eq(pages.path, path))).limit(1);
+  if (taken) throw new PublishingError(`Det finnes allerede en side på ${path}`);
+
+  await db.update(pages).set({ path }).where(eq(pages.id, page.id));
+  let redirected = false;
+  if (page.publishedVersionId) {
+    const [site] = await db.select({ redirects: sites.redirects }).from(sites).where(eq(sites.id, siteId)).limit(1);
+    // Den nye adressen skal ikke sendes videre noe sted, og den gamle sendes hit. Videresendinger som pekte på den
+    // gamle adressen, peker nå rett hit, så det aldri blir to hopp.
+    const list = (site?.redirects ?? [])
+      .filter((r) => r.from !== path && r.from !== page.path)
+      .map((r) => (r.to === page.path ? { ...r, to: path } : r));
+    await db.update(sites).set({ redirects: [...list, { from: page.path, to: path }] }).where(eq(sites.id, siteId));
+    redirected = true;
+  }
+  await db.insert(auditLog).values({ siteId, userId, action: "page.path_changed", detail: { pageId, from: page.path, to: path, redirected } });
+  return { from: page.path, to: path, redirected };
+}
+
+/**
  * Nytt blogginnlegg: en vanlig side under /blogg, utenfor menyen, med ingress og tekst klar til å fylle ut.
  * Første gang lages også /blogg med oversikten over innleggene, og den legges i menyen.
  */

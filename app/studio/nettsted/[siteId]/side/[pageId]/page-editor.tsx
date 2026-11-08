@@ -12,6 +12,7 @@ import { historyReducer, initHistory, type Doc } from "./editor-history";
 import { inputClass } from "./fields";
 import { PreviewFrame, type Device } from "@/components/studio/preview-frame";
 import { SeoPanel } from "./seo-panel";
+import { PathEditor } from "./path-editor";
 import { primaryPlace } from "@/lib/seo/auto";
 import { SectionLibrary } from "./section-library";
 import { SectionList } from "./section-list";
@@ -347,6 +348,7 @@ export function PageEditor({ siteId, preview, pageId, path, initialTitle, initia
               keyword={preview.ctx.site.keyword}
               place={primaryPlace(preview.ctx.site.info)}
               shop={preview.ctx.shop}
+              pathEditor={<PathEditor key={path} siteId={siteId} pageId={pageId} path={path} published={publishedNumber !== null} />}
             />
 
             <h2 className="mb-3 text-lg font-semibold">Seksjoner</h2>
