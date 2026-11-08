@@ -107,6 +107,8 @@ export async function getCheckoutData(siteId: string, items: unknown, shippingCo
     freeShippingOverOre: ctx.settings.freeShippingOverOre,
     paymentMethods: availablePaymentMethods(ctx.settings).map((m) => ({ code: m, label: paymentLabels[m] })),
     termsPath: ctx.settings.termsPath,
+    // Publisering krever abonnement, så en publisert forside betyr at butikken er åpnet.
+    closed: !(await getPublishedPage(ctx.db, ctx.site.id, "/")),
     // Hvor og når kunden kan hente, når hun velger et fraktvalg uten adresse («Hent selv»). Fra butikkens egen info.
     pickupInfo: (() => {
       const info = readSiteInfo(ctx.site.info);
@@ -147,6 +149,7 @@ export async function placeOrder(siteId: string, input: CheckoutInput): Promise<
   const limited = await orderLimitMessage(ctx.db, { siteId: ctx.site.id, ipKey, email: input?.email, secret });
   if (limited) return { ok: false, message: limited };
 
+  if (!(await getPublishedPage(ctx.db, ctx.site.id, "/"))) return { ok: false, message: "Butikken er ikke åpnet ennå. Prøv igjen senere." };
   // Uten publiserte kjøpsvilkår kan butikken ikke ta imot bestillinger (angrerettloven og ehandelsloven).
   if (!(await hasCheckoutTerms(ctx.site, ctx.settings.termsPath, (p) => getPublishedPage(ctx.db, ctx.site.id, p)))) {
     return { ok: false, message: "Butikken tar ikke imot bestillinger akkurat nå. Prøv igjen senere." };

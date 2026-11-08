@@ -1,3 +1,4 @@
+import { getPublishedPage } from "@/lib/publishing";
 import { and, asc, eq, isNotNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { pageVersions, pages, products } from "@/db/schema";
@@ -31,7 +32,8 @@ export async function GET(request: Request) {
   )
     .filter((r) => !r.content.seo?.noindex)
     .map(({ path, updated }) => ({ path, updated }));
-  if (site.kind === "nettbutikk") {
+  // Varene i en butikk som ikke er åpnet, skal ikke inn i Google.
+  if (site.kind === "nettbutikk" && (await getPublishedPage(db, site.id, "/"))) {
     const items = await db
       .select({ slug: products.slug, updated: products.updatedAt, images: products.images })
       .from(products)

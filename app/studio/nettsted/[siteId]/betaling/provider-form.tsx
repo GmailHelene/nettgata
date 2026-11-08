@@ -17,9 +17,9 @@ const setup: Record<KeyProvider, { name: string; intro: string; hintLabel: strin
     hintLabel: "Client ID",
     testLabel: "Test (apitest.vipps.no)",
     fields: [
-      { name: "clientId", label: "Client ID (client_id)" },
-      { name: "clientSecret", label: "Client secret (client_secret)", secret: true },
-      { name: "subscriptionKey", label: "Abonnementsnøkkel (Ocp-Apim-Subscription-Key)", secret: true },
+      { name: "clientId", label: "Client ID" },
+      { name: "clientSecret", label: "Client secret", secret: true },
+      { name: "subscriptionKey", label: "Abonnementsnøkkel", secret: true },
       { name: "msn", label: "Salgsstednummer (MSN)", numeric: true, hint: "Tallet som viser hvilket salgssted betalingene går til, vanligvis seks siffer." },
     ],
     help: (
@@ -103,7 +103,7 @@ function Status({ view }: { view: ProviderView | null }) {
 export function ProviderForm({ siteId, provider, view, canEdit }: { siteId: string; provider: KeyProvider; view: ProviderView | null; canEdit: boolean }) {
   const info = setup[provider];
   const [editing, setEditing] = useState(false);
-  const [environment, setEnvironment] = useState<PaymentEnvironment>(view?.environment ?? "test");
+  const [environment, setEnvironment] = useState<PaymentEnvironment>(view?.environment ?? "production");
   const [values, setValues] = useState<Record<string, string>>({});
   const [state, setState] = useState<ActionState>(null);
   const [pending, startTransition] = useTransition();

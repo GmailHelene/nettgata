@@ -225,7 +225,7 @@ export async function notifyInquiry(db: Db, provider: EmailProvider, inquiryId: 
 export async function notifyWithdrawal(
   db: Db,
   provider: EmailProvider,
-  input: { site: typeof sites.$inferSelect; inquiryId: string; name: string; email: string; about: string; at: string },
+  input: { site: typeof sites.$inferSelect; inquiryId: string; orderId: string | null; name: string; email: string; about: string; at: string },
 ): Promise<boolean> {
   const { site, inquiryId, name, email, about, at } = input;
   const shop = shopInfo(site);
@@ -238,7 +238,7 @@ export async function notifyWithdrawal(
   );
   const owner = notifyAddress(readNotificationSettings(site.notifications), shop.email);
   if (owner) {
-    const notice = withdrawalNoticeEmail({ name, email, about, at, studioUrl: `${platformUrl()}/studio/nettsted/${site.id}/henvendelser` });
+    const notice = withdrawalNoticeEmail({ name, email, about, at, studioUrl: `${platformUrl()}/studio/nettsted/${site.id}/${input.orderId ? `ordre/${input.orderId}` : "henvendelser"}` });
     await deliver(
       db,
       provider,

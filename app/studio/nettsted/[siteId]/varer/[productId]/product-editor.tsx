@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { FormStatus } from "@/components/studio/form-status";
 import { ImageInput, SiteIdContext } from "@/components/studio/image-input";
 import { inputClass } from "@/components/studio/info-fields";
@@ -58,6 +58,14 @@ export function ProductEditor({
 }) {
   const router = useRouter();
   const [name, setName] = useState(initial.name);
+  // Et feiltrykk skal ikke slette det eieren har skrevet.
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
   const [description, setDescription] = useState(initial.description ?? "");
   const [images, setImages] = useState<ImageValue[]>(initial.images ?? []);
   const [categoryId, setCategoryId] = useState(initial.categoryId ?? "");
@@ -156,16 +164,19 @@ export function ProductEditor({
         variants: builtVariants,
       });
       setState(result);
+      if (result.ok) setDirty(false);
       if (result.ok && !initial.id && result.productId) router.replace(`/studio/nettsted/${siteId}/varer/${result.productId}`);
       else if (result.ok) router.refresh();
     });
 
   return (
     <SiteIdContext.Provider value={siteId}>
-      <div className="space-y-8">
+      <div className="space-y-8" onInputCapture={() => setDirty(true)}>
         <section className="space-y-4 rounded-lg border bg-white p-5">
           <label className="block">
-            <span className="mb-1 block text-sm font-medium">Navn</span>
+            <span className="mb-1 block text-sm font-medium">
+              Navn <span className="font-normal text-neutral-600">(må fylles ut)</span>
+            </span>
             <input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="F.eks. Strikket lue i ull" />
           </label>
           <label className="block">
@@ -223,36 +234,36 @@ export function ProductEditor({
             </p>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
+            <table className="w-full text-sm max-sm:block">
+              <thead className="max-sm:hidden">
                 <tr className="text-left text-neutral-600">
                   {variants.length > 1 && <th className="py-2 pr-3 font-medium">Variant</th>}
-                  <th className="py-2 pr-3 font-medium">Pris (kr, inkl. MVA)</th>
+                  <th className="py-2 pr-3 font-medium">{chargesVat ? "Pris (kr, inkl. MVA)" : "Pris (kr)"}</th>
                   <th className="py-2 pr-3 font-medium">På lager</th>
                   {variants.length > 1 && <th className="py-2 pr-3 font-medium">Vekt (gram)</th>}
                   <th className="py-2 pr-3 font-medium">Varenummer (valgfritt)</th>
                   <th className="py-2 font-medium">Strekkode (GTIN, valgfritt)</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="max-sm:block">
                 {variants.map((v, i) => (
-                  <tr key={keyOf(v.optionValues) || i} className="border-t">
-                    {variants.length > 1 && <td className="py-2 pr-3 font-medium">{keyOf(v.optionValues)}</td>}
-                    <td className="py-2 pr-3">
-                      <input aria-label={`Pris${keyOf(v.optionValues) ? ` for ${keyOf(v.optionValues)}` : ""}`} value={v.price} onChange={(e) => updateVariant(i, { price: e.target.value })} inputMode="decimal" className={`${inputClass} w-32`} />
+                  <tr key={keyOf(v.optionValues) || i} className="border-t max-sm:block max-sm:py-2">
+                    {variants.length > 1 && <td className="py-2 pr-3 font-medium max-sm:block max-sm:pr-0">{keyOf(v.optionValues)}</td>}
+                    <td data-label="Pris (kr)" className="py-2 pr-3 max-sm:block max-sm:py-1 max-sm:pr-0 max-sm:before:mb-1 max-sm:before:block max-sm:before:text-xs max-sm:before:content-[attr(data-label)]">
+                      <input aria-label={`Pris${keyOf(v.optionValues) ? ` for ${keyOf(v.optionValues)}` : ""}`} value={v.price} onChange={(e) => updateVariant(i, { price: e.target.value })} inputMode="decimal" className={`${inputClass} w-32 max-sm:w-full`} />
                     </td>
-                    <td className="py-2 pr-3">
+                    <td data-label="På lager" className="py-2 pr-3 max-sm:block max-sm:py-1 max-sm:pr-0 max-sm:before:mb-1 max-sm:before:block max-sm:before:text-xs max-sm:before:content-[attr(data-label)]">
                       <input
                         aria-label={`På lager${keyOf(v.optionValues) ? ` for ${keyOf(v.optionValues)}` : ""}`}
                         value={v.stock}
                         onChange={(e) => updateVariant(i, { stock: e.target.value })}
                         inputMode="numeric"
                         placeholder="Følges ikke"
-                        className={`${inputClass} w-28`}
+                        className={`${inputClass} w-28 max-sm:w-full`}
                       />
                     </td>
                     {variants.length > 1 && (
-                      <td className="py-2 pr-3">
+                      <td data-label="Vekt (gram)" className="py-2 pr-3 max-sm:block max-sm:py-1 max-sm:pr-0 max-sm:before:mb-1 max-sm:before:block max-sm:before:text-xs max-sm:before:content-[attr(data-label)]">
                         <input
                           aria-label={`Vekt i gram for ${keyOf(v.optionValues)}`}
                           value={v.weight}
@@ -260,19 +271,19 @@ export function ProductEditor({
                           inputMode="numeric"
                           autoComplete="off"
                           placeholder="Som varen"
-                          className={`${inputClass} w-28`}
+                          className={`${inputClass} w-28 max-sm:w-full`}
                         />
                       </td>
                     )}
-                    <td className="py-2 pr-3">
+                    <td data-label="Varenummer (valgfritt)" className="py-2 pr-3 max-sm:block max-sm:py-1 max-sm:pr-0 max-sm:before:mb-1 max-sm:before:block max-sm:before:text-xs max-sm:before:content-[attr(data-label)]">
                       <input
                         aria-label={`Varenummer${keyOf(v.optionValues) ? ` for ${keyOf(v.optionValues)}` : ""}`}
                         value={v.sku}
                         onChange={(e) => updateVariant(i, { sku: e.target.value })}
-                        className={`${inputClass} w-40`}
+                        className={`${inputClass} w-40 max-sm:w-full`}
                       />
                     </td>
-                    <td className="py-2">
+                    <td data-label="Strekkode (GTIN, valgfritt)" className="py-2 max-sm:block max-sm:py-1 max-sm:pr-0 max-sm:before:mb-1 max-sm:before:block max-sm:before:text-xs max-sm:before:content-[attr(data-label)]">
                       <input
                         aria-label={`Strekkode${keyOf(v.optionValues) ? ` for ${keyOf(v.optionValues)}` : ""}`}
                         value={v.gtin}
@@ -280,7 +291,7 @@ export function ProductEditor({
                         inputMode="numeric"
                         autoComplete="off"
                         placeholder="13 siffer"
-                        className={`${inputClass} w-40`}
+                        className={`${inputClass} w-40 max-sm:w-full`}
                       />
                     </td>
                   </tr>

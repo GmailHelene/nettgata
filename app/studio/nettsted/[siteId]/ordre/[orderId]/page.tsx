@@ -13,12 +13,13 @@ import { creditNotesForOrder, creditReasonLabel, needsCreditNote, PARTIAL_REASON
 import { allocateDiscount } from "@/lib/shop/discounts";
 import { refundable, refundsForOrder } from "@/lib/shop/refunds";
 import { formatNok } from "@/lib/shop/money";
-import { paymentLabels, type PaymentMethod } from "@/lib/shop/settings";
+import { isOnlinePayment, paymentLabels, type PaymentMethod } from "@/lib/shop/settings";
 import { carrierLabel, trackingUrl } from "@/lib/shop/tracking";
 import { formatOsloDateTime } from "@/lib/oslo-time";
 import { orderStatusLabel } from "../order-status";
 import { LabelPrintHelp } from "@/components/studio/label-print-help";
 import { BringLabelForm } from "./bring-label";
+import { resendOrderEmailAction } from "./email-actions";
 import { OrderActions } from "./order-actions";
 import { RefundForm } from "./refund-form";
 import { CreditNoteRetry, StaffNoteForm, TrackingForm } from "./order-extras";
@@ -43,7 +44,7 @@ const emailKindLabel: Record<string, string> = {
 };
 const emailStatusLabel: Record<string, string> = {
   sendt: "Sendt",
-  feilet: "Feilet",
+  feilet: "Kunne ikke sendes",
   logget: "Ikke sendt, e-post er ikke slått på ennå",
 };
 
@@ -271,6 +272,12 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
             Betaling: {paymentLabels[order.paymentMethod as PaymentMethod] ?? order.paymentMethod}
             {/^(vipps|klarna|kustom|stripe):test:/.test(order.paymentRef ?? "") && " (testmiljø, ingen ekte penger)"}
           </p>
+          {isOnlinePayment(order.paymentMethod) && (
+            <p className="mt-1 text-sm text-neutral-600">Refunder og kanseller her, ikke hos {paymentLabels[order.paymentMethod]}. Da får kunden kreditnota, og tallene stemmer.</p>
+          )}
+          {order.status === "paid" && order.paymentMethod === "stripe" && order.paidAt && order.paidAt.getTime() < new Date().getTime() - 5 * 24 * 60 * 60 * 1000 && (
+            <p className="mt-2 rounded-md bg-amber-100 p-3 text-sm text-amber-900">Reservasjonen på kortet varer omtrent sju dager. Send ordren snart, ellers må kunden betale på nytt.</p>
+          )}
         </div>
         {order.note && (
           <div className="sm:col-span-2">
@@ -367,7 +374,6 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
                 </span>
                 <span className={e.status === "sendt" ? "text-green-800" : e.status === "feilet" ? "text-red-800" : "text-amber-900"}>
                   {emailStatusLabel[e.status] ?? e.status}
-                  {e.error && `: ${e.error}`}
                 </span>
                 {process.env.NODE_ENV !== "production" && (
                   <a href={`/studio/epost/${e.id}`} target="_blank" rel="noreferrer" className="underline">
@@ -377,6 +383,12 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
               </li>
             ))}
           </ul>
+          {emails.filter((e) => e.kind === "ordrebekreftelse").at(-1)?.status === "feilet" && (
+            <form action={resendOrderEmailAction.bind(null, site.id, order.id)} className="mt-3">
+              <p className="mb-2 text-sm text-neutral-700">Kunden har ikke fått ordrebekreftelsen. Prøv å sende på nytt. Virker det ikke, bør du ta kontakt med kunden selv.</p>
+              <button className="rounded-md border border-[#173b6c] bg-white px-3 py-2 text-sm font-semibold text-[#173b6c]">Send ordrebekreftelsen på nytt</button>
+            </form>
+          )}
         </section>
       )}
 

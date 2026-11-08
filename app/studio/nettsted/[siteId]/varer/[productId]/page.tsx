@@ -27,7 +27,7 @@ export default async function ProductPage({ params }: { params: Promise<{ siteId
     images: [],
     options: [],
     vatRate: 25,
-    status: "draft",
+    status: "active",
     categoryId: null,
     weightGrams: null,
     variants: [{ optionValues: [], priceOre: 0, stock: null, weightGrams: null }],

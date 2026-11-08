@@ -36,7 +36,7 @@ const counted = sql`${orders.status} in (${sql.join(
 const stats = {
   orderCount: sql<number>`cast(count(${orders.id}) filter (where ${counted}) as integer)`,
   spentOre: sql<number>`cast(coalesce(sum(${orders.totalOre}) filter (where ${counted}), 0) as integer)`,
-  lastOrderAt: sql<Date | null>`max(${orders.createdAt})`,
+  lastOrderAt: sql<Date | null>`max(${orders.createdAt}) filter (where ${counted})`,
 };
 
 export type CustomerRow = Awaited<ReturnType<typeof listCustomers>>[number];

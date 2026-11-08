@@ -166,6 +166,17 @@ describe("butikk som ikke er MVA-registrert", () => {
       expect(audits).toHaveLength(1);
     });
 
+    it("skriver angringen på ordren når ordrenummer og e-post stemmer, og ellers ikke", async () => {
+      const o = await order();
+      const [row] = await db.select().from(orders).where(eq(orders.id, o.id));
+      const { provider, sent } = recordingProvider();
+      await registerWithdrawal(db, provider, siteId, { name: "Kari", about: `Ordre ${row.number}`, email: "annen@test.no" });
+      expect((await db.select().from(orders).where(eq(orders.id, o.id)))[0].staffNote).toBeNull();
+      await registerWithdrawal(db, provider, siteId, { name: "Kari", about: `Ordre ${row.number}`, email: "KARI@test.no" });
+      expect((await db.select().from(orders).where(eq(orders.id, o.id)))[0].staffNote).toContain("Angre avtalen");
+      expect(sent.at(-1)?.text).toContain(`/ordre/${o.id}`);
+    });
+
     it("varsler butikken selv om varsel om henvendelser er slått av", async () => {
       await db.update(sites).set({ notifications: { newInquiry: false } }).where(eq(sites.id, siteId));
       const { provider, sent } = recordingProvider();

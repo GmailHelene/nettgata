@@ -198,7 +198,8 @@ export async function periodReport(db: Db, siteId: string, from: string, to: str
     payments.set(o.paymentMethod, pay);
     const month = osloDate(o.createdAt).slice(0, 7);
     const mo = months.get(month) ?? { month, orders: 0, ore: 0 };
-    mo.orders++;
+    // Oversikten over måneder teller ikke kansellerte og refunderte ordre. Beløpet deres utlignes av kreditnotaen.
+    if ((salesStatuses as readonly string[]).includes(o.status)) mo.orders++;
     mo.ore += o.totalOre;
     months.set(month, mo);
 

@@ -40,6 +40,7 @@ export async function placeOrderWithOnlinePayment(siteId: string, input: Checkou
   const secret = getSecret();
   const limited = await orderLimitMessage(db, { siteId: site.id, ipKey: await clientKey(h, secret), email: input?.email, secret });
   if (limited) return { ok: false, message: limited };
+  if (!(await getPublishedPage(db, site.id, "/"))) return { ok: false, message: "Butikken er ikke åpnet ennå. Prøv igjen senere." };
   // Uten publiserte kjøpsvilkår kan butikken ikke ta imot bestillinger (angrerettloven og ehandelsloven).
   if (!(await hasCheckoutTerms(site, settings.termsPath, (p) => getPublishedPage(db, site.id, p)))) {
     return { ok: false, message: "Butikken tar ikke imot bestillinger akkurat nå. Prøv igjen senere." };

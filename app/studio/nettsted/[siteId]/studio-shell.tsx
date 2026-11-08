@@ -68,12 +68,12 @@ export function StudioShell({ siteId, siteName, shop, email, siteUrl, groups, ad
     ? [
         { label: "Hjem", href: "" },
         { label: "Ordre", href: "/ordre", badge: "ordre" },
-        { label: "Meldinger", href: "/henvendelser", badge: "henvendelser" },
+        { label: "Henvendelser", href: "/henvendelser", badge: "henvendelser" },
         { label: "Sider", href: "/sider" },
       ]
     : [
         { label: "Hjem", href: "" },
-        { label: "Meldinger", href: "/henvendelser", badge: "henvendelser" },
+        { label: "Henvendelser", href: "/henvendelser", badge: "henvendelser" },
         { label: "Sider", href: "/sider" },
         { label: "Design", href: "/design" },
       ];
@@ -270,7 +270,7 @@ function SideNav({
       ))}
       {addable.length > 0 && (
         <details className="mt-5 rounded-md border border-dashed border-[#c3ccd3] px-3 py-2 text-sm">
-          <summary className="cursor-pointer py-1 font-medium text-[#173b6c]">+ Legg til funksjon</summary>
+          <summary className="cursor-pointer py-1 font-medium text-[#173b6c]">+ Flere funksjoner</summary>
           <ul className="mt-2 space-y-2">
             {addable.map((a) => (
               <li key={a.href}>

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { and, count, desc, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, isNull, lt } from "drizzle-orm";
 import { getDb } from "@/db";
 import { domains, inquiries, orders, pages, products } from "@/db/schema";
 import { displayHost, rootOf } from "@/lib/domains";
@@ -13,6 +13,7 @@ import { availablePaymentMethods, readShopSettings } from "@/lib/shop/settings";
 import { fikenView } from "@/lib/fiken/state";
 import { getEmailProvider } from "@/lib/email/send";
 import { hasActiveSubscription } from "@/lib/billing/state";
+import { paymentLabels, type PaymentMethod } from "@/lib/shop/settings";
 import { orderStatusLabel } from "./ordre/order-status";
 import { SalesChart } from "./sales-chart";
 import { hasCheckoutTerms } from "@/lib/legal/kundesider";
@@ -88,6 +89,7 @@ function GettingStarted({ steps }: { steps: Step[] }) {
                 </span>
                 <span>
                   {step.label}
+                  {step.optional && " (valgfritt)"}
                   <span className="sr-only"> (ferdig)</span>
                 </span>
               </p>
@@ -223,6 +225,21 @@ export default async function OverviewPage({ params }: { params: Promise<{ siteI
     if (fiken?.needsReconnect) tasks.push({ text: "Fiken er koblet fra. Koble til Fiken på nytt for å sende ordre dit", href: `${base}/innstillinger/regnskap#fiken-tittel`, tone: "warning" });
     else if (fiken && !fiken.companySlug) tasks.push({ text: "Velg hvilket selskap i Fiken ordrene skal til", href: `${base}/innstillinger/regnskap#fiken-tittel` });
     bringReady = Boolean(settings.bringShipping);
+    if (settings.bringShipping?.environment === "test") {
+      tasks.push({ text: "Bring står i testmodus. Etiketter blir testbestillinger, og Bring henter ikke pakkene. Bytt til produksjon før butikken åpner", href: `${base}/innstillinger/frakt`, tone: "warning" });
+    }
+    const testPayments = Object.entries(settings.online ?? {}).filter(([, p]) => p?.environment === "test").map(([m]) => paymentLabels[m as PaymentMethod]);
+    if (testPayments.length) {
+      tasks.push({ text: `${testPayments.join(" og ")} står i testmiljøet, så kundene betaler ikke ekte penger. Bytt til produksjon før butikken åpner`, href: `${base}/betaling`, tone: "warning" });
+    }
+    // En kortreservasjon varer omtrent sju dager. Varselet kommer mens det fortsatt er tid til å sende.
+    const [{ expiring }] = await db
+      .select({ expiring: count() })
+      .from(orders)
+      .where(and(eq(orders.siteId, site.id), eq(orders.status, "paid"), eq(orders.paymentMethod, "stripe"), lt(orders.paidAt, new Date(new Date().getTime() - 5 * 24 * 60 * 60 * 1000))));
+    if (expiring) {
+      tasks.push({ text: `${expiring} ${expiring === 1 ? "kortbetaling er" : "kortbetalinger er"} reservert i over fem dager. Send snart, ellers går reservasjonen ut og kunden må betale på nytt`, href: `${base}/ordre?status=klar`, tone: "warning" });
+    }
     paymentReady = availablePaymentMethods(settings).some((m) => m === "vipps" || m === "stripe" || m === "klarna" || m === "kustom");
     if (counts.paid) tasks.push({ text: `${counts.paid} ${counts.paid === 1 ? "ordre er betalt og klar" : "ordre er betalt og klare"} til sending`, href: `${base}/ordre?status=klar` });
     if (counts.pending_payment) tasks.push({ text: `${counts.pending_payment} ordre venter på betaling`, href: `${base}/ordre?status=venter` });
@@ -289,7 +306,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ siteI
   return (
     <main className="mx-auto max-w-5xl px-5 py-12">
       <SiteNav siteId={site.id} name={site.name} shop={isShop} active="oversikt" />
-      <LiveStatus live={live} reason={notLiveReason} url={liveUrl} label={liveHost ? displayHost(liveHost) : "Se nettstedet"} preview={`/vis/${site.slug}`} />
+      <LiveStatus live={live} reason={notLiveReason} url={liveUrl} label={liveHost ? displayHost(liveHost) : "Se nettstedet"} preview={`${base}/vis-kladd`} />
       <GettingStarted steps={steps} />
 
       <section aria-labelledby="gjoremal" className="mb-6 rounded-lg border bg-white p-5">

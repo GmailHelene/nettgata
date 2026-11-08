@@ -129,7 +129,7 @@ export default async function ReportsPage({
               <h3 className="mb-3 font-semibold">Fordelt på</h3>
               <dl className="space-y-1 text-sm tabular-nums">
                 <div className="flex justify-between">
-                  <dt>Varer før rabatt</dt>
+                  <dt>Varer før rabatt, etter kreditnotaer</dt>
                   <dd>{formatNok(report.subtotalOre)}</dd>
                 </div>
                 <div className="flex justify-between">
@@ -138,7 +138,7 @@ export default async function ReportsPage({
                   <dd>{report.discountOre > 0 ? `−${formatNok(report.discountOre)}` : formatNok(-report.discountOre)}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt>Frakt</dt>
+                  <dt>Frakt, etter kreditnotaer</dt>
                   <dd>{formatNok(report.shippingOre)}</dd>
                 </div>
                 {report.creditNotes > 0 && (

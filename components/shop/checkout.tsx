@@ -427,8 +427,13 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
             {error}
           </p>
         )}
+        {data.closed && !preview && (
+          <p role="status" className="rounded-[var(--radius)] border-2 border-[var(--c-text)] p-4 font-medium">
+            Butikken er ikke åpnet ennå, så du kan ikke bestille. Prøv igjen senere.
+          </p>
+        )}
         <button
-          disabled={busy || preview || visiblePayments.length === 0}
+          disabled={busy || preview || data.closed || visiblePayments.length === 0}
           aria-describedby={onlineLabel ? "betaling-videre" : undefined}
           className="w-full rounded-[var(--radius)] bg-[var(--c-primary)] px-6 py-4 text-lg font-semibold text-[var(--c-on-primary)] disabled:opacity-60"
         >
