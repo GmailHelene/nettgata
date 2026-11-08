@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ui } from "@/components/studio/ui";
 import { PageIntro } from "@/components/studio/help";
@@ -9,6 +10,8 @@ import { periodReport } from "@/lib/shop/reports";
 import { inquiriesPerMonth, lastMonths, parsePeriod, STATS_PERIODS, visitStats, type Ranked } from "@/lib/statistikk";
 import { SiteNav } from "../site-nav";
 import { VisitChart } from "./visit-chart";
+
+export const metadata: Metadata = { title: "Besøk" };
 
 const whole = new Intl.NumberFormat("nb-NO");
 

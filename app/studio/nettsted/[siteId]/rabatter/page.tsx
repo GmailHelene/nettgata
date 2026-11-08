@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
@@ -8,6 +9,8 @@ import { describeDiscount, discountStatus, discountToInput, type DiscountStatus 
 import { SiteNav } from "../site-nav";
 import { DiscountForm } from "./discount-form";
 import { DiscountRowActions } from "./discount-row-actions";
+
+export const metadata: Metadata = { title: "Rabatter" };
 
 const statusLabel: Record<DiscountStatus, { text: string; className: string }> = {
   aktiv: { text: "Aktiv", className: "bg-green-100 text-green-900" },

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getDb } from "@/db";
 import { getEmailProvider } from "@/lib/email/send";
 import { readNotificationSettings } from "@/lib/notifications";
@@ -8,6 +9,8 @@ import { SiteNav } from "../../site-nav";
 import { NotificationsForm } from "../notifications-form";
 import { OwnerOnly } from "../owner-note";
 import { ReportForm } from "../report-form";
+
+export const metadata: Metadata = { title: "Varsler på e-post" };
 
 /** Innstillinger › Varsler på e-post: hvem som får beskjed om henvendelser og ordre, og månedsrapporten. */
 export default async function NotificationsPage({ params }: { params: Promise<{ siteId: string }> }) {

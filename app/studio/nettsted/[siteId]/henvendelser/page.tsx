@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { inquiries } from "@/db/schema";
@@ -8,6 +9,8 @@ import { HelpLink } from "@/components/studio/help";
 import { deleteInquiryAction, markInquiryReadAction } from "../../../site-actions";
 import { ConfirmButton } from "@/components/studio/confirm-button";
 import { SiteNav } from "../site-nav";
+
+export const metadata: Metadata = { title: "Henvendelser" };
 
 export default async function InquiriesPage({ params }: { params: Promise<{ siteId: string }> }) {
   const { siteId } = await params;

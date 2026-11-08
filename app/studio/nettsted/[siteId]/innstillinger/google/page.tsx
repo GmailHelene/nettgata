@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
@@ -7,6 +8,8 @@ import { requireSiteAccess } from "@/lib/session";
 import { readSiteInfo } from "@/lib/site-info";
 import { SiteNav } from "../../site-nav";
 import { GoogleForm } from "./google-form";
+
+export const metadata: Metadata = { title: "Google og synlighet" };
 
 /**
  * Innstillinger › Google og synlighet: Search Console, produktfeeden og hva Nettgata ordner selv.

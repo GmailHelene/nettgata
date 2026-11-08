@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { getDb } from "@/db";
 import { listFiles, listMedia, mediaUsage } from "@/lib/media";
 import { requireSiteAccess } from "@/lib/session";
 import { SiteNav } from "../site-nav";
 import { MediaLibrary } from "./media-library";
 import { FileList } from "./file-list";
+
+export const metadata: Metadata = { title: "Bilder" };
 
 export default async function MediaPage({ params }: { params: Promise<{ siteId: string }> }) {
   const { siteId } = await params;

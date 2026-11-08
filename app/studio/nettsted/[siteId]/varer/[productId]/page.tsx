@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
@@ -6,6 +7,8 @@ import { productCategories, productVariants, products } from "@/db/schema";
 import { requireSiteAccess } from "@/lib/session";
 import type { ProductInput } from "@/lib/shop/catalog";
 import { ProductEditor } from "./product-editor";
+
+export const metadata: Metadata = { title: "Vare" };
 
 export default async function ProductPage({ params }: { params: Promise<{ siteId: string; productId: string }> }) {
   const { siteId, productId } = await params;

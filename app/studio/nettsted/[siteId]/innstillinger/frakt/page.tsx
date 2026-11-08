@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { bringSetupView } from "@/lib/bring/config";
@@ -9,6 +10,8 @@ import { SiteNav } from "../../site-nav";
 import { ShopSettingsForm } from "../shop-settings-form";
 import { BringAccountForm } from "./bring-account-form";
 import { BringShippingForm } from "./bring-shipping-form";
+
+export const metadata: Metadata = { title: "Frakt og levering" };
 
 /**
  * Innstillinger › Frakt og levering: faste leveringsmåter og gratis frakt øverst, så Bring med butikkens egen

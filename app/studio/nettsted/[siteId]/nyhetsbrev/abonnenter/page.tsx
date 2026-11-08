@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ui } from "@/components/studio/ui";
 import { getDb } from "@/db";
@@ -9,6 +10,8 @@ import { SiteNav } from "../../site-nav";
 import { deleteSubscriberAction } from "../actions";
 import { ConfirmButton } from "@/components/studio/confirm-button";
 import { NewsletterTabs } from "../newsletter-tabs";
+
+export const metadata: Metadata = { title: "Abonnenter" };
 
 const statusStyle: Record<SubscriberStatus, string> = {
   bekreftet: "bg-[#e9f1ed] text-[#1e3d30]",

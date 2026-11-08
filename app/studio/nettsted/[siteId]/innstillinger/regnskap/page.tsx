@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
 import { fikenOverview, fikenPeriods } from "@/lib/fiken/send";
@@ -7,6 +8,8 @@ import { fikenView } from "@/lib/fiken/state";
 import { requireSiteAccess } from "@/lib/session";
 import { SiteNav } from "../../site-nav";
 import { FikenSection } from "../../betaling/fiken-section";
+
+export const metadata: Metadata = { title: "Regnskap (Fiken)" };
 
 /**
  * Innstillinger › Regnskap (Fiken). Lå før under Betaling, men regnskap er ikke en betalingsmåte.

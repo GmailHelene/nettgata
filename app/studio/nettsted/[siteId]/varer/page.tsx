@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { asc, count, eq } from "drizzle-orm";
 import { getDb } from "@/db";
@@ -8,6 +9,8 @@ import { readShopSettings } from "@/lib/shop/settings";
 import { SiteNav } from "../site-nav";
 import { Categories } from "./categories";
 import { ProductTable } from "./product-table";
+
+export const metadata: Metadata = { title: "Varer" };
 
 export default async function ProductsPage({
   params,

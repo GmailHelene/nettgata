@@ -186,8 +186,8 @@ export function FikenSection({
           </p>
           <ul className="mt-2 list-disc pl-5">
             {overview.needsCredit.map((o) => (
-              <li key={o.number}>
-                Ordre {o.number}, {o.status === "refunded" ? "refundert" : "kansellert"}
+              <li key={`${o.number}-${o.creditNoteNumber ?? ""}`}>
+                Ordre {o.number}, {o.status === "refunded" ? "refundert" : o.status === "cancelled" ? "kansellert" : "delvis refundert"}
                 {o.saleId ? ` (salg ${o.saleId} i Fiken)` : ""}
                 {o.creditNoteNumber ? `, kreditnota ${o.creditNoteNumber} i Nettgata` : ""}
               </li>

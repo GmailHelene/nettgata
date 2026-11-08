@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { LabelPrintHelp } from "@/components/studio/label-print-help";
 import { PageIntro } from "@/components/studio/help";
@@ -11,6 +12,8 @@ import { orderCounts } from "@/lib/shop/reports";
 import { SiteNav } from "../site-nav";
 import { orderStatusLabel } from "./order-status";
 import { OrderList } from "./order-list";
+
+export const metadata: Metadata = { title: "Ordre" };
 
 export default async function OrdersPage({
   params,

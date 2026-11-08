@@ -262,6 +262,64 @@ export function orderShippedEmail(o: { shop: ShopInfo; order: OrderData; orderUr
   };
 }
 
+/**
+ * «Du får penger tilbake»: når butikken refunderer hele eller deler av ordren. Sier hva som er refundert, hvor mye,
+ * og hvordan pengene kommer tilbake. Beløpet er inkludert MVA, som på ordren.
+ */
+export function refundEmail(o: {
+  shop: ShopInfo;
+  order: OrderData;
+  orderUrl: string;
+  amountOre: number;
+  items: { name: string; variantLabel: string | null; quantity: number }[];
+  shipping: boolean;
+  full: boolean;
+  message: string | null;
+}): Rendered {
+  const { shop, order } = o;
+  const subject = `Du får penger tilbake (ordre ${order.number})`;
+  const amount = formatNok(o.amountOre);
+  const online = order.paymentMethod === "vipps" || order.paymentMethod === "klarna" || order.paymentMethod === "kustom";
+  const method = paymentLabels[order.paymentMethod as PaymentMethod] ?? order.paymentMethod;
+  const how = online
+    ? `Pengene går tilbake med ${method}, samme måte som du betalte. Det kan ta noen dager før du ser dem på kontoen.`
+    : `${shop.name} betaler pengene tilbake til deg.`;
+  const what = [
+    ...o.items.map((i) => `${i.quantity} × ${i.name}${i.variantLabel ? ` (${i.variantLabel})` : ""}`),
+    ...(o.shipping ? ["Frakt"] : []),
+  ];
+  const contact = contactLine(shop);
+  const intro = o.full
+    ? `Hei ${firstName(order.customerName)}. ${shop.name} har refundert ordre ${order.number}, og du får ${amount} tilbake.`
+    : `Hei ${firstName(order.customerName)}. ${shop.name} har refundert deler av ordre ${order.number}, og du får ${amount} tilbake.`;
+
+  const body = [
+    paragraph(esc(intro)),
+    what.length ? paragraph(`<strong>Refundert</strong><br>${what.map(esc).join("<br>")}`) : "",
+    o.message ? paragraph(`<strong>Melding fra ${esc(shop.name)}</strong><br>${esc(o.message)}`) : "",
+    paragraph(esc(how)),
+    paragraph(`<a href="${safeUrl(o.orderUrl)}" style="color:#111111;">Se bestillingen</a>`),
+    contact.html,
+  ].join("");
+
+  const text = [
+    intro,
+    what.length ? `Refundert:\n${what.join("\n")}` : "",
+    o.message ? `Melding fra ${shop.name}: ${o.message}` : "",
+    how,
+    `Se bestillingen: ${o.orderUrl}`,
+    contact.text,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  return {
+    subject,
+    text,
+    html: layout({ subject, preheader: `Du får ${amount} tilbake fra ${shop.name}.`, brand: shop.name, heading: "Du får penger tilbake", body, footer: shopFooter(shop) }),
+  };
+}
+
 // ---------- Til bedriften ----------
 
 export function newOrderEmail(o: { shop: ShopInfo; order: OrderData; lines: LineData[]; studioUrl: string; shippedNotice: boolean }): Rendered {

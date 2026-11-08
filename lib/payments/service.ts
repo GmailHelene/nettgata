@@ -687,6 +687,67 @@ async function releasePayment(db: Db, site: Site, order: Order, userId: string |
   return { refundedOre: 0, releasedOre: 0 };
 }
 
+export type PartRefundResult = { provider: "vipps" | "klarna" | "kustom" | null; skipped: boolean };
+
+/**
+ * Betaler tilbake en del av beløpet for en ordre der pengene er trukket (lib/shop/refunds.ts). refundId er nøkkelen
+ * betalingsløsningen får: prøves samme refusjon igjen etter en feil, betales den ikke ut to ganger.
+ * Beløpet kan aldri være mer enn det som er trukket og ikke allerede refundert hos betalingsløsningen.
+ */
+export async function refundPartOfPayment(
+  db: Db,
+  siteId: string,
+  orderId: string,
+  amountOre: number,
+  refundId: string,
+  userId: string | null,
+  o: { retry?: boolean } = {},
+): Promise<PartRefundResult> {
+  const row = await loadOrder(db, orderId, siteId);
+  if (!row) throw new ShopError("Fant ikke ordren");
+  const { order, site } = row;
+  if (!isOnlinePayment(order.paymentMethod)) return { provider: null, skipped: false };
+  const name = providerNames[order.paymentMethod];
+  const found = await clientForAction(db, site, order, userId, "partial_refund");
+  if (!found) return { provider: null, skipped: true };
+  const { ref, access } = found;
+  // Et nytt forsøk kan komme etter at pengene alt er sendt (feilen kom senere). Da ville sjekken under avvist det,
+  // så ved nytt forsøk stoler vi på nøkkelen: betalingsløsningen gir samme svar og betaler ikke ut igjen.
+  const check = (left: number) => {
+    if (!o.retry && amountOre > left) throw tooMuch(left);
+  };
+  const tooMuch = (left: number) =>
+    new PaymentError(`${name} har bare ${(Math.max(left, 0) / 100).toFixed(2).replace(".", ",")} kr igjen som kan refunderes på denne ordren.`);
+  const details = { orderId: order.id, refundId, amountOre, environment: ref.environment };
+
+  if (access.provider === "vipps" && ref.provider === "vipps") {
+    const payment = await access.client.getPayment(ref.reference);
+    const left = payment.aggregate.capturedOre - payment.aggregate.refundedOre;
+    check(left);
+    await access.client.refund(ref.reference, amountOre, `delrefusjon-${refundId}`);
+    await audit(db, site.id, userId, "payment.partially_refunded", { ...details, provider: "vipps", reference: ref.reference });
+    return { provider: "vipps", skipped: false };
+  }
+  if (access.provider === "klarna" && ref.provider === "klarna") {
+    if (ref.kind !== "order") throw new PaymentError("Klarna har ikke bekreftet ordren, så ingenting kan refunderes.");
+    const ko = await access.client.getOrder(ref.id);
+    const left = ko.capturedOre - ko.refundedOre;
+    check(left);
+    await access.client.refund(ref.id, amountOre, await idempotencyUuid(`delrefusjon:${refundId}`));
+    await audit(db, site.id, userId, "payment.partially_refunded", { ...details, provider: "klarna", reference: ref.id });
+    return { provider: "klarna", skipped: false };
+  }
+  if (access.provider === "kustom" && ref.provider === "kustom") {
+    const ko = await access.client.getOrder(ref.id);
+    const left = ko.capturedOre - ko.refundedOre;
+    check(left);
+    await access.client.refund(ref.id, amountOre, await idempotencyUuid(`kustom-delrefusjon:${refundId}`));
+    await audit(db, site.id, userId, "payment.partially_refunded", { ...details, provider: "kustom", reference: ref.id });
+    return { provider: "kustom", skipped: false };
+  }
+  throw new PaymentError(`Betalingen hører ikke til ${name}, så den kan ikke refunderes herfra.`);
+}
+
 /**
  * Stopper en betaling som ikke er fullført, og kansellerer ordren (varene og rabattkoden frigjøres).
  * Rakk kunden å godkjenne i samme øyeblikk, gis pengene tilbake.

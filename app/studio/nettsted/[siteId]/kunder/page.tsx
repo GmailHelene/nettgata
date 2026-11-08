@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { formatOsloDateTime } from "@/lib/oslo-time";
@@ -5,6 +6,8 @@ import { requireSiteAccess } from "@/lib/session";
 import { CUSTOMERS_PER_PAGE, customerSorts, listCustomers, parseCustomerQuery, type CustomerSort } from "@/lib/shop/customers";
 import { formatNok } from "@/lib/shop/money";
 import { SiteNav } from "../site-nav";
+
+export const metadata: Metadata = { title: "Kunder" };
 
 export default async function CustomersPage({
   params,

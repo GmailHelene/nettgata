@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { pages } from "@/db/schema";
@@ -7,6 +8,8 @@ import { requireSiteAccess } from "@/lib/session";
 import { resolveTheme } from "@/lib/theme";
 import { SiteNav } from "../site-nav";
 import { DesignStudio } from "./design-studio";
+
+export const metadata: Metadata = { title: "Tema og farger" };
 
 /**
  * Design for et nettsted som finnes: temagalleri og «Tilpass», som i WordPress. Forhåndsvisningene bruker

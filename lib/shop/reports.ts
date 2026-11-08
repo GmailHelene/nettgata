@@ -24,7 +24,7 @@ export async function salesOverview(db: Db, siteId: string, now = new Date()) {
   const today = osloDate(now);
   const from = parseOsloDate(addDays(today, -59))!;
   const rows = await db
-    .select({ createdAt: orders.createdAt, totalOre: orders.totalOre })
+    .select({ createdAt: orders.createdAt, totalOre: orders.totalOre, refundedOre: orders.refundedOre })
     .from(orders)
     .where(and(eq(orders.siteId, siteId), gte(orders.createdAt, from), inArray(orders.status, [...salesStatuses])));
 
@@ -32,7 +32,8 @@ export async function salesOverview(db: Db, siteId: string, now = new Date()) {
   for (const r of rows) {
     const day = osloDate(r.createdAt);
     const p = byDay.get(day) ?? empty();
-    p.ore += r.totalOre;
+    // Delvise refusjoner trekkes fra salget på dagen ordren kom. MVA-rapporten fører dem på kreditnotaens dato.
+    p.ore += r.totalOre - r.refundedOre;
     p.orders += 1;
     byDay.set(day, p);
   }

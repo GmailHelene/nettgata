@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { ui } from "@/components/studio/ui";
 import { PageIntro } from "@/components/studio/help";
 import { getDb } from "@/db";
@@ -9,6 +10,8 @@ import { requireSiteAccess } from "@/lib/session";
 import { SiteNav } from "../site-nav";
 import { NewsletterComposer } from "./composer";
 import { NewsletterTabs } from "./newsletter-tabs";
+
+export const metadata: Metadata = { title: "Nyhetsbrev" };
 
 export default async function NewsletterPage({ params }: { params: Promise<{ siteId: string }> }) {
   const { siteId } = await params;

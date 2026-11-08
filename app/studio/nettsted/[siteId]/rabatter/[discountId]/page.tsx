@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
@@ -7,6 +8,8 @@ import { requireSiteAccess } from "@/lib/session";
 import { discountToInput } from "@/lib/shop/discounts";
 import { SiteNav } from "../../site-nav";
 import { DiscountForm } from "../discount-form";
+
+export const metadata: Metadata = { title: "Rabatt" };
 
 export default async function EditDiscountPage({ params }: { params: Promise<{ siteId: string; discountId: string }> }) {
   const { siteId, discountId } = await params;

@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSiteAccess } from "@/lib/session";
 import { listVariantsForGrid } from "@/lib/shop/admin";
 import { SiteNav } from "../../site-nav";
 import { VariantGrid } from "./variant-grid";
+
+export const metadata: Metadata = { title: "Pris og lager" };
 
 export default async function PriceStockPage({ params }: { params: Promise<{ siteId: string }> }) {
   const { siteId } = await params;

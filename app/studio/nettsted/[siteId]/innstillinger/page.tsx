@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { requireSiteAccess } from "@/lib/session";
 import { readSiteInfo } from "@/lib/site-info";
 import { SiteNav } from "../site-nav";
 import { SettingsForm } from "./settings-form";
+
+export const metadata: Metadata = { title: "Firma og kontakt" };
 
 /**
  * Innstillinger › Firma og kontakt. Resten av innstillingene har egne undersider i menyen, med én lagreknapp hver

@@ -412,6 +412,8 @@ export const orders = pgTable(
     /** Rabattkoden slik den var ved kjøp, og hvor mye den trakk fra varene. totalOre er etter rabatt. */
     discountCode: text("discount_code"),
     discountOre: integer("discount_ore").notNull().default(0),
+    /** Sum av delvise refusjoner (lib/shop/refunds.ts). Hele refusjonen setter status «refundert» i stedet. */
+    refundedOre: integer("refunded_ore").notNull().default(0),
     trackingCarrier: text("tracking_carrier"),
     trackingNumber: text("tracking_number"),
     /** Internt notat for butikken. Vises aldri for kunden. */
@@ -868,7 +870,19 @@ export const monthlyReports = pgTable(
 // ---------- Kreditnota ----------
 
 /** Én linje på kreditnotaen, med negative beløp. Kopi av ordrelinjen, så den aldri endrer seg. */
-export type CreditNoteLine = { name: string; variantLabel: string | null; sku: string | null; quantity: number; unitPriceOre: number; vatRate: number; totalOre: number };
+export type CreditNoteLine = {
+  name: string;
+  variantLabel: string | null;
+  sku: string | null;
+  quantity: number;
+  unitPriceOre: number;
+  vatRate: number;
+  totalOre: number;
+  /** Ordrelinjen kreditnotaen gjelder. Med på delvise kreditnotaer, så resten kan regnes ut ved full refusjon. */
+  lineId?: string;
+  /** Linjens del av rabatten, negativ. Med på delvise kreditnotaer. */
+  discountOre?: number;
+};
 /** MVA per sats på kreditnotaen, negative beløp. amountOre er inkludert MVA. */
 export type CreditNoteVat = { rate: number; amountOre: number; vatOre: number };
 
@@ -876,8 +890,8 @@ export type CreditNoteVat = { rate: number; amountOre: number; vatOre: number };
  * Kreditnota for en betalt ordre som er kansellert eller refundert (lib/shop/credit-notes.ts). Egen nummerserie per
  * nettsted, fra 1 og uten hull. Beløpene er negative og speiler ordren, også MVA per sats.
  * Bokføringsloven: en kreditnota endres aldri. Databasen stopper endringer med en trigger (migrering 0016), og
- * ordren kan ikke slettes så lenge kreditnotaen finnes. Refusjonen gir alltid hele beløpet tilbake, så det er
- * høyst én kreditnota per ordre.
+ * ordren kan ikke slettes så lenge kreditnotaen finnes. En ordre kan ha flere delvise kreditnotaer (reason
+ * «delvis-refundert», én per delrefusjon) og høyst én for resten (kansellert eller refundert).
  */
 export const creditNotes = pgTable(
   "credit_notes",
@@ -901,7 +915,42 @@ export const creditNotes = pgTable(
   },
   (t) => [
     uniqueIndex("credit_notes_site_number_idx").on(t.siteId, t.number),
-    uniqueIndex("credit_notes_order_idx").on(t.orderId),
+    index("credit_notes_order_idx").on(t.orderId),
+    // Høyst én kreditnota for resten av ordren (kansellert eller refundert). Delvise kan det være flere av.
+    uniqueIndex("credit_notes_final_idx").on(t.orderId).where(sql`${t.reason} <> 'delvis-refundert'`),
     index("credit_notes_site_created_idx").on(t.siteId, t.createdAt),
+  ],
+);
+
+/**
+ * Delvis refusjon av en ordre (lib/shop/refunds.ts). Raden lagres som «behandles» før pengene flyttes, og id-en er
+ * nøkkelen betalingsløsningen får. Trykker eieren igjen etter en feil, brukes samme rad og samme nøkkel, så kunden
+ * aldri får pengene to ganger. Bare én refusjon kan behandles per ordre om gangen (unik delindeks).
+ */
+export type RefundLine = { lineId: string; quantity: number };
+
+export const orderRefunds = pgTable(
+  "order_refunds",
+  {
+    id: id(),
+    siteId: uuid("site_id").notNull().references(() => sites.id, { onDelete: "cascade" }),
+    orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: "restrict" }),
+    /** behandles, ferdig eller feilet. */
+    status: text("status").notNull().default("behandles"),
+    lines: jsonb("lines").$type<RefundLine[]>().notNull(),
+    shippingOre: integer("shipping_ore").notNull().default(0),
+    amountOre: integer("amount_ore").notNull(),
+    /** Vises for kunden i e-posten. */
+    reason: text("reason"),
+    notifyCustomer: boolean("notify_customer").notNull().default(true),
+    creditNoteId: uuid("credit_note_id").references(() => creditNotes.id, { onDelete: "restrict" }),
+    error: text("error"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("order_refunds_order_idx").on(t.orderId),
+    uniqueIndex("order_refunds_one_pending_idx").on(t.orderId).where(sql`${t.status} = 'behandles'`),
   ],
 );

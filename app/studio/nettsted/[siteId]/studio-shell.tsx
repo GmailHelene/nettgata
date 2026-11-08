@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { logout } from "@/app/studio/actions";
 import { signType, StreetSign } from "@/components/brand";
-import { activeHref, navGroups, pageLabel, type NavBadgeKey, type NavGroup, type NavItem } from "./nav-items";
+import { activeHref, type NavBadgeKey, type NavGroup, type NavItem } from "./nav-items";
 
 type Props = {
   siteId: string;
@@ -35,7 +35,6 @@ export function StudioShell({ siteId, siteName, shop, email, siteUrl, groups, ad
   const pathname = usePathname() ?? base;
   const rest = pathname.startsWith(base) ? pathname.slice(base.length).replace(/\/$/, "") : "";
   const current = activeHref(groups, rest);
-  const label = pageLabel(navGroups, rest);
   // Skuffen huskes sammen med siden den ble åpnet på, så den lukkes av seg selv når brukeren går til en annen side.
   const [openOn, setOpenOn] = useState<string | null>(null);
   const open = openOn === pathname;
@@ -50,11 +49,6 @@ export function StudioShell({ siteId, siteName, shop, email, siteUrl, groups, ad
   useEffect(() => {
     aside.current?.querySelector<HTMLElement>('[aria-current="page"]')?.scrollIntoView({ block: "nearest" });
   }, [pathname]);
-
-  // Nettleserfanen får sidens navn, så flere åpne faner kan skilles fra hverandre (WCAG 2.4.2).
-  useEffect(() => {
-    document.title = `${label} · ${siteName} · Nettgata`;
-  }, [label, siteName]);
 
   useEffect(() => {
     if (!open) return;

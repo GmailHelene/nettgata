@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { requireSiteAccess } from "@/lib/session";
 import { SiteNav } from "../../site-nav";
 import { ExportPanel } from "../export-panel";
 import { OwnerOnly } from "../owner-note";
+
+export const metadata: Metadata = { title: "Last ned alt" };
 
 /** Innstillinger › Last ned alt. Filen har alle personopplysningene til nettstedet, så bare eieren får lage den. */
 export default async function ExportPage({ params }: { params: Promise<{ siteId: string }> }) {

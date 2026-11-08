@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { paymentSetupView } from "@/lib/payments/config";
 import { readShopSettings } from "@/lib/shop/settings";
@@ -6,6 +7,8 @@ import { HelpLink } from "@/components/studio/help";
 import { SiteNav } from "../site-nav";
 import { ShopSettingsForm } from "../innstillinger/shop-settings-form";
 import { ProviderForm } from "./provider-form";
+
+export const metadata: Metadata = { title: "Betaling" };
 
 /**
  * Innstillinger › Betaling: alle betalingsmåtene på ett sted, både Vipps og Kustom og det butikken ordner selv

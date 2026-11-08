@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
@@ -8,6 +9,8 @@ import { canPublish } from "@/lib/billing/state";
 import { buildRenderContext } from "@/lib/render";
 import { requireSiteAccess } from "@/lib/session";
 import { PageEditor } from "./page-editor";
+
+export const metadata: Metadata = { title: "Rediger side" };
 
 export default async function EditPage({ params }: { params: Promise<{ siteId: string; pageId: string }> }) {
   const { siteId, pageId } = await params;

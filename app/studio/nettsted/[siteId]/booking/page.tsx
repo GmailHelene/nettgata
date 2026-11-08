@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { heading } from "@/components/brand";
 import { ui } from "@/components/studio/ui";
@@ -13,6 +14,8 @@ import { requireSiteAccess } from "@/lib/session";
 import { formatNok } from "@/lib/shop/money";
 import { SiteNav } from "../site-nav";
 import { CancelBookingButton, DeleteButton, ExceptionForm, ServiceForm, SettingsForm, StaffForm, type StaffView } from "./booking-forms";
+
+export const metadata: Metadata = { title: "Booking" };
 
 const kindLabels = { stengt: "Stengt", egne_tider: "Egne tider", apen: "Åpent som vanlig" } as const;
 

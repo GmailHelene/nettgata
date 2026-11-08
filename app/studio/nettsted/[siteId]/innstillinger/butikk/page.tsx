@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { asc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
@@ -7,6 +8,8 @@ import { requireSiteAccess } from "@/lib/session";
 import { SiteNav } from "../../site-nav";
 import { OwnerOnly } from "../owner-note";
 import { ShopSettingsForm } from "../shop-settings-form";
+
+export const metadata: Metadata = { title: "Vilkår og lager" };
 
 /** Innstillinger › Vilkår og lager: hvilken side som er kjøpsvilkårene, og når en vare regnes som nesten utsolgt. */
 export default async function ShopTermsPage({ params }: { params: Promise<{ siteId: string }> }) {

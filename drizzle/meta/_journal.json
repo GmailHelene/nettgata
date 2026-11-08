@@ -134,6 +134,13 @@
       "when": 1793587833483,
       "tag": "0018_tilbud_bilder",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794102499901,
+      "tag": "0019_delvis_refusjon",
+      "breakpoints": true
     }
   ]
 }

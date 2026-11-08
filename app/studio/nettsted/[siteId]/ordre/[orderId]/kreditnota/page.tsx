@@ -6,7 +6,7 @@ import { orders } from "@/db/schema";
 import { PrintButton } from "@/components/studio/print-button";
 import { formatOsloDateTime } from "@/lib/oslo-time";
 import { requireSiteAccess } from "@/lib/session";
-import { creditNoteForOrder, creditReasonLabel } from "@/lib/shop/credit-notes";
+import { creditNotesForOrder, creditReasonLabel, PARTIAL_REASON } from "@/lib/shop/credit-notes";
 import { formatNok } from "@/lib/shop/money";
 import { paymentLabels, type PaymentMethod } from "@/lib/shop/settings";
 import { formatOrgnr, readSiteInfo } from "@/lib/site-info";
@@ -17,14 +17,23 @@ export const metadata: Metadata = { title: "Kreditnota" };
  * Kreditnotaen til utskrift eller PDF (Skriv ut, Lagre som PDF i nettleseren). Samme stil som pakkseddelen.
  * Viser det som er lagret på kreditnotaen, aldri ordren slik den er nå, så utskriften alltid blir lik.
  */
-export default async function CreditNotePage({ params }: { params: Promise<{ siteId: string; orderId: string }> }) {
+export default async function CreditNotePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ siteId: string; orderId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { siteId, orderId } = await params;
+  const { nr } = await searchParams;
   const { site } = await requireSiteAccess(siteId);
   if (!/^[0-9a-f-]{36}$/.test(orderId)) notFound();
   const db = await getDb();
   const [order] = await db.select().from(orders).where(and(eq(orders.id, orderId), eq(orders.siteId, site.id))).limit(1);
   if (!order) notFound();
-  const note = await creditNoteForOrder(db, site.id, order.id);
+  // En ordre kan ha flere kreditnotaer (delvis refusjon). ?nr= velger én, ellers vises den for resten av ordren.
+  const all = await creditNotesForOrder(db, site.id, order.id);
+  const note = all.find((n) => String(n.number) === nr) ?? all.find((n) => n.reason !== PARTIAL_REASON) ?? all.at(-1);
   if (!note) notFound();
   const info = readSiteInfo(site.info);
   const address = [info.street, [info.postalCode, info.city].filter(Boolean).join(" ")].filter(Boolean);
@@ -141,7 +150,9 @@ export default async function CreditNotePage({ params }: { params: Promise<{ sit
       </table>
 
       <p className="mt-10 text-sm text-neutral-700">
-        Kreditnotaen opphever ordre #{order.number}. Beløpet er betalt tilbake eller ikke trukket, med samme betalingsmåte som ved kjøpet.
+        {note.reason === PARTIAL_REASON
+          ? `Kreditnotaen gjelder varene over fra ordre #${order.number}. Beløpet er betalt tilbake med samme betalingsmåte som ved kjøpet.`
+          : `Kreditnotaen opphever ${all.length > 1 ? "resten av " : ""}ordre #${order.number}. Beløpet er betalt tilbake eller ikke trukket, med samme betalingsmåte som ved kjøpet.`}
       </p>
     </main>
   );

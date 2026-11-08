@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, eq, inArray } from "drizzle-orm";
@@ -8,7 +9,9 @@ import { bringSetupView } from "@/lib/bring/config";
 import { bringProductIds, bringProducts } from "@/lib/bring/products";
 import { cartWeight, formatWeight } from "@/lib/bring/weight";
 import { requireSiteAccess } from "@/lib/session";
-import { creditNoteForOrder, creditReasonLabel, needsCreditNote } from "@/lib/shop/credit-notes";
+import { creditNotesForOrder, creditReasonLabel, needsCreditNote, PARTIAL_REASON } from "@/lib/shop/credit-notes";
+import { allocateDiscount } from "@/lib/shop/discounts";
+import { refundable, refundsForOrder } from "@/lib/shop/refunds";
 import { formatNok } from "@/lib/shop/money";
 import { paymentLabels, type PaymentMethod } from "@/lib/shop/settings";
 import { carrierLabel, trackingUrl } from "@/lib/shop/tracking";
@@ -17,7 +20,10 @@ import { orderStatusLabel } from "../order-status";
 import { LabelPrintHelp } from "@/components/studio/label-print-help";
 import { BringLabelForm } from "./bring-label";
 import { OrderActions } from "./order-actions";
+import { RefundForm } from "./refund-form";
 import { CreditNoteRetry, StaffNoteForm, TrackingForm } from "./order-extras";
+
+export const metadata: Metadata = { title: "Ordre" };
 
 /** Hvor fraktprisen i kassen kom fra, sagt så butikkeieren forstår det. */
 function bringPriceNote(b: OrderBring): string {
@@ -33,6 +39,7 @@ const emailKindLabel: Record<string, string> = {
   ordrebekreftelse: "Ordrebekreftelse",
   "ny-ordre": "Varsel til deg om ny ordre",
   sendt: "«Pakken er på vei»",
+  refusjon: "«Du får penger tilbake»",
 };
 const emailStatusLabel: Record<string, string> = {
   sendt: "Sendt",
@@ -47,11 +54,18 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
   const db = await getDb();
   const [order] = await db.select().from(orders).where(and(eq(orders.id, orderId), eq(orders.siteId, site.id))).limit(1);
   if (!order) notFound();
-  const [lines, emails, creditNote] = await Promise.all([
-    db.select().from(orderLines).where(eq(orderLines.orderId, order.id)),
+  const [lines, emails, notes, refunds] = await Promise.all([
+    db.select().from(orderLines).where(eq(orderLines.orderId, order.id)).orderBy(asc(orderLines.name), asc(orderLines.id)),
     db.select().from(emailLog).where(eq(emailLog.orderId, order.id)).orderBy(asc(emailLog.createdAt)),
-    creditNoteForOrder(db, site.id, order.id),
+    creditNotesForOrder(db, site.id, order.id),
+    refundsForOrder(db, order.id),
   ]);
+  const creditNote = notes.find((n) => n.reason !== PARTIAL_REASON) ?? null;
+  // Delvis refusjon: bare for ordre som er sendt eller hentet, og bare for eieren (som full refusjon).
+  const left = refundable(order, lines, refunds.filter((r) => r.status === "ferdig"));
+  const shares = allocateDiscount(lines.map((l) => l.totalOre), order.discountOre);
+  const pendingRefund = refunds.find((r) => r.status === "behandles") ?? null;
+  const online = order.paymentMethod === "vipps" || order.paymentMethod === "klarna" || order.paymentMethod === "kustom";
   const status = orderStatusLabel[order.status];
 
   // Frakt med Bring: hva kunden valgte i kassen, og etiketten hvis den er laget.
@@ -99,9 +113,28 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
         siteId={site.id}
         orderId={order.id}
         status={order.status}
-        online={order.paymentMethod === "vipps" || order.paymentMethod === "klarna" || order.paymentMethod === "kustom"}
+        online={online}
         owner={role === "owner"}
       />
+      {order.status === "fulfilled" && role === "owner" && (
+        <RefundForm
+          siteId={site.id}
+          orderId={order.id}
+          online={online}
+          paymentLabel={paymentLabels[order.paymentMethod as PaymentMethod] ?? order.paymentMethod}
+          shippingLeftOre={left.shippingOre}
+          pending={pendingRefund && { id: pendingRefund.id, error: pendingRefund.error, lines: pendingRefund.lines, shippingOre: pendingRefund.shippingOre, reason: pendingRefund.reason }}
+          lines={lines.map((l, i) => ({
+            id: l.id,
+            name: l.name,
+            variantLabel: l.variantLabel,
+            remaining: Math.max(left.quantities.get(l.id) ?? 0, 0),
+            quantity: l.quantity,
+            unitPriceOre: l.unitPriceOre,
+            discountShareOre: shares[i],
+          }))}
+        />
+      )}
 
       <section className="mt-8 rounded-lg border bg-white p-5">
         <h2 className="mb-3 font-semibold">Varer</h2>
@@ -147,25 +180,36 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
         </dl>
       </section>
 
-      {creditNote && (
-        <section aria-labelledby="kreditnota" className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white p-5">
-          <div>
-            <h2 id="kreditnota" className="font-semibold">
-              Kreditnota nr. {creditNote.number}
-            </h2>
-            <p className="text-sm text-neutral-600">
-              {creditReasonLabel[creditNote.reason] ?? creditNote.reason}. Laget {formatOsloDateTime(creditNote.createdAt)}, {formatNok(creditNote.totalOre)}.
-              Kreditnotaen kan ikke endres.
-            </p>
-          </div>
-          <a
-            href={`/studio/nettsted/${site.id}/ordre/${order.id}/kreditnota`}
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold"
-          >
-            Vis og skriv ut kreditnota
-          </a>
+      {order.refundedOre > 0 && (
+        <p className="mt-3 text-sm text-neutral-700">
+          Refundert så langt: <strong>{formatNok(order.refundedOre)}</strong> av {formatNok(order.totalOre)}.
+        </p>
+      )}
+
+      {notes.length > 0 && (
+        <section aria-labelledby="kreditnota" className="mt-6 rounded-lg border bg-white p-5">
+          <h2 id="kreditnota" className="font-semibold">
+            {notes.length === 1 ? `Kreditnota nr. ${notes[0].number}` : "Kreditnotaer"}
+          </h2>
+          <p className="text-sm text-neutral-600">En kreditnota kan ikke endres.</p>
+          <ul className="mt-3 divide-y text-sm">
+            {notes.map((n) => (
+              <li key={n.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
+                <span>
+                  {notes.length > 1 && <strong className="mr-2">Nr. {n.number}</strong>}
+                  {creditReasonLabel[n.reason] ?? n.reason}. Laget {formatOsloDateTime(n.createdAt)}, {formatNok(n.totalOre)}.
+                </span>
+                <a
+                  href={`/studio/nettsted/${site.id}/ordre/${order.id}/kreditnota?nr=${n.number}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-md border border-[#173b6c] px-4 py-2 font-semibold"
+                >
+                  Vis og skriv ut<span className="sr-only"> kreditnota {n.number}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

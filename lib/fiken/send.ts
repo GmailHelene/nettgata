@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, lt, or, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { auditLog, creditNotes, orderLines, orders, sites } from "@/db/schema";
 import { addDays, parseOsloDate } from "@/lib/oslo-time";
@@ -255,7 +255,7 @@ export function describeSendResult(r: FikenSendResult): { ok: boolean; message: 
 export type FikenOverview = {
   lastBatch: { at: string; sent: number; failed: number } | null;
   /**
-   * Ordre som er sendt til Fiken og senere kansellert eller refundert. Kreditnotaen fra Nettgata sendes ikke til Fiken:
+   * Ordre som er sendt til Fiken og senere kansellert eller refundert, helt eller delvis. Én rad per kreditnota. Kreditnotaen fra Nettgata sendes ikke til Fiken:
    * kreditnota-kallene i Fiken API v2 krever en faktura laget i Fiken (invoiceId), og salget vi sender er «Annet salg».
    * Negative salg er ikke beskrevet i spesifikasjonen. Eieren fører derfor kreditnotaen selv i Fiken.
    */
@@ -285,7 +285,7 @@ export async function fikenOverview(db: Db, siteId: string, now = new Date()): P
         eq(auditLog.siteId, siteId),
         eq(auditLog.action, "order.fiken_sent"),
         eq(orders.siteId, siteId),
-        inArray(orders.status, ["cancelled", "refunded"]),
+        or(inArray(orders.status, ["cancelled", "refunded"]), gt(orders.refundedOre, 0)),
         gte(orders.createdAt, since),
       ),
     )

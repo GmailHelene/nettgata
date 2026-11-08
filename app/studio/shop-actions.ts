@@ -21,7 +21,8 @@ import {
 import { saveDiscount, type DiscountInput } from "@/lib/shop/discounts";
 import { setCustomerNote } from "@/lib/shop/customers";
 import { CreditNoteError, retryCreditNote } from "@/lib/shop/credit-notes";
-import { notifyOrderPlaced, notifyOrderShipped } from "@/lib/email/notify";
+import { notifyOrderPlaced, notifyOrderShipped, notifyRefund } from "@/lib/email/notify";
+import { abandonRefund, refundPart, type RefundInput } from "@/lib/shop/refunds";
 import { getEmailProvider } from "@/lib/email/send";
 import { updateShopSettings } from "@/lib/payments/config";
 import { changeOrderStatus } from "@/lib/payments/service";
@@ -34,6 +35,11 @@ import type { ActionState } from "./actions";
 /** «Pakken er på vei» til kunden, sendt etter at studioet har fått svar. */
 function shippedNotice(db: Awaited<ReturnType<typeof getDb>>, orderId: string) {
   after(() => notifyOrderShipped(db, getEmailProvider(), orderId).catch((err) => console.error("Sendt-varsel feilet", err)));
+}
+
+/** «Du får penger tilbake» til kunden. refundId er null når hele ordren er refundert. */
+function refundNotice(db: Awaited<ReturnType<typeof getDb>>, orderId: string, refundId: string | null) {
+  after(() => notifyRefund(db, getEmailProvider(), orderId, refundId).catch((err) => console.error("Refusjonsvarsel feilet", err)));
 }
 
 /** Ordrebekreftelsen for Vipps og Klarna sendes når betalingen er bekreftet, ikke når ordren lages. */
@@ -132,12 +138,53 @@ export async function setOrderStatusAction(siteId: string, orderId: string, stat
     const change = await changeOrderStatus(db, site.id, orderId, status, user.id);
     if (change.paid) placedNotice(db, orderId);
     if (status === "fulfilled") shippedNotice(db, orderId);
+    if (status === "refunded") refundNotice(db, orderId, null);
     revalidatePath(`/studio/nettsted/${site.id}/ordre`, "layout");
     return { ok: true, message: change.message };
   } catch (err) {
     unstable_rethrow(err);
     // En sjekk hos Vipps eller Klarna kan ha endret ordren selv om handlingen feilet (for eksempel avbrutt betaling).
     revalidatePath(`/studio/nettsted/${siteId}/ordre`, "layout");
+    return toState(err);
+  }
+}
+
+/**
+ * Delvis refusjon fra ordresiden (lib/shop/refunds.ts). Gir penger tilbake, så bare eieren kan gjøre det,
+ * som full refusjon. Serveren regner ut beløpet selv. Det studioet viser, er bare en forhåndsvisning.
+ */
+export async function refundPartAction(siteId: string, orderId: string, input: RefundInput): Promise<ActionState> {
+  try {
+    const { site, user, role } = await requireSiteAccess(siteId);
+    if (role !== "owner") return { ok: false, message: "Bare eieren av butikken kan refundere." };
+    const db = await getDb();
+    const clean: RefundInput = {
+      lines: (Array.isArray(input?.lines) ? input.lines : []).slice(0, 500).map((l) => ({ lineId: String(l?.lineId ?? ""), quantity: Number(l?.quantity ?? 0) })),
+      shipping: Boolean(input?.shipping),
+      reason: typeof input?.reason === "string" ? input.reason : undefined,
+      notifyCustomer: input?.notifyCustomer !== false,
+      restock: Boolean(input?.restock),
+    };
+    const result = await refundPart(db, site.id, orderId, clean, user.id);
+    if (result.notify) refundNotice(db, orderId, result.refundId);
+    revalidatePath(`/studio/nettsted/${site.id}/ordre`, "layout");
+    return { ok: true, message: result.message };
+  } catch (err) {
+    unstable_rethrow(err);
+    revalidatePath(`/studio/nettsted/${siteId}/ordre`, "layout");
+    return toState(err);
+  }
+}
+
+/** Avbryter en refusjon som stoppet halvveis, etter at eieren har sjekket at pengene ikke gikk ut. */
+export async function abandonRefundAction(siteId: string, refundId: string): Promise<ActionState> {
+  try {
+    const { site, user, role } = await requireSiteAccess(siteId);
+    if (role !== "owner") return { ok: false, message: "Bare eieren av butikken kan avbryte en refusjon." };
+    await abandonRefund(await getDb(), site.id, refundId, user.id);
+    revalidatePath(`/studio/nettsted/${site.id}/ordre`, "layout");
+    return { ok: true, message: "Refusjonen er avbrutt. Ingenting er endret på ordren." };
+  } catch (err) {
     return toState(err);
   }
 }

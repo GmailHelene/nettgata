@@ -103,20 +103,6 @@ export const navGroups: NavGroup[] = [
   },
 ];
 
-/** Navnet på siden i nettleserfanen, for adresser som ikke står i menyen. */
-const extraTitles: [RegExp, string][] = [
-  [/^\/side\/[^/]+/, "Rediger side"],
-  [/^\/varer\/ny$/, "Ny vare"],
-  [/^\/varer\/[^/]+$/, "Rediger vare"],
-  [/^\/ordre\/[^/]+$/, "Ordre"],
-  [/^\/kunder\/[^/]+$/, "Kunde"],
-  [/^\/rabatter\/[^/]+$/, "Rabatt"],
-  [/^\/nyhetsbrev\/abonnenter$/, "Abonnenter"],
-  [/^\/domene/, "Domene"],
-  [/^\/last-ned/, "Last ned alt"],
-  [/^\/innstillinger\/bring/, "Frakt og levering"],
-];
-
 function flatten(groups: NavGroup[]): NavItem[] {
   return groups.flatMap((g) => g.items.flatMap((i) => [i, ...(i.children ?? [])]));
 }
@@ -131,16 +117,6 @@ export function activeHref(groups: NavGroup[], rest: string): string | null {
     }
   }
   return best?.href ?? null;
-}
-
-export function pageLabel(groups: NavGroup[], rest: string): string {
-  // Forsiden av Innstillinger er undersiden Firma og kontakt, og fanen skal si det samme som overskriften.
-  if (rest === "/innstillinger") return "Firma og kontakt";
-  const exact = flatten(groups).find((i) => i.href === rest);
-  if (exact) return exact.label;
-  for (const [re, label] of extraTitles) if (re.test(rest)) return label;
-  const href = activeHref(groups, rest);
-  return flatten(groups).find((i) => i.href === href)?.label ?? "Studio";
 }
 
 /** Menyen for dette nettstedet: butikkpunkter bare for nettbutikker, moduler bare når de er i bruk. */

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireSiteAccess } from "@/lib/session";
@@ -5,6 +6,8 @@ import { formatNok } from "@/lib/shop/money";
 import { parseReportQuery, periodReport, reportPresets } from "@/lib/shop/reports";
 import { paymentLabels, type PaymentMethod } from "@/lib/shop/settings";
 import { SiteNav } from "../site-nav";
+
+export const metadata: Metadata = { title: "Salg og MVA" };
 
 const monthLabel = (month: string) => {
   const [y, m] = month.split("-").map(Number);

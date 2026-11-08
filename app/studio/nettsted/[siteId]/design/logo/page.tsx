@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { letterIconSvg } from "@/lib/favicon";
 import { requireSiteAccess } from "@/lib/session";
 import { readSiteLayout } from "@/lib/site-layout";
 import { SiteNav } from "../../site-nav";
 import { AppearanceForm } from "../../innstillinger/appearance-form";
 import { FaviconForm } from "../../innstillinger/favicon-form";
+
+export const metadata: Metadata = { title: "Logo og bunntekst" };
 
 /**
  * Design › Logo og bunntekst. Lå før i Innstillinger, men hører til utseendet, som i Shopify (Nettbutikk › Tilpass)

@@ -92,13 +92,13 @@ describe("kreditnota", () => {
     const list = [];
     for (let i = 0; i < 8; i++) list.push(await order(mixed));
     const created = await Promise.all(list.map((o) => createCreditNote(db, siteId, o.id, "refundert", userId)));
-    expect(created.map((c) => c.number).sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(created.map((c) => c!.number).sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
 
     // Et annet nettsted har sin egen serie, som starter på 1.
     const [org] = await db.insert(organizations).values({ name: "Org 2" }).returning();
     const [other] = await db.insert(sites).values({ orgId: org.id, name: "Annen", slug: "annen", kind: "nettbutikk", industryPack: "nettbutikk", theme: demoTheme }).returning();
     const o = await order({ ...mixed, site: other.id });
-    expect((await createCreditNote(db, other.id, o.id, "refundert", userId)).number).toBe(1);
+    expect((await createCreditNote(db, other.id, o.id, "refundert", userId))!.number).toBe(1);
   });
 
   it("samme ordre får aldri to kreditnotaer, heller ikke ved dobbeltklikk", async () => {
@@ -108,14 +108,14 @@ describe("kreditnota", () => {
       createCreditNote(db, siteId, o.id, "refundert", userId),
       createCreditNote(db, siteId, o.id, "refundert", userId),
     ]);
-    expect(new Set([a.id, b.id, c.id]).size).toBe(1);
+    expect(new Set([a!.id, b!.id, c!.id]).size).toBe(1);
     expect(await db.select().from(creditNotes)).toHaveLength(1);
   });
 
   it("kan ikke endres etter at den er laget", async () => {
     const o = await order(mixed);
     const note = await createCreditNote(db, siteId, o.id, "refundert", userId);
-    await expect(db.update(creditNotes).set({ totalOre: 0 }).where(eq(creditNotes.id, note.id))).rejects.toThrow();
+    await expect(db.update(creditNotes).set({ totalOre: 0 }).where(eq(creditNotes.id, note!.id))).rejects.toThrow();
     await expect(db.execute(sql`update credit_notes set number = 99`)).rejects.toThrow();
     // Ordren kan ikke slettes mens kreditnotaen finnes.
     await expect(db.delete(orders).where(eq(orders.id, o.id))).rejects.toThrow();

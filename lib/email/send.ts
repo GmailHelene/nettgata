@@ -6,6 +6,7 @@ export type EmailKind =
   | "ordrebekreftelse"
   | "ny-ordre"
   | "sendt"
+  | "refusjon"
   | "ny-henvendelse"
   | "invitasjon"
   | "bookingbekreftelse"

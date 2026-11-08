@@ -1,6 +1,6 @@
 import { count, eq } from "drizzle-orm";
 import type { Db } from "@/db";
-import { inquiries, inquiryImages, orderLines, orders, sites } from "@/db/schema";
+import { inquiries, inquiryImages, orderLines, orderRefunds, orders, sites } from "@/db/schema";
 import { notifyAddress, readNotificationSettings } from "@/lib/notifications";
 import { readShopSettings } from "@/lib/shop/settings";
 import { trackingUrl } from "@/lib/shop/tracking";
@@ -9,7 +9,7 @@ import { readAnswers } from "@/lib/content/form-fields";
 import { ordrebekreftelseTekster } from "@/lib/legal/angrerett";
 import { platformUrl, publicSiteUrl } from "@/lib/site-url";
 import { deliver, type EmailProvider } from "./send";
-import { newInquiryEmail, newOrderEmail, orderConfirmationEmail, orderShippedEmail, type OrderData, type ShopInfo } from "./templates";
+import { newInquiryEmail, newOrderEmail, orderConfirmationEmail, orderShippedEmail, refundEmail, type OrderData, type ShopInfo } from "./templates";
 
 function shopInfo(site: typeof sites.$inferSelect): ShopInfo {
   const info = readSiteInfo(site.info);
@@ -119,6 +119,64 @@ export async function notifyOrderShipped(db: Db, provider: EmailProvider, orderI
       fromName: shop.name,
       ...(shop.email && { replyTo: { email: shop.email, name: shop.name } }),
       tags: ["sendt"],
+    },
+  );
+}
+
+/**
+ * «Du får penger tilbake» til kunden. Med refundId gjelder den én delvis refusjon, uten gjelder den hele ordren
+ * (statusen er «refundert»). Sendes bare når eieren har latt valget «Send e-post til kunden» stå på.
+ */
+export async function notifyRefund(db: Db, provider: EmailProvider, orderId: string, refundId: string | null) {
+  const loaded = await loadOrder(db, orderId);
+  if (!loaded) return;
+  const { order, site } = loaded;
+  const lines = await db.select().from(orderLines).where(eq(orderLines.orderId, order.id));
+  let items: { name: string; variantLabel: string | null; quantity: number }[];
+  let amountOre: number;
+  let shipping: boolean;
+  let message: string | null = null;
+  if (refundId) {
+    const [refund] = await db.select().from(orderRefunds).where(eq(orderRefunds.id, refundId)).limit(1);
+    if (!refund || refund.orderId !== order.id || refund.status !== "ferdig" || !refund.notifyCustomer) return;
+    items = refund.lines.flatMap((r) => {
+      const line = lines.find((l) => l.id === r.lineId);
+      return line ? [{ name: line.name, variantLabel: line.variantLabel, quantity: r.quantity }] : [];
+    });
+    amountOre = refund.amountOre;
+    shipping = refund.shippingOre > 0;
+    message = refund.reason;
+  } else {
+    if (order.status !== "refunded") return;
+    // Etter delvise refusjoner gjelder e-posten bare det som var igjen.
+    const done = (await db.select().from(orderRefunds).where(eq(orderRefunds.orderId, order.id))).filter((r) => r.status === "ferdig");
+    const left = (id: string, q: number) => q - done.flatMap((r) => r.lines).filter((r) => r.lineId === id).reduce((sum, r) => sum + r.quantity, 0);
+    items = lines.map((l) => ({ name: l.name, variantLabel: l.variantLabel, quantity: left(l.id, l.quantity) })).filter((i) => i.quantity > 0);
+    amountOre = order.totalOre - order.refundedOre;
+    shipping = order.shippingOre > 0 && !done.some((r) => r.shippingOre > 0);
+  }
+  const shop = shopInfo(site);
+  const base = await publicSiteUrl(db, site);
+  const email = refundEmail({
+    shop,
+    order: orderData(order),
+    orderUrl: `${base}/ordre/${order.id}?t=${order.accessToken}`,
+    amountOre,
+    items,
+    shipping,
+    full: !refundId,
+    message,
+  });
+  await deliver(
+    db,
+    provider,
+    { siteId: site.id, kind: "refusjon", orderId: order.id },
+    {
+      ...email,
+      to: { email: order.customerEmail, name: order.customerName },
+      fromName: shop.name,
+      ...(shop.email && { replyTo: { email: shop.email, name: shop.name } }),
+      tags: ["refusjon"],
     },
   );
 }

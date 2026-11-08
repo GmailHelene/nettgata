@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
@@ -9,6 +10,8 @@ import { HelpLink } from "@/components/studio/help";
 import { canConnectDomain, DOMAIN_NEEDS_SUBSCRIPTION } from "@/lib/billing/state";
 import { SiteNav } from "../site-nav";
 import { DomainManager } from "./domain-manager";
+
+export const metadata: Metadata = { title: "Domene" };
 
 export default async function DomainPage({ params }: { params: Promise<{ siteId: string }> }) {
   const { siteId } = await params;

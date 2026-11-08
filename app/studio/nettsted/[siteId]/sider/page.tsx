@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { pages } from "@/db/schema";
@@ -6,6 +7,8 @@ import { canPublish } from "@/lib/billing/state";
 import { PageList } from "../page-list";
 import { SiteLinks } from "../site-links";
 import { SiteNav } from "../site-nav";
+
+export const metadata: Metadata = { title: "Sider og meny" };
 
 export default async function PagesPage({ params }: { params: Promise<{ siteId: string }> }) {
   const { siteId } = await params;

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
@@ -6,6 +7,8 @@ import { PrintButton } from "@/components/studio/print-button";
 import { formatOsloDateTime } from "@/lib/oslo-time";
 import { requireSiteAccess } from "@/lib/session";
 import { formatOrgnr, readSiteInfo } from "@/lib/site-info";
+
+export const metadata: Metadata = { title: "Pakkseddel" };
 
 /** Pakkseddel som legges i pakken. Uten priser, så den også passer når varene er en gave. */
 export default async function PackingSlipPage({ params }: { params: Promise<{ siteId: string; orderId: string }> }) {

@@ -173,7 +173,7 @@ async function reserve(db: Db, variantId: string, quantity: number): Promise<boo
   return updated.length === 1;
 }
 
-async function release(db: Db, variantId: string, quantity: number) {
+export async function release(db: Db, variantId: string, quantity: number) {
   await db
     .update(productVariants)
     .set({ stock: sql`${productVariants.stock} + ${quantity}` })

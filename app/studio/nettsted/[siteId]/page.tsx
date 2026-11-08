@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { and, count, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
@@ -18,6 +19,8 @@ import { hasCheckoutTerms } from "@/lib/legal/kundesider";
 import { juridiskeMangler } from "@/lib/legal/felles";
 import { readSiteInfo } from "@/lib/site-info";
 import { SiteNav } from "./site-nav";
+
+export const metadata: Metadata = { title: "Hjem" };
 
 type Task = { text: string; href: string; tone?: "warning" };
 type Step = { label: string; detail: string; href: string; done: boolean; optional?: boolean };

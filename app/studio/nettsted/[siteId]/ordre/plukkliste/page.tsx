@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
@@ -5,6 +6,8 @@ import { orderLines, orders } from "@/db/schema";
 import { PrintButton } from "@/components/studio/print-button";
 import { formatOsloDateTime } from "@/lib/oslo-time";
 import { requireSiteAccess } from "@/lib/session";
+
+export const metadata: Metadata = { title: "Plukkliste" };
 
 /** Alt som skal plukkes for ordrene som er betalt og ikke sendt, slått sammen per variant. */
 export default async function PickListPage({ params }: { params: Promise<{ siteId: string }> }) {

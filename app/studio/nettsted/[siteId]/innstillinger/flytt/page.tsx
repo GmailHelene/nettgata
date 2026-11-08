@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { requireSiteAccess } from "@/lib/session";
 import { SiteNav } from "../../site-nav";
 import { OwnerOnly } from "../owner-note";
 import { RedirectsForm } from "../redirects-form";
+
+export const metadata: Metadata = { title: "Flytt fra gammel side" };
 
 /**
  * Innstillinger › Flytt fra gammel side: omdirigeringer fra gamle adresser, skrevet for hånd eller hentet fra sitemapen

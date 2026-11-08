@@ -1,11 +1,23 @@
 import { and, count, eq, isNull } from "drizzle-orm";
+import type { Metadata } from "next";
 import { getDb } from "@/db";
 import { aiSuggestions, bookingServices, domains, inquiries, newsletters, newsletterSubscribers, orders } from "@/db/schema";
 import { aiTeamActive } from "@/lib/ai/access";
 import { fikenAvailableTo } from "@/lib/fiken/oauth";
-import { requireSiteAccess } from "@/lib/session";
+import { checkSiteAccess, requireSiteAccess } from "@/lib/session";
 import { visibleNav, type NavBadgeKey } from "./nav-items";
 import { StudioShell } from "./studio-shell";
+
+/**
+ * Nettleserfanen viser «Ordre · Kari sin krok · Nettgata», så flere åpne faner kan skilles fra hverandre (WCAG 2.4.2).
+ * Hver side setter bare sitt eget navn. Navnet på nettstedet vises bare for den som har tilgang til det.
+ */
+export async function generateMetadata({ params }: { params: Promise<{ siteId: string }> }): Promise<Metadata> {
+  const { siteId } = await params;
+  const access = await checkSiteAccess(siteId);
+  const suffix = access ? `${access.site.name} · Nettgata` : "Nettgata";
+  return { title: { template: `%s · ${suffix}`, default: suffix } };
+}
 
 /**
  * Felles ramme for alle sidene til ett nettsted. Tellerne og menyen hentes én gang her, ikke på hver side.

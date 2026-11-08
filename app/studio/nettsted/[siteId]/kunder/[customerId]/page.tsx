@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
@@ -8,6 +9,8 @@ import { formatNok } from "@/lib/shop/money";
 import { orderStatusLabel } from "../../ordre/order-status";
 import { SiteNav } from "../../site-nav";
 import { CustomerNote } from "./customer-note";
+
+export const metadata: Metadata = { title: "Kunde" };
 
 export default async function CustomerPage({ params }: { params: Promise<{ siteId: string; customerId: string }> }) {
   const { siteId, customerId } = await params;
