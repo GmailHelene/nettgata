@@ -25,10 +25,7 @@ export default async function DomainPage({ params }: { params: Promise<{ siteId:
   return (
     <main className="mx-auto max-w-3xl px-5 py-12">
       <SiteNav siteId={site.id} name={site.name} shop={site.kind === "nettbutikk"} active="innstillinger" title="Domene" />
-      <Link href={`/studio/nettsted/${site.id}/innstillinger`} className="text-sm underline">
-        Tilbake til innstillinger
-      </Link>
-      <h2 className="mb-2 mt-4 text-xl font-bold">Eget domene</h2>
+      <h2 className="mb-2 text-xl font-bold">Eget domene</h2>
       <p className="mb-6 text-neutral-700">
         Skriv inn domenet ditt, legg inn pekerne hos forhandleren, så kobler vi det til automatisk med sikker tilkobling (https). Til da ligger nettstedet på{" "}
         <span className="font-mono">{freeAddress}</span>. <HelpLink slug="domene" />

@@ -44,7 +44,7 @@ export async function inviteAction(siteId: string, _prev: InviteState, formData:
     const provider = getEmailProvider();
     const mail = invitationEmail({ siteName: site.name, inviter: user.name || user.email, role: roles[invitation.role as Role], link });
     await deliver(db, provider, { siteId: site.id, kind: "invitasjon" }, { to: { email: invitation.email }, fromName: "Nettgata", ...mail });
-    revalidatePath(`/studio/nettsted/${site.id}/innstillinger`);
+    revalidatePath(`/studio/nettsted/${site.id}/innstillinger`, "layout");
     const emailed = provider.name !== "logg";
     return {
       ok: true,
@@ -63,7 +63,7 @@ export async function revokeInvitationAction(siteId: string, invitationId: strin
   try {
     const { user, site } = await requireOwner(siteId);
     await revokeInvitation(await getDb(), site.id, invitationId, user.id);
-    revalidatePath(`/studio/nettsted/${site.id}/innstillinger`);
+    revalidatePath(`/studio/nettsted/${site.id}/innstillinger`, "layout");
     return { ok: true, message: "Invitasjonen er trukket tilbake" };
   } catch (err) {
     return toState(err);
@@ -74,7 +74,7 @@ export async function removeMemberAction(siteId: string, memberId: string): Prom
   try {
     const { user, site } = await requireOwner(siteId);
     await removeMember(await getDb(), site.id, memberId, user.id);
-    revalidatePath(`/studio/nettsted/${site.id}/innstillinger`);
+    revalidatePath(`/studio/nettsted/${site.id}/innstillinger`, "layout");
     return { ok: true, message: "Brukeren har ikke lenger tilgang" };
   } catch (err) {
     return toState(err);

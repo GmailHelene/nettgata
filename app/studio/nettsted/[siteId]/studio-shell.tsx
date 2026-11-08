@@ -36,25 +36,32 @@ export function StudioShell({ siteId, siteName, shop, email, siteUrl, groups, ad
   const rest = pathname.startsWith(base) ? pathname.slice(base.length).replace(/\/$/, "") : "";
   const current = activeHref(groups, rest);
   const label = pageLabel(navGroups, rest);
-  const [open, setOpen] = useState(false);
+  // Skuffen huskes sammen med siden den ble åpnet på, så den lukkes av seg selv når brukeren går til en annen side.
+  const [openOn, setOpenOn] = useState<string | null>(null);
+  const open = openOn === pathname;
+  const setOpen = (next: boolean | ((was: boolean) => boolean)) =>
+    setOpenOn((prev) => ((typeof next === "function" ? next(prev === pathname) : next) ? pathname : null));
   const drawerId = useId();
   const menuButton = useRef<HTMLButtonElement>(null);
   const drawer = useRef<HTMLDivElement>(null);
+  const aside = useRef<HTMLElement>(null);
+
+  // Undermenyen til Innstillinger ligger nederst. Det aktive punktet rulles fram, så brukeren ser hvor de er.
+  useEffect(() => {
+    aside.current?.querySelector<HTMLElement>('[aria-current="page"]')?.scrollIntoView({ block: "nearest" });
+  }, [pathname]);
 
   // Nettleserfanen får sidens navn, så flere åpne faner kan skilles fra hverandre (WCAG 2.4.2).
   useEffect(() => {
     document.title = `${label} · ${siteName} · Nettgata`;
   }, [label, siteName]);
 
-  // Skuffen lukkes når brukeren går til en annen side.
-  useEffect(() => setOpen(false), [pathname]);
-
   useEffect(() => {
     if (!open) return;
     drawer.current?.querySelector<HTMLElement>("a,button")?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setOpen(false);
+        setOpenOn(null);
         menuButton.current?.focus();
       }
     };
@@ -108,8 +115,10 @@ export function StudioShell({ siteId, siteName, shop, email, siteUrl, groups, ad
           </span>
           <span className="min-w-0 truncate font-semibold">{siteName}</span>
           <div className="ml-auto flex items-center gap-1">
-            <a href={siteUrl} target="_blank" rel="noreferrer" className={bar}>
-              Se nettstedet<span aria-hidden> ↗</span>
+            <a href={siteUrl} target="_blank" rel="noreferrer" className={`${bar} whitespace-nowrap`}>
+              <span className="sm:hidden">Se siden</span>
+              <span className="hidden sm:inline">Se nettstedet</span>
+              <span aria-hidden> ↗</span>
               <span className="sr-only"> (åpnes i ny fane)</span>
             </a>
             <Link href="/studio/hjelp" className={`${bar} hidden sm:block`}>
@@ -128,7 +137,7 @@ export function StudioShell({ siteId, siteName, shop, email, siteUrl, groups, ad
       </header>
 
       {/* Venstremeny på PC. */}
-      <aside className="fixed bottom-0 left-0 top-14 z-30 hidden w-60 overflow-y-auto border-r border-[#d5dbe0] bg-white print:hidden lg:block">
+      <aside ref={aside} className="fixed bottom-0 left-0 top-14 z-30 hidden w-60 overflow-y-auto border-r border-[#d5dbe0] bg-white print:hidden lg:block">
         <SideNav base={base} groups={groups} addable={addable} current={current} badges={badges} />
       </aside>
 

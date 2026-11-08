@@ -28,7 +28,7 @@ import {
   saveBringKeysAction,
   saveBringShippingAction,
   testBringConnectionAction,
-} from "@/app/studio/nettsted/[siteId]/innstillinger/bring/actions";
+} from "@/app/studio/nettsted/[siteId]/innstillinger/frakt/actions";
 import { bookBringShipment, bringLabelPdf, readBringBooking, readOrderBring } from "@/lib/bring/booking";
 import { bulkBookLabels, labelBadge, MAX_BULK_LABELS } from "@/lib/bring/bulk";
 import { bookingRequest, readShippingGuideResponse, shippingGuideRequest } from "@/lib/bring/client";

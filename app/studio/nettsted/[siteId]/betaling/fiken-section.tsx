@@ -90,9 +90,9 @@ export function FikenSection({
   return (
     <section aria-labelledby="fiken-tittel" className="space-y-4 rounded-lg border bg-white p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 id="fiken-tittel" className="text-lg font-semibold">
+        <h2 id="fiken-tittel" className="text-lg font-semibold">
           Regnskap: Fiken
-        </h3>
+        </h2>
         <Status view={view} />
       </div>
       <p className="text-sm text-neutral-700">
@@ -362,9 +362,9 @@ function SettingsForm({ siteId, view }: { siteId: string; view: FikenView }) {
         });
       }}
     >
-      <h4 id="fiken-valg-tittel" className="font-semibold">
+      <h3 id="fiken-valg-tittel" className="font-semibold">
         Hvilke ordre som sendes
-      </h4>
+      </h3>
       <p className="text-sm text-neutral-700">Velg betalingsmåtene som skal sendes, og kontoen i Fiken pengene kommer inn på.</p>
       {view.bankAccounts.length === 0 && (
         <p role="alert" className="rounded-md bg-red-100 p-3 text-sm text-red-900">
@@ -457,9 +457,9 @@ function SendForm({ siteId, periods, view }: { siteId: string; periods: FikenPer
         });
       }}
     >
-      <h4 id="fiken-send-tittel" className="font-semibold">
+      <h3 id="fiken-send-tittel" className="font-semibold">
         Send ordre til Fiken
-      </h4>
+      </h3>
       <p className="text-sm text-neutral-700">
         Ordre som er betalt eller sendt, og som ikke har vært sendt til Fiken før, blir med. Kansellerte og refunderte ordre sendes ikke.{" "}
         {enabled.length > 0

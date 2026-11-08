@@ -7,6 +7,8 @@
 
 export type NavBadgeKey = "ordre" | "henvendelser" | "ai-teamet";
 export type NavModule = "booking" | "nyhetsbrev" | "ai-teamet";
+/** Punkter som bare vises når funksjonen er åpnet for brukeren, uten å være en modul man legger til selv. */
+export type NavFeature = "fiken";
 
 export type NavItem = {
   label: string;
@@ -14,6 +16,7 @@ export type NavItem = {
   href: string;
   shopOnly?: boolean;
   module?: NavModule;
+  feature?: NavFeature;
   badge?: NavBadgeKey;
   /** Kort forklaring under «Legg til funksjon». */
   pitch?: string;
@@ -48,7 +51,14 @@ export const navGroups: NavGroup[] = [
     label: "Nettsted",
     items: [
       { label: "Sider og meny", href: "/sider", also: ["/side"] },
-      { label: "Design", href: "/design" },
+      {
+        label: "Design",
+        href: "/design",
+        children: [
+          { label: "Tema og farger", href: "/design" },
+          { label: "Logo og bunntekst", href: "/design/logo" },
+        ],
+      },
       { label: "Bilder", href: "/bilder" },
     ],
   },
@@ -75,10 +85,17 @@ export const navGroups: NavGroup[] = [
         href: "/innstillinger",
         also: ["/domene", "/last-ned"],
         children: [
-          { label: "Generelt", href: "/innstillinger" },
+          { label: "Firma og kontakt", href: "/innstillinger" },
           { label: "Betaling", href: "/betaling", shopOnly: true },
-          { label: "Frakt med Bring", href: "/innstillinger/bring", shopOnly: true },
+          { label: "Frakt og levering", href: "/innstillinger/frakt", shopOnly: true },
+          { label: "Vilkår og lager", href: "/innstillinger/butikk", shopOnly: true },
+          { label: "Varsler på e-post", href: "/innstillinger/varsler" },
+          { label: "Brukere og tilgang", href: "/innstillinger/brukere" },
+          { label: "Google og synlighet", href: "/innstillinger/google" },
+          { label: "Flytt fra gammel side", href: "/innstillinger/flytt" },
+          { label: "Regnskap (Fiken)", href: "/innstillinger/regnskap", shopOnly: true, feature: "fiken" },
           { label: "Domene", href: "/domene" },
+          { label: "Last ned alt", href: "/innstillinger/eksport" },
           { label: "Abonnement", href: "/abonnement" },
         ],
       },
@@ -97,6 +114,7 @@ const extraTitles: [RegExp, string][] = [
   [/^\/nyhetsbrev\/abonnenter$/, "Abonnenter"],
   [/^\/domene/, "Domene"],
   [/^\/last-ned/, "Last ned alt"],
+  [/^\/innstillinger\/bring/, "Frakt og levering"],
 ];
 
 function flatten(groups: NavGroup[]): NavItem[] {
@@ -116,6 +134,8 @@ export function activeHref(groups: NavGroup[], rest: string): string | null {
 }
 
 export function pageLabel(groups: NavGroup[], rest: string): string {
+  // Forsiden av Innstillinger er undersiden Firma og kontakt, og fanen skal si det samme som overskriften.
+  if (rest === "/innstillinger") return "Firma og kontakt";
   const exact = flatten(groups).find((i) => i.href === rest);
   if (exact) return exact.label;
   for (const [re, label] of extraTitles) if (re.test(rest)) return label;
@@ -124,12 +144,16 @@ export function pageLabel(groups: NavGroup[], rest: string): string {
 }
 
 /** Menyen for dette nettstedet: butikkpunkter bare for nettbutikker, moduler bare når de er i bruk. */
-export function visibleNav(o: { shop: boolean; modules: Record<NavModule, boolean> }): { groups: NavGroup[]; addable: NavItem[] } {
-  const keep = (i: NavItem) => (o.shop || !i.shopOnly) && (!i.module || o.modules[i.module]);
+export function visibleNav(o: {
+  shop: boolean;
+  modules: Record<NavModule, boolean>;
+  features?: Partial<Record<NavFeature, boolean>>;
+}): { groups: NavGroup[]; addable: NavItem[] } {
+  const keep = (i: NavItem) => (o.shop || !i.shopOnly) && (!i.module || o.modules[i.module]) && (!i.feature || Boolean(o.features?.[i.feature]));
   const groups = navGroups
     .map((g) => ({
       ...g,
-      items: g.items.filter(keep).map((i) => (i.children ? { ...i, children: i.children.filter((c) => o.shop || !c.shopOnly) } : i)),
+      items: g.items.filter(keep).map((i) => (i.children ? { ...i, children: i.children.filter(keep) } : i)),
     }))
     .filter((g) => g.items.length > 0);
   const addable = flatten(navGroups).filter((i) => i.module && !o.modules[i.module]);

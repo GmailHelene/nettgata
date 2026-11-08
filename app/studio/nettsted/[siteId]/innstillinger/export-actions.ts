@@ -27,6 +27,6 @@ export async function requestExportAction(siteId: string): Promise<ActionState> 
   after(() =>
     runExportStep({ db, store, fetchPath: platformFetcher(), email: getEmailProvider() }, site.id).catch((err) => console.error("Eksporten feilet", err)),
   );
-  revalidatePath(`/studio/nettsted/${site.id}/innstillinger`);
+  revalidatePath(`/studio/nettsted/${site.id}/innstillinger`, "layout");
   return { ok: true, message: "Filen lages nå. Du får e-post når den er klar." };
 }

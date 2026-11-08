@@ -21,7 +21,7 @@ export async function GET(request: Request) {
       return access?.role === "owner" && access.site.kind === "nettbutikk";
     },
   );
-  return redirect(request, siteId ? `/studio/nettsted/${siteId}/betaling?fiken=${result}#fiken-tittel` : `/studio?fiken=${result}`);
+  return redirect(request, siteId ? `/studio/nettsted/${siteId}/innstillinger/regnskap?fiken=${result}#fiken-tittel` : `/studio?fiken=${result}`);
 }
 
 function redirect(request: Request, path: string) {

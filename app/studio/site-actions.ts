@@ -7,6 +7,7 @@ import { redirect, unstable_rethrow } from "next/navigation";
 import { getDb } from "@/db";
 import { auditLog, inquiries, pages, sites } from "@/db/schema";
 import { readSiteLayout, siteLayoutSchema, type SiteLayout } from "@/lib/site-layout";
+import { readSiteInfo } from "@/lib/site-info";
 import { notificationSettingsSchema, type NotificationSettings } from "@/lib/notifications";
 import type { Theme } from "@/lib/theme";
 import { lookupOrgnr, type BrregCompany } from "@/lib/brreg";
@@ -43,7 +44,7 @@ function infoFromForm(formData: FormData) {
     city: text(formData, "city"),
     orgnr: text(formData, "orgnr"),
     serviceArea: text(formData, "serviceArea"),
-    googleVerification: text(formData, "googleVerification"),
+    googleVerification: formData.has("googleVerification") ? text(formData, "googleVerification") : undefined,
     openingHours: days
       .map((day, i) => ({ day: day.trim(), time: (times[i] ?? "").trim() }))
       .filter((h) => h.day && h.time),
@@ -105,9 +106,25 @@ export async function updateSettingsAction(siteId: string, _prev: ActionState, f
   try {
     const { user, site } = await requireSiteAccess(siteId);
     const db = await getDb();
-    await updateSiteSettings(db, site.id, { name: text(formData, "name"), info: infoFromForm(formData) }, user.id);
+    const info = infoFromForm(formData);
+    // Google-koden har egen side (Google og synlighet). Skjemaer uten feltet beholder koden som er lagret.
+    const googleVerification = info.googleVerification ?? readSiteInfo(site.info).googleVerification ?? "";
+    await updateSiteSettings(db, site.id, { name: text(formData, "name"), info: { ...info, googleVerification } }, user.id);
     revalidatePath(`/studio/nettsted/${site.id}`, "layout");
     return { ok: true, message: "Lagret. Endringene vises på nettstedet med en gang." };
+  } catch (err) {
+    return toState(err);
+  }
+}
+
+/** Bare koden fra Google Search Console. Navn og kontaktinfo blir liggende som de er. */
+export async function saveGoogleVerificationAction(siteId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    const { user, site } = await requireSiteAccess(siteId);
+    const info = { ...readSiteInfo(site.info), googleVerification: text(formData, "googleVerification") };
+    await updateSiteSettings(await getDb(), site.id, { name: site.name, info }, user.id);
+    revalidatePath(`/studio/nettsted/${site.id}`, "layout");
+    return { ok: true, message: "Lagret. Trykk nå Bekreft hos Google." };
   } catch (err) {
     return toState(err);
   }
@@ -252,7 +269,7 @@ export async function saveRedirectsAction(siteId: string, text: string): Promise
     const db = await getDb();
     await db.update(sites).set({ redirects }).where(eq(sites.id, site.id));
     await db.insert(auditLog).values({ siteId: site.id, userId: user.id, action: "site.redirects_updated", detail: { count: redirects.length } });
-    revalidatePath(`/studio/nettsted/${site.id}/innstillinger`);
+    revalidatePath(`/studio/nettsted/${site.id}/innstillinger`, "layout");
     if (!redirects.length) return { ok: true, message: "Ingen omdirigeringer lagret." };
     // Sider som finnes, vinner over omdirigeringer (se findRedirect). Kunden må få vite at disse ikke sendes videre.
     const paths = new Set((await db.select({ path: pages.path }).from(pages).where(eq(pages.siteId, site.id))).map((p) => p.path));
@@ -322,7 +339,7 @@ export async function saveNotificationsAction(siteId: string, input: Notificatio
     const db = await getDb();
     await db.update(sites).set({ notifications: parsed.data }).where(eq(sites.id, site.id));
     await db.insert(auditLog).values({ siteId: site.id, userId: user.id, action: "site.notifications_updated" });
-    revalidatePath(`/studio/nettsted/${site.id}/innstillinger`);
+    revalidatePath(`/studio/nettsted/${site.id}/innstillinger`, "layout");
     return { ok: true, message: "Varslene er lagret" };
   } catch (err) {
     return toState(err);

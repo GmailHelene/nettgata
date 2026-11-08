@@ -140,7 +140,7 @@ export async function buildMonthlyReport(db: Db, site: { id: string; name: strin
     salesOre: sales ? sales.totalOre : null,
     fixNow,
     statsUrl: `${base}/statistikk`,
-    settingsUrl: `${base}/innstillinger`,
+    settingsUrl: `${base}/innstillinger/varsler`,
   };
 }
 

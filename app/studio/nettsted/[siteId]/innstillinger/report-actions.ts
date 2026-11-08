@@ -15,6 +15,6 @@ export async function saveReportPrefsAction(siteId: string, input: ReportPrefs):
     if (err instanceof ReportPrefsError) return { ok: false, message: err.message };
     throw err;
   }
-  revalidatePath(`/studio/nettsted/${site.id}/innstillinger`);
+  revalidatePath(`/studio/nettsted/${site.id}/innstillinger`, "layout");
   return { ok: true, message: "Lagret." };
 }

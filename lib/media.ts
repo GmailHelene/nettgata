@@ -91,8 +91,8 @@ export async function mediaUsage(db: Db, siteId: string): Promise<Map<string, Me
   for (const s of siteRows) {
     // Alt i oppsettet teller, også det som ikke kan leses. Ikonet i fanen får egen merkelapp.
     const icon = mediaKeysIn(readSiteLayout(s.layout).favicon);
-    add([...mediaKeysIn(s.layout)].filter((key) => !icon.has(key)), { label: "Logoen", href: `${base}/innstillinger` });
-    add(icon, { label: "Ikonet i nettleserfanen", href: `${base}/innstillinger` });
+    add([...mediaKeysIn(s.layout)].filter((key) => !icon.has(key)), { label: "Logoen", href: `${base}/design/logo` });
+    add(icon, { label: "Ikonet i nettleserfanen", href: `${base}/design/logo` });
   }
   return usage;
 }

@@ -2,6 +2,7 @@ import { and, count, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { aiSuggestions, bookingServices, domains, inquiries, newsletters, newsletterSubscribers, orders } from "@/db/schema";
 import { aiTeamActive } from "@/lib/ai/access";
+import { fikenAvailableTo } from "@/lib/fiken/oauth";
 import { requireSiteAccess } from "@/lib/session";
 import { visibleNav, type NavBadgeKey } from "./nav-items";
 import { StudioShell } from "./studio-shell";
@@ -34,7 +35,7 @@ export default async function SiteLayout({ children, params }: { children: React
     nyhetsbrev: subscribers > 0 || letters > 0,
     "ai-teamet": aiTeamActive(site.billing) || newIdeas > 0,
   };
-  const { groups, addable } = visibleNav({ shop, modules });
+  const { groups, addable } = visibleNav({ shop, modules, features: { fiken: fikenAvailableTo(user) } });
 
   const badges: Partial<Record<NavBadgeKey, string>> = {};
   if (toShip > 0) badges.ordre = `${toShip} å sende`;

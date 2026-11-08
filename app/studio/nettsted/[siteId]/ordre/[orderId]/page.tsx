@@ -264,7 +264,7 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
           ) : !bringReady ? (
             <p className="text-sm text-neutral-700">
               Koble til Bring under{" "}
-              <Link href={`/studio/nettsted/${site.id}/innstillinger/bring`} className="underline">
+              <Link href={`/studio/nettsted/${site.id}/innstillinger/frakt`} className="underline">
                 Frakt med Bring
               </Link>{" "}
               for å lage fraktetiketten herfra.

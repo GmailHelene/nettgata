@@ -129,9 +129,9 @@ export function ProviderForm({ siteId, provider, view, canEdit }: { siteId: stri
   return (
     <section aria-labelledby={id("tittel")} className="space-y-4 rounded-lg border bg-white p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 id={id("tittel")} className="text-lg font-semibold">
+        <h2 id={id("tittel")} className="text-lg font-semibold">
           {info.name}
-        </h3>
+        </h2>
         <Status view={view} />
       </div>
       <p className="text-sm text-neutral-700">{info.intro}</p>

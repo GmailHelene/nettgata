@@ -48,12 +48,12 @@ export const helpArticles: HelpArticle[] = [
       "Oversikten viser det som venter på deg, for eksempel nye henvendelser og ordre som skal sendes.",
     ],
     steps: [
-      "Gå til «Innstillinger» og sjekk navn, adresse, telefon, e-post og åpningstider. De brukes på alle sidene, også i personvernerklæringen.",
+      "Gå til «Innstillinger» og «Firma og kontakt», og sjekk navn, adresse, telefon, e-post og åpningstider. De brukes på alle sidene, også i personvernerklæringen.",
       "Gå til «Sider», åpne forsiden og bytt ut eksempeltekstene med dine egne.",
       "Last opp egne bilder under «Bilder», eller rett fra bildefeltet når du redigerer en side.",
       "Trykk «Forhåndsvis» for å se siden slik besøkende ser den.",
       "Velg abonnement under «Abonnement», og publiser sidene.",
-      "Koble til eget domene under «Innstillinger» og «Administrer domene» når du er klar.",
+      "Koble til eget domene under «Innstillinger» og «Domene» når du er klar.",
     ],
     related: ["rediger-side", "publisere", "abonnement"],
   },
@@ -105,7 +105,7 @@ export const helpArticles: HelpArticle[] = [
     category: "kom-i-gang",
     summary: "Inviter en kollega som eier, redaktør eller utvikler.",
     steps: [
-      "Gå til «Innstillinger» og finn «Brukere».",
+      "Gå til «Innstillinger» og «Brukere og tilgang».",
       "Under «Inviter noen» skriver du e-postadressen og velger rolle.",
       "Personen får en e-post med en lenke som virker i sju dager.",
     ],
@@ -159,7 +159,7 @@ export const helpArticles: HelpArticle[] = [
     category: "sider",
     summary: "Bytt forbokstaven i fanen med logoen din.",
     steps: [
-      "Gå til «Innstillinger» og finn «Ikon i nettleserfanen».",
+      "Gå til «Design» og «Logo og bunntekst», og finn «Ikon i nettleserfanen».",
       "Last opp et kvadratisk bilde, gjerne logoen, i PNG, WebP, ICO eller JPEG.",
       "Ikonet lagres med en gang.",
     ],
@@ -209,7 +209,7 @@ export const helpArticles: HelpArticle[] = [
     summary: "Legg inn to pekere hos domeneforhandleren, så kobler vi til resten.",
     intro: ["Domenet skal stå i ditt eller bedriftens navn. Har du ikke domene ennå, kjøper du det hos en norsk forhandler, for eksempel Domeneshop. Eget domene er med i abonnementet."],
     steps: [
-      "Gå til «Innstillinger» og trykk «Koble til domene».",
+      "Gå til «Innstillinger» og «Domene».",
       "Skriv domenet, for eksempel dinbedrift.no, og trykk «Koble til».",
       "Logg inn hos domeneforhandleren og legg inn pekerne studioet viser: en CNAME for www og en ANAME eller ALIAS for domenet uten www.",
       "Vent. Vi sjekker av oss selv og kobler til med https så snart pekerne er på plass. Du kan også trykke «Sjekk nå».",
@@ -252,7 +252,7 @@ export const helpArticles: HelpArticle[] = [
       "Profilen gjelder bedrifter som møter kundene sine, i et lokale eller hjemme hos kunden. Selger du bare på nett, kan du ikke ha profil.",
     ],
     steps: [
-      "Sjekk først at navn, adresse, telefon og åpningstider er riktige under «Innstillinger» her i studioet. Skriv dem helt likt hos Google, så Google ser at det er samme bedrift.",
+      "Sjekk først at navn, adresse, telefon og åpningstider er riktige under «Innstillinger» og «Firma og kontakt» her i studioet. Skriv dem helt likt hos Google, så Google ser at det er samme bedrift.",
       "Gå til business.google.com og logg inn med Google-kontoen bedriften skal eie profilen med. Bruk gjerne en konto som tilhører bedriften, ikke en ansatt.",
       "Søk opp bedriftsnavnet. Finnes bedriften allerede, gjør du krav på den. Ellers lager du en ny.",
       "Velg kategori, for eksempel «Frisør» eller «Rørlegger». Den første kategorien betyr mest.",
@@ -275,7 +275,7 @@ export const helpArticles: HelpArticle[] = [
     category: "synlighet",
     summary: "Send gamle adresser videre til de nye, så du ikke mister plasseringen i Google.",
     steps: [
-      "Gå til «Innstillinger» og finn «Flytter du fra en gammel nettside?».",
+      "Gå til «Innstillinger» og «Flytt fra gammel side».",
       "Skriv adressen til den gamle sitemapen, ofte gammelside.no/sitemap.xml, eller last opp filen.",
       "Se over forslagene. Studioet foreslår hvilken ny side hver gamle adresse skal til.",
       "Lagre. Du kan også skrive omdirigeringer selv, én per linje: gammel adresse, mellomrom, ny adresse.",
@@ -317,7 +317,7 @@ export const helpArticles: HelpArticle[] = [
       "Trykk «Merk som lest», og «Slett» når saken er ferdig.",
     ],
     notes: [
-      "Hvem som får varsel på e-post, velger eieren under «Innstillinger».",
+      "Hvem som får varsel på e-post, velger eieren under «Innstillinger» og «Varsler på e-post».",
       "Henvendelser er personopplysninger. De slettes av seg selv etter tolv måneder.",
     ],
     related: ["skjemafelt"],
@@ -397,7 +397,7 @@ export const helpArticles: HelpArticle[] = [
     notes: [
       "«Hvor finner jeg nøklene?» på siden viser stegene for hver av dem.",
       "Beløpet reserveres når kunden betaler, og trekkes når du markerer ordren som sendt eller hentet.",
-      "Betaling ved henting og faktura velger du under «Innstillinger».",
+      "Betaling ved henting og faktura velger du nederst på samme side, under «Innstillinger» og «Betaling».",
       "Bare eieren kan legge inn nøklene.",
       "Vil du prøve først, lag testnøkler i Kustom playground og velg Test. Da trekkes ingen ekte penger.",
       "Kustom er en hel kasse der kunden velger betalingsmåte inne i Kustom. Den vises som et eget valg ved siden av Vipps og Klarna.",
@@ -429,7 +429,7 @@ export const helpArticles: HelpArticle[] = [
     category: "nettbutikk",
     summary: "Fraktpris fra Bring i kassen og fraktetikett fra ordren.",
     steps: [
-      "Gå til «Innstillinger» og trykk «Sett opp Bring».",
+      "Gå til «Innstillinger» og «Frakt og levering», og finn «Frakt med Bring».",
       "Legg inn opplysningene fra Mybring-kontoen din. «Hvor finner jeg dette i Mybring?» viser hvor.",
       "Test tilkoblingen, og velg hvilke fraktvalg kassen skal vise.",
       "Sett vekten på varene under «Varer».",
@@ -503,7 +503,7 @@ export const helpArticles: HelpArticle[] = [
       "Tilbake i studioet står det «Sagt opp» og hvilken dato abonnementet varer til.",
     ],
     notes: [
-      "Last ned alt før perioden er ute. Under «Innstillinger» finner du «Last ned alt» med sidene, bildene og alle dataene dine.",
+      "Last ned alt før perioden er ute. Under «Innstillinger» og «Last ned alt» får du sidene, bildene og alle dataene dine i én fil.",
       "Domenet står i ditt navn, så du tar det med deg.",
     ],
     related: ["last-ned-alt"],
@@ -531,7 +531,7 @@ export const helpArticles: HelpArticle[] = [
     summary: "Én ZIP-fil med nettstedet, bildene og alle dataene dine. Du kan alltid ta med deg alt.",
     intro: ["Det du har laget, er ditt. «Last ned alt» gir deg en kopi du kan åpne på egen maskin eller legge ut et annet sted."],
     steps: [
-      "Gå til «Innstillinger» og finn «Last ned alt».",
+      "Gå til «Innstillinger» og «Last ned alt».",
       "Trykk «Lag ZIP-fil». Filen lages i bakgrunnen.",
       "Du får e-post når den er klar. Store nettsteder kan ta litt tid.",
       "Last ned filen fra lenken i e-posten eller fra «Innstillinger». Lenken virker i sju dager.",
@@ -566,7 +566,7 @@ export const helpArticles: HelpArticle[] = [
     category: "problemer",
     summary: "Det står «Venter på DNS», eller domenet viser feil side.",
     steps: [
-      "Gå til «Innstillinger» og «Administrer domene», og trykk «Vis DNS-pekerne».",
+      "Gå til «Innstillinger» og «Domene», og trykk «Vis DNS-pekerne».",
       "Sammenlign med det som står hos domeneforhandleren. Type, navn og verdi må være helt like.",
       "Slett gamle pekere for www og for domenet uten www, hvis de finnes.",
       "Vent en stund og trykk «Sjekk nå». Endringer i DNS tar vanligvis fra noen minutter til noen timer.",
