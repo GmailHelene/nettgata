@@ -21,6 +21,7 @@ import { availablePaymentMethods, checkoutShippingOptions, paymentLabels, readSh
 import { kasseTekster } from "@/lib/legal/angrerett";
 import { hasCheckoutTerms } from "@/lib/legal/kundesider";
 import { readSiteInfo } from "@/lib/site-info";
+import { orderLimitMessage } from "@/lib/shop/order-limits";
 
 const itemsSchema = z.array(z.object({ variantId: z.string().uuid(), quantity: z.number().int().min(1).max(99) })).max(50);
 const postalCodeSchema = z.string().trim().regex(/^\d{4}$/);
@@ -135,10 +136,10 @@ export async function placeOrder(siteId: string, input: CheckoutInput): Promise<
   const ctx = await shopSite(siteId);
   if (!ctx) return { ok: false, message: "Butikken er ikke tilgjengelig" };
 
-  const ipKey = await clientKey(await headers(), getSecret());
-  if (!(await hit(ctx.db, `order-ip:${ipKey}`, { limit: 10, windowSeconds: 600 }))) {
-    return { ok: false, message: "Mange bestillinger på kort tid. Vent litt og prøv igjen." };
-  }
+  const secret = getSecret();
+  const ipKey = await clientKey(await headers(), secret);
+  const limited = await orderLimitMessage(ctx.db, { siteId: ctx.site.id, ipKey, email: input?.email, secret });
+  if (limited) return { ok: false, message: limited };
 
   // Uten publiserte kjøpsvilkår kan butikken ikke ta imot bestillinger (angrerettloven og ehandelsloven).
   if (!(await hasCheckoutTerms(ctx.site, ctx.settings.termsPath, (p) => getPublishedPage(ctx.db, ctx.site.id, p)))) {

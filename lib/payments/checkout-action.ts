@@ -5,7 +5,8 @@ import { headers } from "next/headers";
 import { getDb } from "@/db";
 import { sites } from "@/db/schema";
 import { getPublishedPage } from "@/lib/publishing";
-import { clientKey, hit } from "@/lib/rate-limit";
+import { clientKey } from "@/lib/rate-limit";
+import { orderLimitMessage } from "@/lib/shop/order-limits";
 import { getSecret } from "@/lib/secret";
 import { ShopError } from "@/lib/shop/catalog";
 import { createOrder, type CheckoutInput } from "@/lib/shop/orders";
@@ -26,7 +27,7 @@ export type OnlinePaymentResult = { ok: true; orderId: string; redirectUrl: stri
 /**
  * Kassen med Vipps eller Klarna: lagrer ordren (varene holdes av), starter betalingen og gir adressen kunden
  * skal sendes til. Ordrebekreftelsen sendes først når Vipps eller Klarna har bekreftet betalingen.
- * Samme kontroller som vanlige bestillinger (app/actions/shop.ts): grense per IP og publiserte kjøpsvilkår.
+ * Samme kontroller som vanlige bestillinger (app/actions/shop.ts): grensene i lib/shop/order-limits.ts og publiserte kjøpsvilkår.
  */
 export async function placeOrderWithOnlinePayment(siteId: string, input: CheckoutInput): Promise<OnlinePaymentResult> {
   const ctx = await shopSite(siteId);
@@ -36,9 +37,9 @@ export async function placeOrderWithOnlinePayment(siteId: string, input: Checkou
   const settings = readShopSettings(site.shop);
 
   const h = await headers();
-  if (!(await hit(db, `order-ip:${await clientKey(h, getSecret())}`, { limit: 10, windowSeconds: 600 }))) {
-    return { ok: false, message: "Mange bestillinger på kort tid. Vent litt og prøv igjen." };
-  }
+  const secret = getSecret();
+  const limited = await orderLimitMessage(db, { siteId: site.id, ipKey: await clientKey(h, secret), email: input?.email, secret });
+  if (limited) return { ok: false, message: limited };
   // Uten publiserte kjøpsvilkår kan butikken ikke ta imot bestillinger (angrerettloven og ehandelsloven).
   if (!(await hasCheckoutTerms(site, settings.termsPath, (p) => getPublishedPage(db, site.id, p)))) {
     return { ok: false, message: "Butikken tar ikke imot bestillinger akkurat nå. Prøv igjen senere." };

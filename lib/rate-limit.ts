@@ -19,6 +19,12 @@ export const rules = {
   bookingPerSite: { limit: 100, windowSeconds: 60 * 60 },
   /** Oppslag av ledige tider. Rause, men stopper skraping av kalenderen. */
   bookingLookupPerIp: { limit: 120, windowSeconds: 10 * 60 },
+  /** Bestillinger i kassen, se lib/shop/order-limits.ts. Per IP stopper én maskin, per adresse stopper at kassen
+   *  brukes til å fylle innboksen til andre med ordrebekreftelser, og per butikk stopper roboter som bytter IP og
+   *  holder av hele lageret. Grensen per butikk er så høy at et vanlig salg aldri merker den. */
+  orderPerIp: { limit: 10, windowSeconds: 10 * 60 },
+  orderPerEmail: { limit: 5, windowSeconds: 60 * 60 },
+  orderPerSite: { limit: 300, windowSeconds: 60 * 60 },
   /** Bare koder som ikke finnes teller, så en kunde som skriver feil et par ganger ikke stenges ute. */
   discountFailuresPerIp: { limit: 10, windowSeconds: 10 * 60 },
   /** Koder fra appen har en million muligheter. Fem forsøk per kvarter gjør gjetting nytteløst. */
