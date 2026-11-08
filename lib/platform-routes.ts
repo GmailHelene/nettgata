@@ -228,8 +228,8 @@ const titles: Record<Exclude<PlatformRoute["kind"], "bransje" | "juridisk">, [st
     "Lag nettside for bedriften med ferdige sider og tekster for 45 bransjer. Fra 199 kr i måneden eks. mva, uten bindingstid. Domenet står i ditt navn.",
   ],
   nettbutikk: [
-    "Lag nettbutikk med Vipps og Klarna, 399 kr/mnd | Nettgata",
-    "Nettbutikk for små bedrifter, med varer, lager, rabattkoder, frakt med Bring og Vipps og Klarna rett til deg. 399 kr i måneden eks. mva.",
+    "Lag nettbutikk med Vipps og kort, 399 kr/mnd | Nettgata",
+    "Nettbutikk for små bedrifter, med varer, lager, rabattkoder, frakt med Bring, og betaling med Vipps og kort rett til deg. 399 kr i måneden eks. mva.",
   ],
   temaer: [
     "12 design for nettsiden din, fire farger hver | Nettgata",
@@ -270,7 +270,7 @@ export function bransjeTitle(m: BransjeMatch): [string, string] {
 
 const ogImages = {
   forside: { path: "/nettgata/og-forside.png", alt: "Nettgata: nettside og nettbutikk for norske bedrifter, fra 199 kr i måneden eks. mva" },
-  nettbutikk: { path: "/nettgata/og-nettbutikk.png", alt: "Nettgata: nettbutikk med Vipps og Klarna, 399 kr i måneden eks. mva" },
+  nettbutikk: { path: "/nettgata/og-nettbutikk.png", alt: "Nettgata: nettbutikk med Vipps og kort, 399 kr i måneden eks. mva" },
   bransjer: { path: "/nettgata/og-bransjer.png", alt: "Nettgata: nettside for din bransje, ferdig satt opp" },
 } as const;
 

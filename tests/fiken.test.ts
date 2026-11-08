@@ -346,8 +346,8 @@ describe("Fiken-koblingen", () => {
     expect(stored.secret).toMatch(/^v1:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$/);
     expect(stored).toMatchObject({ auth: "oauth", companySlug: "ullstua-as", companyChoices: [], companyName: "Ullstua AS", vatRegistered: true, testCompany: false, lastError: null });
     expect(stored.expiresAt).toBeGreaterThan(Date.now() + 86_000_000);
-    // Forslaget: Vipps og Klarna til bankkontoene med samme navn. Faktura og betaling ved henting er av.
-    expect(stored.settings).toEqual({ paymentAccounts: { vipps: "1920:10002", klarna: "1920:10003" }, incomeAccount: "3000", zeroVatIncomeAccount: "3100" });
+    // Forslaget: betalinger på nett til bankkontoene med samme navn, ellers driftskontoen. Faktura og betaling ved henting er av.
+    expect(stored.settings).toEqual({ paymentAccounts: { vipps: "1920:10002", stripe: "1920:10001", klarna: "1920:10003", kustom: "1920:10001" }, incomeAccount: "3000", zeroVatIncomeAccount: "3100" });
     expect((await audits("fiken.connected"))[0].detail).toEqual({ companies: 2 });
     expect((await audits("fiken.company_chosen"))[0].detail).toEqual({ companySlug: "ullstua-as", testCompany: false });
 
@@ -515,6 +515,22 @@ describe("Fiken-koblingen", () => {
       ["ullstua-as", String(paid.number)],
       ["ullstua-as", String(fulfilled.number)],
       ["ullstua-test", String(testPaid.number)],
+    ]);
+  });
+
+  it("sender kortordre og Kustom-ordre til kontoene som er valgt, men ikke kort betalt i testmiljøet", async () => {
+    await connect();
+    await enable({ stripe: "1920:10001", kustom: "1920:10003" });
+    const kort = await insertOrder({ status: "paid", paymentMethod: "stripe", paymentRef: "stripe:production:acct_1Butikk:cs_live_abc123" });
+    const kustom = await insertOrder({ status: "fulfilled", paymentMethod: "kustom", paymentRef: "kustom:production:kustomordre1234" });
+    await insertOrder({ status: "paid", paymentMethod: "stripe", paymentRef: "stripe:test:acct_1Butikk:cs_test_abc123" });
+
+    const result = await send();
+    expect(result.sent.map((s) => s.number)).toEqual([kort.number, kustom.number]);
+    expect(result.skipped).toEqual({ method: 0, test: 1, zero: 0 });
+    expect(world.posts().map((p) => [p.body?.saleNumber, p.body?.paymentAccount])).toEqual([
+      [String(kort.number), "1920:10001"],
+      [String(kustom.number), "1920:10003"],
     ]);
   });
 

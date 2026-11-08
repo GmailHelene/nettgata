@@ -1,11 +1,12 @@
 import { and, eq, gte, inArray, isNull, max, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Db } from "@/db";
-import { auditLog, customers, orderLines, orders, productVariants, products, type ShippingAddress, type ShippingChoice } from "@/db/schema";
+import { auditLog, customers, orderLines, orders, productVariants, products, sites, type ShippingAddress, type ShippingChoice } from "@/db/schema";
 import type { OrderBring } from "@/lib/bring/booking";
 import { findPickupPoints } from "@/lib/bring/pickup";
 import { quoteBring } from "@/lib/bring/quote";
 import { cartWeight } from "@/lib/bring/weight";
+import { readSiteInfo } from "@/lib/site-info";
 import { ShopError } from "./catalog";
 import { allocateDiscount, assertUsable, claimDiscount, discountAmount, findDiscount, releaseDiscount, type Discount } from "./discounts";
 import { formatNok, vatOf } from "./money";
@@ -77,6 +78,9 @@ export async function priceLines(db: Db, siteId: string, lines: { variantId: str
     .innerJoin(products, eq(productVariants.productId, products.id))
     .where(and(inArray(productVariants.id, ids), eq(products.siteId, siteId), eq(products.status, "active")));
   const byId = new Map(rows.map((r) => [r.variant.id, r]));
+  // En butikk som ikke er MVA-registrert, kan ikke ta MVA. Her settes det for alle veier inn til kassen og ordren.
+  const [site] = await db.select({ info: sites.info }).from(sites).where(eq(sites.id, siteId)).limit(1);
+  const chargesVat = readSiteInfo(site?.info).mvaRegistrert;
   // Samme variant flere ganger i kurven slås sammen.
   const merged = new Map<string, number>();
   for (const l of lines) merged.set(l.variantId, Math.min(MAX_QUANTITY, (merged.get(l.variantId) ?? 0) + l.quantity));
@@ -93,7 +97,7 @@ export async function priceLines(db: Db, siteId: string, lines: { variantId: str
         sku: row.variant.sku,
         quantity,
         unitPriceOre: row.variant.priceOre,
-        vatRate: row.product.vatRate,
+        vatRate: chargesVat ? row.product.vatRate : 0,
         totalOre: row.variant.priceOre * quantity,
         stock: row.variant.stock,
         weightGrams: row.variant.weightGrams ?? row.product.weightGrams ?? null,

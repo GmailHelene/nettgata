@@ -27,6 +27,8 @@ function paymentError(err: unknown, action: string): PaymentError {
   if (err instanceof PaymentError) return err;
   if (err instanceof StripeApiError) {
     if (err.status === 0) return new PaymentError("Fikk ikke kontakt med Stripe. Prøv igjen om litt.", { status: 0 });
+    // Stripes egen forklaring står bare i serverloggen. Kunden får en vanlig feilmelding.
+    console.error("Stripe avviste", action, err.status, err.code ?? "", err.message);
     return new PaymentError(`Stripe avviste ${action} (${err.status}${err.code ? `: ${err.code}` : ""})`, { status: err.status, code: err.code });
   }
   throw err;
@@ -175,7 +177,7 @@ export function stripePayments(secretKey: string, accountId: string, environment
             {
               mode: "payment",
               locale: "nb",
-              payment_method_types: ["card"],
+              // Stripe styrer betalingsmåtene fra kontoens innstillinger. payment_method_types avvises nå med 400.
               customer_email: input.customerEmail,
               client_reference_id: input.orderId,
               expires_at: Math.floor(input.expiresAt.getTime() / 1000),

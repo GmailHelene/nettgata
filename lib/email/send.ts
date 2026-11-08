@@ -8,6 +8,8 @@ export type EmailKind =
   | "sendt"
   | "refusjon"
   | "ny-henvendelse"
+  | "angre-kvittering"
+  | "angre-varsel"
   | "invitasjon"
   | "bookingbekreftelse"
   | "ny-booking"

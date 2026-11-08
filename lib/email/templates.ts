@@ -105,7 +105,7 @@ function linesTable(lines: LineData[], order: OrderData, withVat: boolean): stri
     order.discountOre > 0 && row(`Rabatt${order.discountCode ? ` (${esc(order.discountCode)})` : ""}`, `−${esc(formatNok(order.discountOre))}`),
     row(`Frakt, ${esc(order.shippingName)}`, order.shippingOre === 0 ? "Gratis" : esc(formatNok(order.shippingOre))),
     row("<strong>Totalt</strong>", `<strong>${esc(formatNok(order.totalOre))}</strong>`),
-    withVat && row('<span style="color:#555555;">Herav MVA</span>', `<span style="color:#555555;">${esc(formatNok(order.vatOre))}</span>`),
+    withVat && order.vatOre > 0 && row('<span style="color:#555555;">Herav MVA</span>', `<span style="color:#555555;">${esc(formatNok(order.vatOre))}</span>`),
   ]
     .filter(Boolean)
     .join("");
@@ -117,7 +117,7 @@ function linesText(lines: LineData[], order: OrderData): string {
     ...lines.map((l) => `${l.quantity} x ${l.name}${l.variantLabel ? ` (${l.variantLabel})` : ""}: ${formatNok(l.totalOre)}`),
     order.discountOre > 0 ? `Rabatt${order.discountCode ? ` (${order.discountCode})` : ""}: -${formatNok(order.discountOre)}` : "",
     `Frakt, ${order.shippingName}: ${order.shippingOre === 0 ? "Gratis" : formatNok(order.shippingOre)}`,
-    `Totalt: ${formatNok(order.totalOre)} (herav MVA ${formatNok(order.vatOre)})`,
+    `Totalt: ${formatNok(order.totalOre)}${order.vatOre > 0 ? ` (herav MVA ${formatNok(order.vatOre)})` : ""}`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -458,6 +458,62 @@ export function newInquiryEmail(o: {
 }
 
 /** Invitasjon til et nettsted i studioet. Lenken virker i sju dager og kan bare brukes én gang. */
+/** Kvitteringen på varig medium etter at kunden har brukt «Angre avtalen» (angrerettloven § 20 a): innholdet i meldingen og når den ble sendt. */
+export function withdrawalReceiptEmail(o: { shop: ShopInfo; name: string; email: string; about: string; at: string; returnInfoUrl: string }): Rendered {
+  const { shop } = o;
+  const subject = `Kvittering: du har brukt angreretten hos ${shop.name}`;
+  const contact = contactLine(shop);
+  const lines: [string, string][] = [
+    ["Sendt", o.at],
+    ["Navn", o.name],
+    ["Gjelder", o.about],
+    ["Kvittering til", o.email],
+  ];
+  const body = [
+    paragraph(`Hei ${esc(firstName(o.name))}. ${esc(shop.name)} har fått meldingen din om at du bruker angreretten. Dette er innholdet i meldingen:`),
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px;">${lines
+      .map(([k, v]) => `<tr><td style="padding:6px 12px 6px 0;font-size:15px;vertical-align:top;font-weight:600;">${esc(k)}</td><td style="padding:6px 0;font-size:15px;">${esc(v)}</td></tr>`)
+      .join("")}</table>`,
+    paragraph("Send varen tilbake senest 14 dager etter denne meldingen. Du får pengene tilbake senest 14 dager etter at butikken fikk beskjeden. Butikken kan vente til den har fått varen, eller til du har vist at den er sendt."),
+    paragraph(`<a href="${safeUrl(o.returnInfoUrl)}" style="color:#111111;">Les mer om retur og angrerett</a>`),
+    contact.html,
+  ].join("");
+  const text = [
+    `Hei ${firstName(o.name)}. ${shop.name} har fått meldingen din om at du bruker angreretten.`,
+    "",
+    ...lines.map(([k, v]) => `${k}: ${v}`),
+    "",
+    "Send varen tilbake senest 14 dager etter denne meldingen. Du får pengene tilbake senest 14 dager etter at butikken fikk beskjeden. Butikken kan vente til den har fått varen, eller til du har vist at den er sendt.",
+    `Les mer: ${o.returnInfoUrl}`,
+    contact.text,
+  ]
+    .filter((l) => l !== undefined)
+    .join("\n");
+  return { subject, text, html: layout({ subject, preheader: "Kvittering på at du har brukt angreretten.", brand: shop.name, heading: "Vi har fått beskjeden", body, footer: shopFooter(shop) }) };
+}
+
+/** Varsel til butikken om at en kunde har brukt «Angre avtalen». Fristen for å betale tilbake løper fra meldingen. */
+export function withdrawalNoticeEmail(o: { name: string; email: string; about: string; at: string; studioUrl: string }): Rendered {
+  const subject = `Kunde har brukt angreretten: ${o.name}`;
+  const lines: [string, string][] = [
+    ["Sendt", o.at],
+    ["Navn", o.name],
+    ["E-post", o.email],
+    ["Gjelder", o.about],
+  ];
+  const duty = "Du må betale tilbake senest 14 dager etter denne meldingen. Du kan vente til du har fått varen, eller til kunden har vist at den er sendt. Kunden har fått kvittering på e-post.";
+  const body = [
+    paragraph("En kunde har brukt «Angre avtalen» i nettbutikken din."),
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px;">${lines
+      .map(([k, v]) => `<tr><td style="padding:6px 12px 6px 0;font-size:15px;vertical-align:top;font-weight:600;">${esc(k)}</td><td style="padding:6px 0;font-size:15px;">${esc(v)}</td></tr>`)
+      .join("")}</table>`,
+    paragraph(esc(duty)),
+    button(o.studioUrl, "Se henvendelsen"),
+  ].join("");
+  const text = ["En kunde har brukt «Angre avtalen» i nettbutikken din.", "", ...lines.map(([k, v]) => `${k}: ${v}`), "", duty, `Se henvendelsen: ${o.studioUrl}`].join("\n");
+  return { subject, text, html: layout({ subject, preheader: "Fristen for å betale tilbake løper fra denne meldingen.", brand: "Nettgata", heading: "Kunde har angret kjøpet", body, footer: "" }) };
+}
+
 export function invitationEmail(o: { siteName: string; inviter: string; role: string; link: string }): Rendered {
   const subject = `Du er invitert til ${o.siteName}`;
   const body = [

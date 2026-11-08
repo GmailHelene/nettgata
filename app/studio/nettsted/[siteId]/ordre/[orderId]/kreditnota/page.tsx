@@ -92,7 +92,7 @@ export default async function CreditNotePage({
           <tr className="border-b-2 border-[#173b6c] text-left">
             <th className="py-2 pr-3">Vare</th>
             <th className="py-2 pr-3 text-right">Antall</th>
-            <th className="py-2 pr-3 text-right">MVA</th>
+            {note.vatOre !== 0 && <th className="py-2 pr-3 text-right">MVA</th>}
             <th className="py-2 text-right">Beløp</th>
           </tr>
         </thead>
@@ -105,7 +105,7 @@ export default async function CreditNotePage({
                 {l.sku && <span className="block text-xs text-neutral-600">Varenr. {l.sku}</span>}
               </td>
               <td className="py-2 pr-3 text-right">{l.quantity}</td>
-              <td className="py-2 pr-3 text-right">{l.vatRate} %</td>
+              {note.vatOre !== 0 && <td className="py-2 pr-3 text-right">{l.vatRate} %</td>}
               <td className="whitespace-nowrap py-2 text-right">{formatNok(l.totalOre)}</td>
             </tr>
           ))}
@@ -129,25 +129,27 @@ export default async function CreditNotePage({
         </div>
       </dl>
 
-      <table className="ml-auto mt-6 w-full max-w-sm text-sm tabular-nums">
-        <caption className="mb-1 text-left font-semibold">MVA per sats</caption>
-        <thead>
-          <tr className="border-b text-left">
-            <th className="py-1 font-medium">Sats</th>
-            <th className="py-1 text-right font-medium">Grunnlag</th>
-            <th className="py-1 text-right font-medium">MVA</th>
-          </tr>
-        </thead>
-        <tbody>
-          {note.vat.map((r) => (
-            <tr key={r.rate} className="border-b last:border-0">
-              <td className="py-1">{r.rate} %</td>
-              <td className="whitespace-nowrap py-1 text-right">{formatNok(r.amountOre - r.vatOre)}</td>
-              <td className="whitespace-nowrap py-1 text-right">{formatNok(r.vatOre)}</td>
+      {note.vatOre !== 0 && (
+        <table className="ml-auto mt-6 w-full max-w-sm text-sm tabular-nums">
+          <caption className="mb-1 text-left font-semibold">MVA per sats</caption>
+          <thead>
+            <tr className="border-b text-left">
+              <th className="py-1 font-medium">Sats</th>
+              <th className="py-1 text-right font-medium">Grunnlag</th>
+              <th className="py-1 text-right font-medium">MVA</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {note.vat.map((r) => (
+              <tr key={r.rate} className="border-b last:border-0">
+                <td className="py-1">{r.rate} %</td>
+                <td className="whitespace-nowrap py-1 text-right">{formatNok(r.amountOre - r.vatOre)}</td>
+                <td className="whitespace-nowrap py-1 text-right">{formatNok(r.vatOre)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
 
       <p className="mt-10 text-sm text-neutral-700">
         {note.reason === PARTIAL_REASON

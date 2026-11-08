@@ -6,6 +6,7 @@ import { getDb } from "@/db";
 import { productCategories, productVariants, products } from "@/db/schema";
 import { requireSiteAccess } from "@/lib/session";
 import type { ProductInput } from "@/lib/shop/catalog";
+import { readSiteInfo } from "@/lib/site-info";
 import { ProductEditor } from "./product-editor";
 
 export const metadata: Metadata = { title: "Vare" };
@@ -72,7 +73,7 @@ export default async function ProductPage({ params }: { params: Promise<{ siteId
         Alle varer
       </Link>
       <h1 className="mb-8 mt-4 text-2xl font-bold">{initial.id ? initial.name : "Ny vare"}</h1>
-      <ProductEditor siteId={site.id} initial={initial} categories={categories} viewPath={slug ? `/vis/${site.slug}/produkt/${slug}` : null} />
+      <ProductEditor siteId={site.id} chargesVat={readSiteInfo(site.info).mvaRegistrert} initial={initial} categories={categories} viewPath={slug ? `/vis/${site.slug}/produkt/${slug}` : null} />
     </main>
   );
 }

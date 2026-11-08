@@ -43,6 +43,8 @@ function infoFromForm(formData: FormData) {
     postalCode: text(formData, "postalCode"),
     city: text(formData, "city"),
     orgnr: text(formData, "orgnr"),
+    // Feltet finnes bare for nettbutikker. Uten markøren brukes standardverdien, og en tom avkrysning betyr ikke «nei».
+    mvaRegistrert: formData.has("mva-felt") ? formData.get("mvaRegistrert") === "ja" : undefined,
     serviceArea: text(formData, "serviceArea"),
     googleVerification: formData.has("googleVerification") ? text(formData, "googleVerification") : undefined,
     openingHours: days

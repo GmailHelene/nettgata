@@ -1129,7 +1129,7 @@ function SiteFooter({ ctx }: { ctx: RenderContext }) {
         <Container className="flex flex-wrap items-center justify-between gap-3 py-5 text-xs text-[var(--c-muted)]">
           <p>
             © {new Date().getFullYear()} {name}
-            {info.orgnr && ` · Org.nr. ${formatOrgnr(info.orgnr)}`}
+            {info.orgnr && ` · Org.nr. ${formatOrgnr(info.orgnr)}${ctx.shop && info.mvaRegistrert !== false ? " MVA" : ""}`}
           </p>
           <ul className="flex flex-wrap gap-x-4 gap-y-1">
             <li>
@@ -1148,6 +1148,13 @@ function SiteFooter({ ctx }: { ctx: RenderContext }) {
               <li>
                 <a href={siteHref(ctx.basePath, "/angrerett")} className="hover:text-[var(--c-text)] hover:underline">
                   Angrerett i 14 dager
+                </a>
+              </li>
+            )}
+            {ctx.shop && (
+              <li>
+                <a href={siteHref(ctx.basePath, "/angre-avtalen")} className="font-semibold underline hover:text-[var(--c-text)]">
+                  Angre avtalen
                 </a>
               </li>
             )}

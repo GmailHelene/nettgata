@@ -6,9 +6,9 @@ import { InfoFields, inputClass } from "@/components/studio/info-fields";
 import type { SiteInfo } from "@/lib/site-info";
 import { updateSettingsAction } from "../../../site-actions";
 
-type Props = { siteId: string; name: string; info: SiteInfo };
+type Props = { siteId: string; name: string; info: SiteInfo; isShop: boolean };
 
-export function SettingsForm({ siteId, name, info: initialInfo }: Props) {
+export function SettingsForm({ siteId, name, info: initialInfo, isShop }: Props) {
   const [state, action, pending] = useActionState(updateSettingsAction.bind(null, siteId), null);
   const [info, setInfo] = useState(initialInfo);
 
@@ -21,7 +21,7 @@ export function SettingsForm({ siteId, name, info: initialInfo }: Props) {
           <span className="mb-1 block text-sm font-medium">Navn</span>
           <input name="name" defaultValue={name} required className={inputClass} />
         </label>
-        <InfoFields value={info} onChange={setInfo} />
+        <InfoFields value={info} onChange={setInfo} showVat={isShop} />
       </section>
       {/* Skjemaet er langt, så lagreknappen følger med nederst i vinduet. Over bunnmenyen på mobil. */}
       <div className="sticky bottom-16 z-20 -mx-1 flex flex-wrap items-center gap-4 rounded-lg border bg-white/95 px-4 py-3 shadow-sm backdrop-blur lg:bottom-3">

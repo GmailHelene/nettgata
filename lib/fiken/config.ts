@@ -19,7 +19,7 @@ import {
 } from "./state";
 
 /**
- * Forslag når butikken kobler til: Vipps og Klarna til en bankkonto i Fiken som heter det samme, ellers driftskontoen.
+ * Forslag når butikken kobler til: betalinger på nett til en bankkonto i Fiken som heter det samme, ellers driftskontoen.
  * Faktura og betaling ved henting er av til eieren slår dem på, fordi de ofte allerede er ført i Fiken eller i et kassesystem.
  */
 function defaultSettings(bank: FikenAccount[], income: FikenAccount[]): FikenSettings {
@@ -28,7 +28,7 @@ function defaultSettings(bank: FikenAccount[], income: FikenAccount[]): FikenSet
   const incomeOr = (wanted: string, fallback: string) => (income.length === 0 || income.some((a) => a.code === wanted) ? wanted : fallback);
   const incomeAccount = incomeOr("3000", income[0]?.code ?? "3000");
   return fikenSettingsSchema.parse({
-    paymentAccounts: main ? { vipps: named("vipps"), klarna: named("klarna") } : {},
+    paymentAccounts: main ? { vipps: named("vipps"), stripe: named("stripe"), klarna: named("klarna"), kustom: named("kustom") } : {},
     incomeAccount,
     zeroVatIncomeAccount: incomeOr("3100", incomeAccount),
   });

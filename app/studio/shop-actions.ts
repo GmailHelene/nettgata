@@ -230,7 +230,7 @@ export async function saveShopSettingsAction(siteId: string, settings: ShopSetti
     if (new Set(codes).size !== codes.length) return { ok: false, message: "To fraktvalg har samme kode" };
     // Kassen må ha minst én betalingsmåte: en butikken håndterer selv, eller Vipps eller Klarna.
     if (availablePaymentMethods({ ...parsed.data, online: readyProviders(site.shop) }).length === 0) {
-      return { ok: false, message: "Velg minst én betalingsmåte, eller koble til Vipps eller Klarna under Betaling." };
+      return { ok: false, message: "Velg minst én betalingsmåte, eller koble til kort eller Vipps under Betaling." };
     }
     const db = await getDb();
     // Skriver bare butikkinnstillingene. Betalingsnøklene i samme felt blir liggende urørt.

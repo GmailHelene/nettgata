@@ -546,10 +546,12 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
             <dt>{data.shippingPending ? "Totalt før frakt" : "Totalt"}</dt>
             <dd>{formatNok(data.totalOre)}</dd>
           </div>
-          <div className="flex justify-between text-sm text-[var(--c-muted)]">
-            <dt>Herav MVA</dt>
-            <dd>{formatNok(data.vatOre)}</dd>
-          </div>
+          {data.vatOre > 0 && (
+            <div className="flex justify-between text-sm text-[var(--c-muted)]">
+              <dt>Herav MVA</dt>
+              <dd>{formatNok(data.vatOre)}</dd>
+            </div>
+          )}
         </dl>
       </aside>
     </div>

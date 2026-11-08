@@ -71,7 +71,7 @@ function card(title, sub) {
 
 const cards = {
   "og-forside.png": card("Nettside og nettbutikk\nfor norske bedrifter", "Fra 199 kr i måneden eks. mva · Domenet står i ditt navn"),
-  "og-nettbutikk.png": card("Nettbutikk med\nVipps og Klarna", "399 kr i måneden eks. mva · Ingen andel av salget"),
+  "og-nettbutikk.png": card("Nettbutikk med\nVipps og kort", "399 kr i måneden eks. mva · Ingen andel av salget"),
   "og-bransjer.png": card("Nettside for din bransje,\nferdig satt opp", "45 bransjepakker · 12 temaer · Fra 199 kr i måneden eks. mva"),
 };
 

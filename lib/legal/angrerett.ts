@@ -12,6 +12,8 @@ import type { Betalingsmate } from "./personvern";
  *   § 17 leveringsbegrensninger og betalingsmidler når bestillingen starter, § 18 bekreftelse på varig medium,
  *   § 20 melding og bekreftelse på mottatt melding, § 21 frist (12 måneder ekstra hvis opplysningene mangler),
  *   § 22 unntak, § 24 tilbakebetaling innen 14 dager, § 25 retur innen 14 dager og returkostnad.
+ * - § 20 a elektronisk angrefunksjon (tilføyd ved lov 19. juni 2026 nr. 34, i kraft fra den tid Kongen bestemmer, sjekket 8. november 2026).
+ *   Funksjonen ligger på /angre-avtalen, med lenke «Angre avtalen» i bunnteksten på alle sider.
  * - Angreskjemaet er standardskjemaet fra Barne- og familiedepartementet (regjeringen.no, «Angrerettskjema»,
  *   sist oppdatert 8. februar 2018). Ordlyden er beholdt.
  * - Forbrukerkjøpsloven § 6 (levering innen 30 dager) og § 27 (reklamasjon innen to eller fem år).
@@ -139,9 +141,10 @@ export function lagAngrerettside(input: AngrerettInput): PageContent {
     ]),
 
     tekstSeksjon("angre-slik", "Slik angrer du", [
+      "Det enkleste er å bruke «Angre avtalen» nederst på alle sidene i butikken. Du fyller ut navn, hvilket kjøp det gjelder og e-postadressen din, og får kvittering med en gang.",
       kanal
-        ? `Gi oss beskjed før fristen går ut, ${kanal}. Skriv at du vil gå fra kjøpet, og ta gjerne med ordrenummeret.`
-        : "Gi oss skriftlig beskjed før fristen går ut. Skriv at du vil gå fra kjøpet, og ta gjerne med ordrenummeret.",
+        ? `Du kan også gi oss beskjed før fristen går ut, ${kanal}. Skriv at du vil gå fra kjøpet, og ta gjerne med ordrenummeret.`
+        : "Du kan også gi oss skriftlig beskjed før fristen går ut. Skriv at du vil gå fra kjøpet, og ta gjerne med ordrenummeret.",
       "Du kan bruke angreskjemaet lenger ned på siden, men du må ikke. En vanlig e-post holder, så lenge det går klart fram at du angrer. Send beskjeden skriftlig, fordi det er du som må kunne vise at du ga beskjed i tide.",
       v.info.email && "Får vi beskjeden på e-post, bekrefter vi på e-post at vi har fått den.",
     ]),
@@ -185,7 +188,7 @@ export function lagAngrerettside(input: AngrerettInput): PageContent {
       [betaling, `Vi sender bare til adresser i ${input.leveringsland?.trim() || "Norge"}.`].filter(Boolean).join(" "),
       "Du bestiller ved å legge varene i handlekurven og gå til kassen. Der fyller du inn navn, e-post og eventuell leveringsadresse, og velger frakt og betaling. Helt til du trykker «Bestill med plikt til å betale», kan du se over varene, frakten og totalprisen og rette det som er feil. Når du trykker på knappen, er bestillingen bindende.",
       "Bestillingen lagres hos oss, og du får en ordrebekreftelse på e-post med en lenke der du kan se den igjen. Kjøpet gjøres på norsk.",
-      "Prisene står med merverdiavgift. Hva frakten koster, ser du i kassen før du bestiller.",
+      `${v.info.mvaRegistrert === false ? `${v.navn} er ikke registrert for merverdiavgift, så det er ingen merverdiavgift i prisene.` : "Prisene står med merverdiavgift."} Hva frakten koster, ser du i kassen før du bestiller.`,
       [
         input.leveringstid?.trim() && `Vi sender varene innen ${input.leveringstid.trim()}.`,
         "Er ingenting annet avtalt, skal du ha varene senest 30 dager etter at du bestilte.",
@@ -233,7 +236,7 @@ export function kasseTekster(input: { butikk: Virksomhet; betalingsmater?: reado
       .filter(Boolean)
       .join(" "),
     personvern: "Vi bruker opplysningene dine til å levere bestillingen og sende deg ordrebekreftelsen. Les mer i personvernerklæringen.",
-    forKnappen: `Du kjøper fra ${v.navn}${orgnr ? `, ${orgnr}` : ""}. Totalprisen i oppsummeringen er med merverdiavgift og frakt. Du har 14 dagers angrerett, regnet fra dagen etter at du får varene, og ordrebekreftelsen med angreskjema kommer på e-post.`,
+    forKnappen: `Du kjøper fra ${v.navn}${orgnr ? `, ${orgnr}` : ""}. Totalprisen i oppsummeringen er med ${v.info.mvaRegistrert === false ? "frakt" : "merverdiavgift og frakt"}. Du har 14 dagers angrerett, regnet fra dagen etter at du får varene, og ordrebekreftelsen med angreskjema kommer på e-post.`,
     vilkar: "Jeg har lest og godtar kjøpsvilkårene og informasjonen om angrerett.",
     knapp: BESTILL_KNAPP,
     lenker: { angrerett: "/angrerett", personvern: "/personvern" },
@@ -261,7 +264,7 @@ export function ordrebekreftelseTekster(input: AngrerettInput): Ordrebekreftelse
   const overskrift = "Angrerett og retur";
   const avsnittListe = [
     input.leveringstid?.trim() ? `Vi sender varene innen ${input.leveringstid.trim()}.` : "",
-    `Du har 14 dagers angrerett, regnet fra dagen etter at du fikk varene. Vil du angre, gir du oss beskjed før fristen går ut${kanal ? `, ${kanal}` : ""}. Du kan bruke angreskjemaet under, men en vanlig e-post holder.`,
+    `Du har 14 dagers angrerett, regnet fra dagen etter at du fikk varene. Vil du angre, gir du oss beskjed før fristen går ut${kanal ? `, ${kanal}` : ""}. Du kan også bruke «Angre avtalen» nederst på nettsiden vår, eller angreskjemaet under. En vanlig e-post holder.`,
     [`Send varene tilbake senest 14 dager etter at du ga beskjed${retur ? `, til ${v.navn}, ${retur}` : ""}.`, ...returkostnad(input)].join(" "),
     "Vi betaler tilbake alt du har betalt, også vanlig frakt, senest 14 dager etter at vi fikk beskjeden. Vi kan vente til vi har fått varene, eller til du har vist at de er sendt.",
     unntak.length ? `Angreretten gjelder ikke for ${oppramsing(unntak.map((u) => unntakKort[u]), "eller")}.` : "",

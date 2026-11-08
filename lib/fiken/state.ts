@@ -8,12 +8,14 @@ import { z } from "zod";
  */
 
 /** Betalingsmåtene som kan sendes. Testbetaling og det gamle «kort» sendes aldri. */
-export const fikenMethods = ["vipps", "klarna", "faktura", "ved-henting"] as const;
+export const fikenMethods = ["vipps", "stripe", "klarna", "kustom", "faktura", "ved-henting"] as const;
 export type FikenMethod = (typeof fikenMethods)[number];
 
 export const fikenMethodNames: Record<FikenMethod, string> = {
   vipps: "Vipps",
+  stripe: "Kort",
   klarna: "Klarna",
+  kustom: "Kustom",
   faktura: "Faktura",
   "ved-henting": "Betaling ved henting",
 };
@@ -34,7 +36,9 @@ export const fikenSettingsSchema = z.object({
   paymentAccounts: z
     .object({
       vipps: accountCode.optional(),
+      stripe: accountCode.optional(),
       klarna: accountCode.optional(),
+      kustom: accountCode.optional(),
       faktura: accountCode.optional(),
       "ved-henting": accountCode.optional(),
     })
@@ -73,7 +77,7 @@ export const storedFikenSchema = z.object({
   organizationNumber: z.string().max(20).nullable().default(null),
   /** Fra company.vatType i Fiken. Et selskap som ikke er MVA-registrert, fører alt salg uten MVA. */
   vatRegistered: z.boolean().default(true),
-  /** Testselskap i Fiken. Bare da sendes ordre som er betalt i testmiljøet til Vipps eller Klarna. */
+  /** Testselskap i Fiken. Bare da sendes ordre som er betalt i testmiljøet hos betalingsleverandøren. */
   testCompany: z.boolean().default(false),
   bankAccounts: z.array(account).max(100).default([]),
   incomeAccounts: z.array(account).max(300).default([]),

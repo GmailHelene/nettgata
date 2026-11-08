@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { notFound, permanentRedirect } from "next/navigation";
 import { cache } from "react";
 import { PageRenderer, SiteChrome, siteHref } from "@/components/sections";
-import { ProductPage, ProductsPage, OrderPage, CartPage, shopMeta, type ShopRoute } from "@/components/shop/pages";
+import { ProductPage, ProductsPage, OrderPage, CartPage, WithdrawPage, shopMeta, type ShopRoute } from "@/components/shop/pages";
 import { firstContentImage, pageSeo, shareImageSrc } from "@/lib/content/seo";
 import { bransjeKeyword, parseServiceArea, primaryPlace } from "@/lib/seo/auto";
 import {
@@ -95,6 +95,7 @@ function shopRoute(segments: string[]): ShopRoute | null {
   if (first === "produkter" && !second) return { kind: "products" };
   if (first === "produkt" && second) return { kind: "product", slug: second };
   if (first === "handlekurv" && !second) return { kind: "cart" };
+  if (first === "angre-avtalen" && !second) return { kind: "withdraw" };
   if (first === "ordre" && second) return { kind: "order", orderId: second };
   return null;
 }
@@ -233,7 +234,7 @@ async function pageMetadata(props: Props): Promise<Metadata> {
   if (route) {
     const meta = await shopMeta(db, site, route);
     // Handlekurv og ordre skal aldri i søkemotorer.
-    const noindex = route.kind === "cart" || route.kind === "order";
+    const noindex = route.kind === "cart" || route.kind === "order" || route.kind === "withdraw";
     if (route.kind === "products") {
       // Søk, filter og sortering er varianter av varelisten og skal ikke i søkemotorer. Lenkene kan fortsatt følges.
       const params = await props.searchParams;
@@ -349,6 +350,12 @@ export default async function PublicPage(props: Props) {
       case "cart":
         body = <CartPage siteId={site.id} basePath={basePath} />;
         break;
+      case "withdraw": {
+        const query = await props.searchParams;
+        const order = typeof query.ordre === "string" && /^\d{1,10}$/.test(query.ordre) ? query.ordre : "";
+        body = <WithdrawPage siteId={site.id} basePath={basePath} order={order} />;
+        break;
+      }
       case "order": {
         const query = await props.searchParams;
         const token = typeof query.t === "string" ? query.t : "";

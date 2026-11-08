@@ -25,8 +25,10 @@ export function generatedLegalPage(
   path: string,
   extra: { bookingHosts?: readonly string[]; ownBooking?: boolean; newsletter?: boolean; embeds?: { kart?: boolean; video?: boolean }; inquiryImages?: boolean } = {},
 ): PageContent | null {
-  const butikk = { navn: site.name, info: readSiteInfo(site.info) };
   const shop = site.kind === "nettbutikk";
+  const info = readSiteInfo(site.info);
+  // «MVA» etter org.nr. bare for nettbutikker, der bedriften selv har svart på om den er registrert.
+  const butikk = { navn: site.name, info, mva: shop && info.mvaRegistrert };
   const betalingsmater = shop ? availablePaymentMethods(readShopSettings(site.shop)) : [];
   if (path === GENERATED_PATHS.personvern) {
     // Anthropic nevnes bare når AI-teamet er med i abonnementet.

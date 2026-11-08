@@ -9,7 +9,7 @@ import { readAnswers } from "@/lib/content/form-fields";
 import { ordrebekreftelseTekster } from "@/lib/legal/angrerett";
 import { platformUrl, publicSiteUrl } from "@/lib/site-url";
 import { deliver, type EmailProvider } from "./send";
-import { newInquiryEmail, newOrderEmail, orderConfirmationEmail, orderShippedEmail, refundEmail, type OrderData, type ShopInfo } from "./templates";
+import { newInquiryEmail, newOrderEmail, orderConfirmationEmail, orderShippedEmail, refundEmail, withdrawalNoticeEmail, withdrawalReceiptEmail, type OrderData, type ShopInfo } from "./templates";
 
 function shopInfo(site: typeof sites.$inferSelect): ShopInfo {
   const info = readSiteInfo(site.info);
@@ -61,7 +61,7 @@ export async function notifyOrderPlaced(db: Db, provider: EmailProvider, orderId
     lines: lineData,
     orderUrl: `${base}/ordre/${order.id}?t=${order.accessToken}`,
     termsUrl: `${base}${readShopSettings(site.shop).termsPath}`,
-    angrerett: ordrebekreftelseTekster({ butikk: { navn: site.name, info: readSiteInfo(site.info) } }),
+    angrerett: ordrebekreftelseTekster({ butikk: { navn: site.name, info: readSiteInfo(site.info), mva: readSiteInfo(site.info).mvaRegistrert } }),
   });
   await deliver(
     db,
@@ -215,4 +215,36 @@ export async function notifyInquiry(db: Db, provider: EmailProvider, inquiryId: 
       tags: ["ny-henvendelse"],
     },
   );
+}
+
+/**
+ * Kvittering til kunden og varsel til butikken når angrefunksjonen er brukt (angrerettloven § 20 a).
+ * Varselet sendes uansett varslingsinnstillinger, fordi fristen for å betale tilbake løper fra meldingen.
+ * Svarer sant bare hvis kvitteringen faktisk er sendt, så siden kan si fra til kunden hvis den ikke er det.
+ */
+export async function notifyWithdrawal(
+  db: Db,
+  provider: EmailProvider,
+  input: { site: typeof sites.$inferSelect; inquiryId: string; name: string; email: string; about: string; at: string },
+): Promise<boolean> {
+  const { site, inquiryId, name, email, about, at } = input;
+  const shop = shopInfo(site);
+  const receipt = withdrawalReceiptEmail({ shop, name, email, about, at, returnInfoUrl: `${await publicSiteUrl(db, site)}/angrerett` });
+  const sent = await deliver(
+    db,
+    provider,
+    { siteId: site.id, kind: "angre-kvittering", inquiryId },
+    { ...receipt, to: { email, name }, fromName: shop.name, ...(shop.email && { replyTo: { email: shop.email, name: shop.name } }), tags: ["angre-kvittering"] },
+  );
+  const owner = notifyAddress(readNotificationSettings(site.notifications), shop.email);
+  if (owner) {
+    const notice = withdrawalNoticeEmail({ name, email, about, at, studioUrl: `${platformUrl()}/studio/nettsted/${site.id}/henvendelser` });
+    await deliver(
+      db,
+      provider,
+      { siteId: site.id, kind: "angre-varsel", inquiryId },
+      { ...notice, to: { email: owner }, fromName: "Nettgata", replyTo: { email, name }, tags: ["angre-varsel"] },
+    );
+  }
+  return sent.status === "sendt";
 }

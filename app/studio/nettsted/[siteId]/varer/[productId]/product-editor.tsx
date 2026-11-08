@@ -44,11 +44,14 @@ const priceText = (ore: number) => (ore === 0 ? "" : (ore / 100).toString().repl
 
 export function ProductEditor({
   siteId,
+  chargesVat,
   initial,
   categories,
   viewPath,
 }: {
   siteId: string;
+  /** Av når bedriften ikke er MVA-registrert (Firma og kontakt). Da selges varen uten MVA. */
+  chargesVat: boolean;
   initial: ProductInput & { id?: string };
   categories: { id: string; name: string }[];
   viewPath: string | null;
@@ -342,13 +345,17 @@ export function ProductEditor({
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-medium">MVA</span>
-              <select value={vatRate} onChange={(e) => setVatRate(Number(e.target.value))} className={inputClass}>
-                {vatChoices.map((v) => (
-                  <option key={v.rate} value={v.rate}>
-                    {v.label}
-                  </option>
-                ))}
-              </select>
+              {chargesVat ? (
+                <select value={vatRate} onChange={(e) => setVatRate(Number(e.target.value))} className={inputClass}>
+                  {vatChoices.map((v) => (
+                    <option key={v.rate} value={v.rate}>
+                      {v.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="block text-sm text-neutral-700">Selges uten MVA, fordi bedriften ikke er MVA-registrert. Det endrer du under Firma og kontakt.</span>
+              )}
             </label>
           </div>
         </section>

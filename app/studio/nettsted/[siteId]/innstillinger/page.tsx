@@ -17,7 +17,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ siteI
   return (
     <main className="mx-auto max-w-3xl px-5 py-12">
       <SiteNav siteId={site.id} active="innstillinger" title="Firma og kontakt" />
-      <SettingsForm siteId={site.id} name={site.name} info={readSiteInfo(site.info)} />
+      <SettingsForm siteId={site.id} name={site.name} info={readSiteInfo(site.info)} isShop={site.kind === "nettbutikk"} />
     </main>
   );
 }

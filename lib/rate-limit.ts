@@ -8,6 +8,7 @@ export const rules = {
   loginPerEmail: { limit: 5, windowSeconds: 15 * 60 },
   loginPerIp: { limit: 20, windowSeconds: 15 * 60 },
   inquiryPerIp: { limit: 5, windowSeconds: 10 * 60 },
+  withdrawalPerEmail: { limit: 3, windowSeconds: 24 * 60 * 60 },
   inquiryPerSite: { limit: 50, windowSeconds: 60 * 60 },
   /** Bilder i tilbudsforespørsler. Fem per skjema, så seks skjemaer med fulle bildefelt per ti minutter fra samme adresse. */
   inquiryImagePerIp: { limit: 30, windowSeconds: 10 * 60 },

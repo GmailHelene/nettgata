@@ -173,10 +173,12 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
             <dt>Totalt</dt>
             <dd>{formatNok(order.totalOre)}</dd>
           </div>
-          <div className="flex justify-between text-neutral-600">
-            <dt>Herav MVA</dt>
-            <dd>{formatNok(order.vatOre)}</dd>
-          </div>
+          {order.vatOre > 0 && (
+            <div className="flex justify-between text-neutral-600">
+              <dt>Herav MVA</dt>
+              <dd>{formatNok(order.vatOre)}</dd>
+            </div>
+          )}
         </dl>
       </section>
 

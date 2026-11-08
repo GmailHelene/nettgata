@@ -556,7 +556,7 @@ function Features({ shop = false }: { shop?: boolean }) {
       "Timebestilling",
       "Kundene bestiller time rett på nettsiden, med tjenestene, de ansatte og arbeidstidene du setter. Bruker du Timma, Fresha, Resos eller Spond, kan du bygge inn den i stedet.",
     ],
-    butikk: ["Nettbutikk med Vipps og Klarna", "Varer, varianter, lager, rabattkoder og frakt. Betalingen går rett til deg gjennom dine egne avtaler."],
+    butikk: ["Nettbutikk med Vipps og kort", "Varer, varianter, lager, rabattkoder og frakt. Betalingen går rett til deg gjennom dine egne avtaler."],
     bring: ["Frakt med Bring", "Med din egen Bring-avtale regnes frakten ut fra vekt og postnummer, og etiketten lager du rett fra ordren. Faste fraktpriser og henting går også."],
     domene: ["Domenet er ditt", "Domenet registreres alltid i ditt navn. Har du et fra før, kobler vi det til sammen."],
     lover: ["Lover og regler på plass", "Personvernerklæring og vilkår lages ut fra nettstedet ditt. Nettbutikken har angrerettskjema og opplysningene loven krever."],
@@ -648,7 +648,7 @@ function Pricing({ shop = false }: { shop?: boolean }) {
           price="399"
           yearly={"339 kr/mnd når du betaler for et år om gangen (4 068 kr)"}
           highlight={shop}
-          items={["Alt i Nettside", "Varer, varianter og lager", "Vipps og Klarna med dine egne avtaler", "Frakt, rabattkoder og ordre", "Angrerett og opplysningsplikt"]}
+          items={["Alt i Nettside", "Varer, varianter og lager", "Vipps og kort med dine egne avtaler", "Frakt, rabattkoder og ordre", "Angrerett og opplysningsplikt"]}
         />
       </div>
       <div className="mt-6 grid gap-6 md:grid-cols-2">
@@ -667,7 +667,7 @@ function Pricing({ shop = false }: { shop?: boolean }) {
           </p>
         </div>
       </div>
-      <p className={`mt-6 text-sm ${muted}`}>Alle priser er eks. mva. Domenet kjøper du selv, og i nettbutikken tar Vipps og Klarna sine egne gebyrer.</p>
+      <p className={`mt-6 text-sm ${muted}`}>Alle priser er eks. mva. Domenet kjøper du selv, og i nettbutikken tar Vipps, Stripe og Kustom sine egne gebyrer.</p>
     </>
   );
 }
@@ -718,7 +718,7 @@ export const shopFaq: [string, string][] = [
   ],
   [
     "Hvordan tar jeg betalt i nettbutikken?",
-    "Du inngår avtale direkte med Vipps og Klarna og kobler dem til nettbutikken, og du får hjelp til oppsettet om du trenger det. Pengene går rett til deg. Vipps og Klarna tar sine egne gebyrer.",
+    "Kort kobler du til med én knapp hos Stripe. For Vipps inngår du avtale direkte med Vipps MobilePay, og du får hjelp til oppsettet om du trenger det. Vil du tilby Klarna og delbetaling, kobler du til Kustom med egen avtale. Pengene går rett til deg. Vipps, Stripe og Kustom tar sine egne gebyrer.",
   ],
   [
     "Hvordan sender jeg varene?",
@@ -832,8 +832,8 @@ function ShopLanding({ env, crumbs }: { env: PlatformEnv; crumbs: Crumb[] }) {
         eyebrow="Nettbutikk for små bedrifter"
         eyebrowInTitle
         crumbs={crumbs}
-        title="Nettbutikk med Vipps og Klarna, klar til å selge"
-        text="Lag nettbutikken selv, eller få den satt opp. Varer med varianter og lager, rabattkoder, frakt og ordre på ett sted. Kundene betaler med Vipps eller Klarna, og pengene går rett til deg."
+        title="Nettbutikk med Vipps og kort, klar til å selge"
+        text="Lag nettbutikken selv, eller få den satt opp. Varer med varianter og lager, rabattkoder, frakt og ordre på ett sted. Kundene betaler med Vipps eller kort, og pengene går rett til deg."
       >
         <Street shops={shopStreet} width={160} vacant={false} inset={false} label="Eksempler på nettbutikker fra bransjepakkene" />
       </Hero>
@@ -843,12 +843,13 @@ function ShopLanding({ env, crumbs }: { env: PlatformEnv; crumbs: Crumb[] }) {
       <Section
         eyebrow="Betaling"
         title="Dine avtaler, dine penger"
-        intro="Du inngår avtale direkte med Vipps og Klarna og kobler dem til nettbutikken. Nettgata tar ingen del av salget og ser aldri pengene."
+        intro="Kort kobler du til med én knapp hos Stripe, og for Vipps inngår du avtale direkte med Vipps MobilePay. Vil du tilby Klarna og delbetaling, kobler du til Kustom. Nettgata tar ingen del av salget og ser aldri pengene."
       >
-        <ul className="grid gap-6 md:grid-cols-3">
+        <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {[
             ["Vipps", "Kunden betaler i Vipps-appen. Beløpet reserveres ved kjøp og trekkes først når du sender varen."],
-            ["Klarna", "Kort, faktura og delbetaling i én løsning. Klarna tar risikoen for fakturaen."],
+            ["Kort", "Kunden betaler med kort på betalingssiden til Stripe. Beløpet reserveres ved kjøp og trekkes først når du sender varen."],
+            ["Kustom", "En ferdig kasse der kunden velger betalingsmåte, for eksempel Klarna med faktura eller delbetaling. Hva som er med, avhenger av avtalen din med Kustom."],
             ["Henting og faktura", "Vil du heller ta betalt ved henting eller sende faktura selv, kan du slå det på også."],
           ].map(([title, text]) => (
             <li key={title} className="border-t-2 border-[#1b232b] pt-4">

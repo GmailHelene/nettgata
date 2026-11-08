@@ -29,6 +29,8 @@ export const siteInfoSchema = z.object({
     .transform((v) => v.replace(/\s/g, ""))
     .refine((v) => v === "" || /^\d{9}$/.test(v), "Org.nr må ha ni siffer")
     .default(""),
+  /** Registrert i Merverdiavgiftsregisteret. Er den av, selger nettbutikken alt uten MVA, uansett satsen på varen. */
+  mvaRegistrert: z.boolean().default(true),
   openingHours: z
     .array(z.object({ day: z.string().trim().min(1).max(30), time: z.string().trim().min(1).max(40) }))
     .max(10)

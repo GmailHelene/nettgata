@@ -251,6 +251,8 @@ describe("kort med Stripe", () => {
     const [created] = world.find("POST", "/v1/checkout/sessions");
     expect(created.headers["stripe-account"]).toBe(ACCOUNT);
     expect(created.body.get("payment_intent_data[capture_method]")).toBe("manual");
+    // Stripe avviser payment_method_types på Checkout med 400. Det så vi først mot ekte Stripe.
+    expect(created.body.has("payment_method_types[0]")).toBe(false);
     expect(created.body.get("payment_intent_data[application_fee_amount]")).toBeNull();
     expect(created.body.get("line_items[0][price_data][unit_amount]")).toBe(String(o.totalOre));
     expect(created.body.get("line_items[0][price_data][currency]")).toBe("nok");

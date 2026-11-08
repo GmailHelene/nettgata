@@ -23,7 +23,9 @@ const dangerButton = `rounded-md border border-red-800 px-4 py-2 text-sm font-se
 /** Tekstene per betalingsmåte. hint står under de som ofte allerede er ført i regnskapet på en annen måte. */
 const methodText: Record<FikenMethod, { checkbox: string; account: string; short: string; hint?: string }> = {
   vipps: { checkbox: "Ordre betalt med Vipps", account: "Konto i Fiken for Vipps", short: "Vipps" },
+  stripe: { checkbox: "Ordre betalt med kort", account: "Konto i Fiken for kort", short: "Kort" },
   klarna: { checkbox: "Ordre betalt med Klarna", account: "Konto i Fiken for Klarna", short: "Klarna" },
+  kustom: { checkbox: "Ordre betalt med Kustom", account: "Konto i Fiken for Kustom", short: "Kustom" },
   faktura: {
     checkbox: "Ordre betalt med faktura",
     account: "Konto i Fiken for faktura",
@@ -207,7 +209,7 @@ export function FikenSection({
           Du gir aldri passordet ditt til Nettgata. Tilgangen kan du trekke tilbake her med «Koble fra», eller i Fiken under Rediger konto, Sikkerhet.
         </p>
         <p className="mt-2">
-          Har du en egen bankkonto i Fiken for Vipps eller Klarna, velger du den. Da kan du avstemme utbetalingene fra dem mot salget i Fiken.
+          Har du en egen bankkonto i Fiken for Vipps eller kort, velger du den. Da kan du avstemme utbetalingene mot salget i Fiken.
         </p>
       </details>
       <details className="rounded-md border p-3 text-sm">
@@ -216,9 +218,9 @@ export function FikenSection({
           <li>Ordrene sendes bare når du trykker på knappen. Ingenting sendes av seg selv.</li>
           <li>Hver ordre blir ett betalt salg i Fiken, med ordrenummeret som salgsnummer. Navnet og adressen til kunden sendes ikke.</li>
           <li>Samme ordre sendes aldri to ganger, heller ikke om du kobler fra og til igjen.</li>
-          <li>Gebyrene fra Vipps og Klarna, og utbetalingene til banken, fører du selv i Fiken.</li>
+          <li>Gebyrene fra Vipps og Stripe, og utbetalingene til banken, fører du selv i Fiken.</li>
           <li>Kreditnotaer sendes ikke. Kansellerer eller refunderer du en ordre som er sendt, fører du kreditnotaen i Fiken. Ordrene det gjelder, vises her.</li>
-          <li>Ordre betalt i testmiljøet hos Vipps eller Klarna sendes bare til et testselskap i Fiken.</li>
+          <li>Ordre betalt i testmiljøet hos Vipps eller Stripe sendes bare til et testselskap i Fiken.</li>
         </ul>
       </details>
     </section>

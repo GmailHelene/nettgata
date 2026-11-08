@@ -19,7 +19,18 @@ function Text({ name, label, value, onChange, ...rest }: { name: string; label: 
  * Kontaktinfo og åpningstider. Kontrollert, slik at Brreg-oppslaget kan fylle feltene.
  * Feltnavnene matcher infoFromForm() i site-actions.
  */
-export function InfoFields({ value, onChange, hideOrgnr = false }: { value: SiteInfo; onChange: (v: SiteInfo) => void; hideOrgnr?: boolean }) {
+export function InfoFields({
+  value,
+  onChange,
+  hideOrgnr = false,
+  showVat = false,
+}: {
+  value: SiteInfo;
+  onChange: (v: SiteInfo) => void;
+  hideOrgnr?: boolean;
+  /** Valget om MVA-registrering. Bare for nettbutikker. */
+  showVat?: boolean;
+}) {
   const set = (key: keyof SiteInfo) => (v: string) => onChange({ ...value, [key]: v });
   const hours = value.openingHours;
   const setHours = (next: SiteInfo["openingHours"]) => onChange({ ...value, openingHours: next });
@@ -54,6 +65,26 @@ export function InfoFields({ value, onChange, hideOrgnr = false }: { value: Site
         </span>
       </label>
       {!hideOrgnr && <Text name="orgnr" label="Org.nr." inputMode="numeric" value={value.orgnr} onChange={set("orgnr")} />}
+      {showVat && (
+        <div>
+          <input type="hidden" name="mva-felt" value="1" />
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              name="mvaRegistrert"
+              value="ja"
+              checked={value.mvaRegistrert !== false}
+              onChange={(e) => onChange({ ...value, mvaRegistrert: e.target.checked })}
+              aria-describedby="mva-hjelp"
+              className="mt-0.5 size-5 accent-[#173b6c]"
+            />
+            <span className="text-sm font-semibold">Bedriften er registrert i Merverdiavgiftsregisteret</span>
+          </label>
+          <span id="mva-hjelp" className="mt-1 block text-sm text-neutral-700">
+            Ta bort haken hvis bedriften ikke er MVA-registrert, for eksempel fordi omsetningen er under 50 000 kr i året. Da selges alle varer uten MVA, og kundene ser ingen MVA i kassen eller på kvitteringen.
+          </span>
+        </div>
+      )}
 
       <fieldset className="rounded-md border border-neutral-300 p-3">
         <legend className="px-1 text-sm font-medium">Åpningstider</legend>

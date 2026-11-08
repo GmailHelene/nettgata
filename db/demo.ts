@@ -66,6 +66,7 @@ export const demoFrontpage: PageContent = {
 };
 
 export const demoInfo: SiteInfo = {
+  mvaRegistrert: true,
   phone: "900 00 000",
   email: "post@demo-ror.no",
   street: "Storgata 1",

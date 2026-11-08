@@ -114,7 +114,7 @@ export async function getCheckoutData(siteId: string, items: unknown, shippingCo
       return address ? { address, hours: info.openingHours.map((h) => `${h.day} ${h.time}`) } : null;
     })(),
     // Opplysningene angrerettloven krever i kassen (§§ 16 og 17), laget fra butikkens egen info.
-    legal: kasseTekster({ butikk: { navn: ctx.site.name, info: readSiteInfo(ctx.site.info) }, betalingsmater: availablePaymentMethods(ctx.settings) }),
+    legal: kasseTekster({ butikk: { navn: ctx.site.name, info: readSiteInfo(ctx.site.info), mva: readSiteInfo(ctx.site.info).mvaRegistrert }, betalingsmater: availablePaymentMethods(ctx.settings) }),
     subtotalOre: totals.subtotalOre,
     discount: discount ? { code: discount.code, label: describeDiscount(discount), amountOre: totals.discountOre, freeShipping } : null,
     discountError,

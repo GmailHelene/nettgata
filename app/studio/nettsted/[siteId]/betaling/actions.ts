@@ -20,7 +20,7 @@ import type { ActionState } from "../../../actions";
 async function ownerAccess(siteId: string, provider: KeyProvider | "stripe") {
   if (provider !== "stripe" && !keyProviders.includes(provider)) throw new ShopError("Ukjent betalingsløsning");
   const { site, user, role } = await requireSiteAccess(siteId);
-  if (site.kind !== "nettbutikk") throw new ShopError("Betaling med Vipps og Klarna gjelder bare nettbutikker");
+  if (site.kind !== "nettbutikk") throw new ShopError("Betalingsoppsettet gjelder bare nettbutikker");
   if (role !== "owner") throw new ShopError("Bare eieren av butikken kan endre betalingsoppsettet.");
   const db = await getDb();
   // Hver test er et kall til Vipps eller Klarna. Grensen stopper gjetting og uhell.

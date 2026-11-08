@@ -17,11 +17,13 @@ import { Gallery } from "./gallery";
 import { BrowseControls } from "./browse-controls";
 import { availableFilters, browse, resultSummary, type BrowseQuery } from "@/lib/shop/browse";
 import { ProductGrid } from "./product-grid";
+import { WithdrawForm } from "./withdraw-form";
 
 export type ShopRoute =
   | { kind: "products" }
   | { kind: "product"; slug: string }
   | { kind: "cart" }
+  | { kind: "withdraw" }
   | { kind: "order"; orderId: string };
 
 /** Kort beskrivelse for Google og deling: hele ord, maks rundt 160 tegn. */
@@ -43,6 +45,8 @@ export async function shopMeta(db: Db, site: typeof sites.$inferSelect, route: S
       return { title: "Alle varer" };
     case "cart":
       return { title: "Handlekurv" };
+    case "withdraw":
+      return { title: "Angre avtalen" };
     case "order":
       return { title: "Bestilling" };
     case "product": {
@@ -305,6 +309,30 @@ export function CartPage({ siteId, basePath }: { siteId: string; basePath: strin
   );
 }
 
+/** Angrefunksjonen etter angrerettloven § 20 a. Lenket fra bunnteksten på alle sider i butikken. */
+export function WithdrawPage({ siteId, basePath, order }: { siteId: string; basePath: string; order: string }) {
+  return (
+    <section className="py-12">
+      <Container>
+        <div className="max-w-xl">
+          <Heading level={1}>Angre avtalen</Heading>
+          <p className="mt-4">
+            Har du ombestemt deg? Du har 14 dagers angrerett, regnet fra dagen etter at du fikk varen. Det holder at du sender dette før fristen går ut.
+          </p>
+          <div className="mt-8">
+            <WithdrawForm siteId={siteId} basePath={basePath} order={order} />
+          </div>
+          <p className="mt-8">
+            <Link href={`${basePath}/angrerett`} className="underline">
+              Les mer om angrerett og retur
+            </Link>
+          </p>
+        </div>
+      </Container>
+    </section>
+  );
+}
+
 const statusText: Record<string, string> = {
   pending_payment: "Mottatt, venter på betaling",
   paid: "Betalt",
@@ -419,10 +447,12 @@ export async function OrderPage({ db, siteId, orderId, token, basePath }: { db: 
               <dt>Totalt</dt>
               <dd>{formatNok(order.totalOre)}</dd>
             </div>
-            <div className="flex justify-between text-sm text-[var(--c-muted)]">
-              <dt>Herav MVA</dt>
-              <dd>{formatNok(order.vatOre)}</dd>
-            </div>
+            {order.vatOre > 0 && (
+              <div className="flex justify-between text-sm text-[var(--c-muted)]">
+                <dt>Herav MVA</dt>
+                <dd>{formatNok(order.vatOre)}</dd>
+              </div>
+            )}
           </dl>
         </div>
 
@@ -456,10 +486,15 @@ export async function OrderPage({ db, siteId, orderId, token, basePath }: { db: 
           </div>
         )}
 
-        <p className="mt-8">
+        <p className="mt-8 flex flex-wrap gap-x-6 gap-y-2">
           <Link href={`${basePath}/produkter`} className="font-semibold underline">
             Fortsett å handle
           </Link>
+          {!cancelled && order.status !== "refunded" && !waiting && (
+            <Link href={`${basePath}/angre-avtalen?ordre=${order.number}`} className="underline">
+              Angre avtalen
+            </Link>
+          )}
         </p>
       </Container>
     </section>
