@@ -23,6 +23,9 @@ import { setCustomerNote } from "@/lib/shop/customers";
 import { CreditNoteError, retryCreditNote } from "@/lib/shop/credit-notes";
 import { notifyOrderPlaced, notifyOrderShipped, notifyRefund } from "@/lib/email/notify";
 import { abandonRefund, refundPart, type RefundInput } from "@/lib/shop/refunds";
+import { eraseCustomer } from "@/lib/shop/personvern";
+import { getMediaStore } from "@/lib/storage";
+import { formatOsloDay } from "@/lib/oslo-time";
 import { getEmailProvider } from "@/lib/email/send";
 import { updateShopSettings } from "@/lib/payments/config";
 import { changeOrderStatus } from "@/lib/payments/service";
@@ -184,6 +187,33 @@ export async function abandonRefundAction(siteId: string, refundId: string): Pro
     await abandonRefund(await getDb(), site.id, refundId, user.id);
     revalidatePath(`/studio/nettsted/${site.id}/ordre`, "layout");
     return { ok: true, message: "Refusjonen er avbrutt. Ingenting er endret på ordren." };
+  } catch (err) {
+    return toState(err);
+  }
+}
+
+/**
+ * Sletter en kunde etter GDPR artikkel 17 (lib/shop/personvern.ts). Bare eieren, fordi det ikke kan angres.
+ * Ordre innenfor oppbevaringstiden blir stående, og meldingen sier hvor lenge.
+ */
+export async function eraseCustomerAction(siteId: string, customerId: string): Promise<ActionState> {
+  try {
+    const { site, user, role } = await requireSiteAccess(siteId);
+    if (role !== "owner") return { ok: false, message: "Bare eieren av butikken kan slette en kunde." };
+    const db = await getDb();
+    const store = await getMediaStore().catch(() => null);
+    const r = await eraseCustomer(db, store, site.id, customerId, user.id);
+    revalidatePath(`/studio/nettsted/${site.id}/kunder`, "layout");
+    const parts = [
+      "Kunden er slettet.",
+      r.inquiries || r.subscriptions || r.bookings
+        ? `Slettet også ${[r.inquiries && `${r.inquiries} henvendelser`, r.subscriptions && "nyhetsbrev-abonnementet", r.bookings && `${r.bookings} timebestillinger`].filter(Boolean).join(", ")}.`
+        : "",
+      r.keptOrders
+        ? `${r.keptOrders} ordre beholdes for regnskapet til ${formatOsloDay(r.keptUntil!)}, som bokføringsloven krever. Kunden kan få beskjed om det.`
+        : "",
+    ];
+    return { ok: true, message: parts.filter(Boolean).join(" ") };
   } catch (err) {
     return toState(err);
   }

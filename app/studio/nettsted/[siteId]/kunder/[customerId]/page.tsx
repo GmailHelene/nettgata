@@ -9,12 +9,13 @@ import { formatNok } from "@/lib/shop/money";
 import { orderStatusLabel } from "../../ordre/order-status";
 import { SiteNav } from "../../site-nav";
 import { CustomerNote } from "./customer-note";
+import { PrivacyPanel } from "./privacy-panel";
 
 export const metadata: Metadata = { title: "Kunde" };
 
 export default async function CustomerPage({ params }: { params: Promise<{ siteId: string; customerId: string }> }) {
   const { siteId, customerId } = await params;
-  const { site } = await requireSiteAccess(siteId);
+  const { site, role } = await requireSiteAccess(siteId);
   const data = await getCustomer(await getDb(), site.id, customerId);
   if (!data) notFound();
   const { customer } = data;
@@ -96,6 +97,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ siteI
         <p className="mb-3 text-sm text-neutral-600">Bare for deg og de som jobber i butikken. Kunden ser det aldri.</p>
         <CustomerNote siteId={site.id} customerId={customer.id} note={customer.note} />
       </section>
+
+      <PrivacyPanel siteId={site.id} customerId={customer.id} name={customer.name} owner={role === "owner"} />
     </main>
   );
 }
