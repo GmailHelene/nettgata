@@ -591,8 +591,13 @@ function Owner() {
         </div>
         <div className="space-y-4 text-lg leading-relaxed text-white/90">
           <p>
-            Jeg heter Helene og lager nettsider og nettbutikker for bedrifter i hele Norge, fra Modum. Nettgata er plattformen jeg ønsket at kundene mine
-            hadde: enkel nok til å bruke selv, og trygg nok til at jeg kan stå inne for den.
+            Jeg heter Helene, og jeg vet hvordan det er å stå der du står. I 2009 begynte jeg å selge et produkt på nett fra stua. Det ble mitt eget merke
+            med hair extensions, med varer og design jeg importerte rett fra fabrikken. Etter noen år hadde jeg kontor, AS og et par ansatte, og på det
+            meste 12 millioner i omsetning.
+          </p>
+          <p>
+            Jeg har hatt alle rollene en nettbutikk har, og koding har jeg lært meg selv de siste tre årene. Nettgata er det verktøyet jeg skulle ønske
+            jeg hadde da jeg startet i stua.
           </p>
           <p>Du skriver til meg, ikke til et kundesenter, og du får svar innen én virkedag. Vil du heller at jeg setter alt opp, gjør jeg det.</p>
           <p className="text-base text-white/75">
