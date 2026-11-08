@@ -152,7 +152,7 @@ export async function startNightly(db: Db, client: AiClient, now = new Date()) {
       continue;
     }
     const params = messageParams(await promptInput(db, site.id, now));
-    const [run] = await db.insert(aiRuns).values({ siteId: site.id, trigger: "natt", model: AI_MODEL }).returning({ id: aiRuns.id });
+    const [run] = await db.insert(aiRuns).values({ siteId: site.id, trigger: "natt", model: AI_MODEL, createdAt: now }).returning({ id: aiRuns.id });
     queued.push({ runId: run.id, siteId: site.id, params });
   }
   if (!queued.length) return { queued: 0, skipped };
@@ -209,7 +209,7 @@ export async function startWeekly(db: Db, client: AiClient, now = new Date()) {
       continue;
     }
     const params = messageParams(await promptInput(db, site.id, now), "ukentlig");
-    const [run] = await db.insert(aiRuns).values({ siteId: site.id, trigger: "uke", model: AI_MODEL }).returning({ id: aiRuns.id });
+    const [run] = await db.insert(aiRuns).values({ siteId: site.id, trigger: "uke", model: AI_MODEL, createdAt: now }).returning({ id: aiRuns.id });
     queued.push({ runId: run.id, params });
   }
   if (!queued.length) return { queued: 0, skipped };
