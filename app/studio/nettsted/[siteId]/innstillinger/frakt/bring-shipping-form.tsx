@@ -115,25 +115,29 @@ export function BringShippingForm({
             const product = bringProducts[id];
             return (
               <div key={id} className="grid items-end gap-3 rounded-md border border-neutral-200 p-3 sm:grid-cols-[1fr_10rem]">
-                <label className="flex items-start gap-3">
+                {/* Navnet er labelen og beskrivelsen er beskrivelsen. Lå begge i labelen, leste skjermleseren beskrivelsen to ganger. */}
+                <div className="flex items-start gap-3">
                   <input
+                    id={`bring-${id}`}
                     type="checkbox"
                     checked={row.enabled}
                     onChange={(e) => setRows({ ...rows, [id]: { ...row, enabled: e.target.checked } })}
                     aria-describedby={`bring-${id}-om`}
-                    className="mt-1"
+                    className="mt-1 size-5 shrink-0"
                   />
-                  <span>
-                    <span className="font-medium">{product.name}</span>
-                    <span id={`bring-${id}-om`} className="block text-xs text-neutral-600">
+                  <div>
+                    <label htmlFor={`bring-${id}`} className="font-medium">
+                      {product.name}
+                    </label>
+                    <p id={`bring-${id}-om`} className="text-xs text-neutral-600">
                       {product.description} Hos Bring heter tjenesten {product.bringName} ({id}).
-                    </span>
-                  </span>
-                </label>
+                    </p>
+                  </div>
+                </div>
                 {row.enabled && (
                   <label className="block">
                     <span className="mb-1 block text-xs">
-                      Reservepris (kr)<span className="sr-only"> for {product.name}</span>
+                      Reservepris (kr)<span className="sr-only"> for {product.name}</span>, må fylles ut
                     </span>
                     <input
                       value={row.fallback}
@@ -152,7 +156,9 @@ export function BringShippingForm({
 
         <fieldset className="space-y-3">
           <legend className="mb-1 text-sm font-medium">Avsender</legend>
-          <p className="text-xs text-neutral-600">Adressen pakkene sendes fra. Den står på etiketten, og prisen regnes ut fra postnummeret.</p>
+          <p className="text-xs text-neutral-600">
+            Adressen pakkene sendes fra. Den står på etiketten, og prisen regnes ut fra postnummeret. Alle de fire feltene må fylles ut.
+          </p>
           {senderField("name", "Navn", { maxLength: 35, autoComplete: "organization" })}
           {senderField("street", "Gateadresse", { maxLength: 35, autoComplete: "street-address" })}
           <div className="grid gap-3 sm:grid-cols-[8rem_1fr]">

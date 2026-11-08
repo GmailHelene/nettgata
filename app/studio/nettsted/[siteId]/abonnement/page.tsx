@@ -103,7 +103,7 @@ export default async function SubscriptionPage({
       <section aria-labelledby="status" className="mb-8 rounded-lg border bg-white p-5">
         <div className="flex flex-wrap items-center gap-3">
           <h2 id="status" className="mr-auto text-lg font-semibold">
-            Abonnement
+            Status
           </h2>
           <span className={`rounded-full px-3 py-1 text-sm ${chip[summary.tone]}`}>{summary.label}</span>
         </div>
