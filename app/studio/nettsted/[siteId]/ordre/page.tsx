@@ -38,9 +38,11 @@ export default async function OrdersPage({
   };
   const href = (changes: Record<string, string | number>) => {
     const next = new URLSearchParams();
-    const merged = { status: query.filter, q: query.search, side: query.page, ...changes };
+    const merged = { status: query.filter, q: query.search, side: query.page, fra: query.from, til: query.to, ...changes };
     if (merged.status !== "alle") next.set("status", String(merged.status));
     if (merged.q) next.set("q", String(merged.q));
+    if (merged.fra) next.set("fra", String(merged.fra));
+    if (merged.til) next.set("til", String(merged.til));
     if (Number(merged.side) > 1) next.set("side", String(merged.side));
     const qs = next.toString();
     return qs ? `${base}?${qs}` : base;
@@ -67,6 +69,24 @@ export default async function OrdersPage({
             className="min-w-0 flex-1 rounded-md border border-neutral-400 px-3 py-2"
           />
           <button className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold">Søk</button>
+        </form>
+        <form action={base} className="flex flex-wrap items-end gap-2 text-sm" aria-label="Velg datoer">
+          {query.filter !== "alle" && <input type="hidden" name="status" value={query.filter} />}
+          {query.search && <input type="hidden" name="q" value={query.search} />}
+          <label className="block">
+            <span className="mb-1 block text-xs text-neutral-700">Fra dato</span>
+            <input type="date" name="fra" defaultValue={query.from} className="rounded-md border border-neutral-400 px-2 py-1.5" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs text-neutral-700">Til dato</span>
+            <input type="date" name="til" defaultValue={query.to} className="rounded-md border border-neutral-400 px-2 py-1.5" />
+          </label>
+          <button className="rounded-md border border-[#173b6c] px-3 py-1.5 font-semibold">Vis</button>
+          {(query.from || query.to) && (
+            <Link href={href({ fra: "", til: "", side: 1 })} className="py-1.5 underline">
+              Alle datoer
+            </Link>
+          )}
         </form>
         {(counts.paid ?? 0) > 0 && (
           <Link href={`${base}/plukkliste`} className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold">
@@ -102,7 +122,13 @@ export default async function OrdersPage({
 
       {rows.length === 0 ? (
         <p className="rounded-lg border bg-white p-6 text-neutral-700">
-          {query.search ? `Ingen ordre passer «${query.search}».` : countFor("alle") === 0 ? "Ingen ordre ennå." : "Ingen ordre med denne statusen."}
+          {query.search
+            ? `Ingen ordre passer «${query.search}».`
+            : countFor("alle") === 0
+              ? "Ingen ordre ennå."
+              : query.from || query.to
+                ? "Ingen ordre i denne perioden."
+                : "Ingen ordre med denne statusen."}
         </p>
       ) : (
         <OrderList
@@ -118,6 +144,7 @@ export default async function OrdersPage({
             statusText: orderStatusLabel[o.status].text,
             statusClass: orderStatusLabel[o.status].className,
             selectable: bringReady && (o.status === "paid" || o.status === "fulfilled"),
+            canFulfil: o.status === "paid",
             label: labelBadge(o, bringReady),
           }))}
         />

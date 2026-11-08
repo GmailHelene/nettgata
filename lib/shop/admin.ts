@@ -1,8 +1,8 @@
-import { and, asc, desc, eq, ilike, inArray, ne, or, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, lt, ne, or, type SQL } from "drizzle-orm";
 import type { Db } from "@/db";
 import { orders, productCategories, productVariants, products } from "@/db/schema";
 import { csvKroner, toCsv } from "@/lib/csv";
-import { formatOsloDateTime, osloDate } from "@/lib/oslo-time";
+import { addDays, formatOsloDateTime, osloDate, parseOsloDate } from "@/lib/oslo-time";
 import { paymentLabels, type PaymentMethod } from "./settings";
 import { carrierLabel } from "./tracking";
 
@@ -30,10 +30,14 @@ export const ORDERS_PER_PAGE = 50;
 export function parseOrderQuery(q: Query) {
   const filter = first(q.status);
   const page = Number(first(q.side));
+  // Dato fra og til (norsk tid, til og med til-datoen). Ugyldige datoer ignoreres.
+  const date = (v: string) => (/^\d{4}-\d{2}-\d{2}$/.test(v) && parseOsloDate(v) ? v : "");
   return {
     filter: (filter in orderFilters ? filter : "alle") as OrderFilter,
     search: first(q.q).trim().slice(0, 100),
     page: Number.isInteger(page) && page > 1 && page < 10_000 ? page : 1,
+    from: date(first(q.fra)),
+    to: date(first(q.til)),
   };
 }
 
@@ -42,6 +46,8 @@ export async function listOrders(db: Db, siteId: string, query: ReturnType<typeo
   const conditions: SQL[] = [eq(orders.siteId, siteId)];
   const statuses = orderFilters[query.filter].statuses;
   if (statuses) conditions.push(inArray(orders.status, [...statuses]));
+  if (query.from) conditions.push(gte(orders.createdAt, parseOsloDate(query.from)!));
+  if (query.to) conditions.push(lt(orders.createdAt, parseOsloDate(addDays(query.to, 1))!));
   if (query.search) {
     const pattern = `%${escapeLike(query.search)}%`;
     const number = /^#?(\d{1,9})$/.exec(query.search);

@@ -1,8 +1,14 @@
 "use server";
 
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
+import { after } from "next/server";
 import { getDb } from "@/db";
+import { orders } from "@/db/schema";
+import { notifyOrderShipped } from "@/lib/email/notify";
+import { getEmailProvider } from "@/lib/email/send";
+import { changeOrderStatus } from "@/lib/payments/service";
 import { bulkBookLabels, labelSelection, type BulkItem } from "@/lib/bring/bulk";
 import { hit } from "@/lib/rate-limit";
 import { requireSiteAccess } from "@/lib/session";
@@ -89,5 +95,59 @@ export async function bulkPrintLabelsAction(siteId: string, orderIds: string[]):
     if (err instanceof ShopError) return { ok: false, message: err.message, url: null, count: 0, skipped: [] };
     console.error("Utskrift av bulk-etiketter feilet", err instanceof Error ? err.name : "ukjent feil");
     return { ok: false, message: "Noe gikk galt. Prøv igjen.", url: null, count: 0, skipped: [] };
+  }
+}
+
+export type BulkFulfilState = {
+  ok: boolean;
+  message: string;
+  done: number;
+  problems: { orderId: string; number: number | null; reason: string }[];
+} | null;
+
+/**
+ * «Marker som sendt» for flere betalte ordre. Samme regler som én og én: med Vipps, Klarna og Kustom trekkes beløpet
+ * først, og feiler det, står ordren som før. Kunden får «Pakken er på vei» som vanlig. Alle med tilgang kan gjøre det.
+ */
+export async function bulkFulfilAction(siteId: string, orderIds: string[]): Promise<NonNullable<BulkFulfilState>> {
+  try {
+    const { site, user } = await requireSiteAccess(siteId);
+    const db = await getDb();
+    const ids = [...new Set((Array.isArray(orderIds) ? orderIds : []).filter((id) => typeof id === "string" && /^[0-9a-f-]{36}$/.test(id)))].slice(0, 25);
+    const rows = ids.length
+      ? await db
+          .select({ id: orders.id, number: orders.number, status: orders.status })
+          .from(orders)
+          .where(and(eq(orders.siteId, site.id), inArray(orders.id, ids)))
+      : [];
+    let done = 0;
+    const problems: NonNullable<BulkFulfilState>["problems"] = [];
+    for (const id of ids) {
+      const row = rows.find((r) => r.id === id);
+      if (!row) {
+        problems.push({ orderId: id, number: null, reason: "Fant ikke ordren." });
+        continue;
+      }
+      if (row.status !== "paid") continue;
+      try {
+        await changeOrderStatus(db, site.id, id, "fulfilled", user.id);
+        after(() => notifyOrderShipped(db, getEmailProvider(), id).catch((err) => console.error("Sendt-varsel feilet", err)));
+        done++;
+      } catch (err) {
+        unstable_rethrow(err);
+        problems.push({ orderId: id, number: row.number, reason: err instanceof ShopError ? err.message : "Noe gikk galt. Prøv denne ordren alene." });
+        if (!(err instanceof ShopError)) console.error("Marker som sendt feilet", id, err);
+      }
+    }
+    revalidatePath(`/studio/nettsted/${site.id}/ordre`, "layout");
+    const message = done
+      ? `${plural(done, "ordre er", "ordre er")} markert som sendt.${problems.length ? ` ${plural(problems.length, "ordre", "ordre")} ble ikke endret.` : ""}`
+      : problems.length
+        ? "Ingen ordre ble endret."
+        : "Ingen av de valgte ordrene er betalt og klare til sending.";
+    return { ok: problems.length === 0 && done > 0, message, done, problems };
+  } catch (err) {
+    unstable_rethrow(err);
+    return { ok: false, message: err instanceof ShopError ? err.message : "Noe gikk galt. Prøv igjen.", done: 0, problems: [] };
   }
 }

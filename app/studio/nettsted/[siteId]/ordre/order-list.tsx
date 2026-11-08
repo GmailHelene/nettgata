@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useId, useMemo, useState, useTransition } from "react";
 import { ui } from "@/components/studio/ui";
-import { bulkCreateLabelsAction, bulkPrintLabelsAction, type BulkLabelsState, type BulkPrintState } from "./bulk-actions";
+import { bulkCreateLabelsAction, bulkFulfilAction, bulkPrintLabelsAction, type BulkFulfilState, type BulkLabelsState, type BulkPrintState } from "./bulk-actions";
 
 const MAX = 25;
 
@@ -17,6 +17,8 @@ export type OrderRowData = {
   statusClass: string;
   /** Kan velges til etikett: betalt eller sendt, og Bring er koblet til. */
   selectable: boolean;
+  /** Betalt og ikke sendt: kan markeres som sendt sammen med andre. */
+  canFulfil: boolean;
   label: { state: "booked"; consignmentNumber: string } | { state: "none" } | null;
 };
 
@@ -30,11 +32,14 @@ export function OrderList({ siteId, base, rows, bulk }: { siteId: string; base: 
   const [selected, setSelected] = useState<string[]>([]);
   const [created, setCreated] = useState<BulkLabelsState>(null);
   const [printed, setPrinted] = useState<BulkPrintState>(null);
+  const [fulfilled, setFulfilled] = useState<BulkFulfilState>(null);
   const [pending, startTransition] = useTransition();
-  const [busy, setBusy] = useState<"create" | "print" | null>(null);
+  const [busy, setBusy] = useState<"create" | "print" | "fulfil" | null>(null);
   const uid = useId();
 
-  const selectable = useMemo(() => rows.filter((r) => r.selectable), [rows]);
+  // Ordre kan velges for etiketter (Bring er koblet til) eller for «Marker som sendt» (betalt).
+  const selectable = useMemo(() => rows.filter((r) => (bulk && r.selectable) || r.canFulfil), [rows, bulk]);
+  const fulfilCount = rows.filter((r) => r.canFulfil && selected.includes(r.id)).length;
   const chosen = new Set(selected);
   const full = selected.length >= MAX;
   const allSelected = selectable.length > 0 && selectable.slice(0, MAX).every((r) => chosen.has(r.id));
@@ -43,23 +48,29 @@ export function OrderList({ siteId, base, rows, bulk }: { siteId: string; base: 
   const toggle = (id: string) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : s.length >= MAX ? s : [...s, id]));
   const toggleAll = () => setSelected(allSelected ? [] : selectable.slice(0, MAX).map((r) => r.id));
 
-  const run = (kind: "create" | "print") => {
+  const run = (kind: "create" | "print" | "fulfil") => {
+    if (kind === "fulfil" && !confirm(`Markere ${fulfilCount} ordre som sendt? Med Vipps og Kustom trekkes beløpet nå, og kundene får «Pakken er på vei».`)) return;
     setCreated(null);
     setPrinted(null);
+    setFulfilled(null);
     setBusy(kind);
     startTransition(async () => {
       if (kind === "create") setCreated(await bulkCreateLabelsAction(siteId, selected));
-      else setPrinted(await bulkPrintLabelsAction(siteId, selected));
+      else if (kind === "print") setPrinted(await bulkPrintLabelsAction(siteId, selected));
+      else {
+        setFulfilled(await bulkFulfilAction(siteId, selected));
+        setSelected([]);
+      }
       setBusy(null);
     });
   };
 
-  const status = created ?? printed;
+  const status = created ?? printed ?? fulfilled;
 
   return (
     <>
-      {bulk && selectable.length > 0 && (
-        <section aria-label="Etiketter for flere ordre" className={`${ui.card} mb-4 space-y-3 p-4`}>
+      {selectable.length > 0 && (
+        <section aria-label="Handlinger for flere ordre" className={`${ui.card} mb-4 space-y-3 p-4`}>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
             <div className="flex items-center gap-2">
               <input
@@ -80,16 +91,25 @@ export function OrderList({ siteId, base, rows, bulk }: { siteId: string; base: 
               {selected.length === 0 ? `Velg opptil ${MAX} ordre.` : `${plural(selected.length, "ordre valgt", "ordre valgt")}${full ? ` (maks ${MAX})` : ""}.`}
             </p>
             <div className="ml-auto flex flex-wrap gap-2">
-              <button type="button" className={ui.button} disabled={pending || selected.length === 0} onClick={() => run("create")}>
-                {pending && busy === "create" ? "Bestiller hos Bring..." : "Lag etiketter"}
-              </button>
-              <button type="button" className={ui.buttonGhost} disabled={pending || selected.length === 0} onClick={() => run("print")}>
-                Skriv ut etiketter
+              {bulk && (
+                <>
+                  <button type="button" className={ui.button} disabled={pending || selected.length === 0} onClick={() => run("create")}>
+                    {pending && busy === "create" ? "Bestiller hos Bring..." : "Lag etiketter"}
+                  </button>
+                  <button type="button" className={ui.buttonGhost} disabled={pending || selected.length === 0} onClick={() => run("print")}>
+                    Skriv ut etiketter
+                  </button>
+                </>
+              )}
+              <button type="button" className={ui.buttonGhost} disabled={pending || fulfilCount === 0} onClick={() => run("fulfil")}>
+                {pending && busy === "fulfil" ? "Markerer..." : `Marker som sendt${fulfilCount ? ` (${fulfilCount})` : ""}`}
               </button>
             </div>
           </div>
           <p className="text-sm text-neutral-600">
-            «Lag etiketter» bestiller hos Bring for ordrene som ikke har etikett. Ordre som hentes, mangler adresse eller vekt, hoppes over. «Skriv ut etiketter» samler etikettene i én PDF.
+            {bulk &&
+              "«Lag etiketter» bestiller hos Bring for ordrene som ikke har etikett. Ordre som hentes, mangler adresse eller vekt, hoppes over. «Skriv ut etiketter» samler etikettene i én PDF. "}
+            «Marker som sendt» gjelder ordre som er betalt og ikke sendt.
           </p>
         </section>
       )}
@@ -105,6 +125,15 @@ export function OrderList({ siteId, base, rows, bulk }: { siteId: string; base: 
                   <li key={p.orderId}>
                     {p.number === null ? "Ukjent ordre" : `Ordre #${p.number}`}: {p.status === "booked" ? "booket. " : ""}
                     {p.reason}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {fulfilled && fulfilled.problems.length > 0 && (
+              <ul className="mt-2 list-disc space-y-0.5 pl-5">
+                {fulfilled.problems.map((p) => (
+                  <li key={p.orderId}>
+                    {p.number === null ? "Ukjent ordre" : `Ordre #${p.number}`}: {p.reason}
                   </li>
                 ))}
               </ul>
@@ -135,7 +164,7 @@ export function OrderList({ siteId, base, rows, bulk }: { siteId: string; base: 
           return (
             <li key={o.id} className="flex items-stretch hover:bg-neutral-50">
               <div className="flex w-12 shrink-0 items-center justify-center">
-                {bulk && o.selectable && (
+                {((bulk && o.selectable) || o.canFulfil) && (
                   <>
                     <input
                       id={`${uid}-${o.id}`}
