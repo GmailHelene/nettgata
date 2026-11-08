@@ -79,6 +79,14 @@ export const bookingInputSchema = z.object({
     .int("Skriv vekten i hele gram")
     .min(1, "Skriv hvor mye pakken veier, i gram")
     .max(35_000, "Pakken kan veie maks 35 kg"),
+  /** Målene på akkurat denne pakken. Uten dem brukes butikkens vanlige pakkestørrelse, ellers en standard for tjenesten. */
+  packageCm: z
+    .object({
+      length: z.number({ error: "Skriv pakkens mål i hele centimeter" }).int("Skriv pakkens mål i hele centimeter").min(1, "Målene må være minst 1 cm").max(300, "Målene kan være maks 300 cm"),
+      width: z.number({ error: "Skriv pakkens mål i hele centimeter" }).int("Skriv pakkens mål i hele centimeter").min(1, "Målene må være minst 1 cm").max(300, "Målene kan være maks 300 cm"),
+      height: z.number({ error: "Skriv pakkens mål i hele centimeter" }).int("Skriv pakkens mål i hele centimeter").min(1, "Målene må være minst 1 cm").max(300, "Målene kan være maks 300 cm"),
+    })
+    .optional(),
 });
 export type BookingInputValues = z.input<typeof bookingInputSchema>;
 
@@ -158,7 +166,8 @@ export async function bookBringShipment(
       product,
       customerNumber: access.customerNumber,
       weightGrams,
-      packageCm: shipping.packageCm,
+      // Bring avviser bestillingen uten mål eller volum (BOOK-INPUT-013), så det må alltid sendes med mål.
+      packageCm: parsed.data.packageCm ?? shipping.packageCm ?? bringProducts[product].defaultPackageCm,
       shippingDateTime: now,
       pickupPointId: product === "5800" ? readOrderBring(order.shipping)?.pickupPoint?.id : null,
     });

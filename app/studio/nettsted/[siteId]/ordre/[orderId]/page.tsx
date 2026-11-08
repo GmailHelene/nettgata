@@ -322,6 +322,7 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
               products={labelProducts}
               defaultProduct={orderBring?.product ?? labelProducts[0].id}
               defaultWeightGrams={estimatedGrams}
+              shopPackageCm={bringSetup.shipping?.packageCm ?? null}
               test={bringSetup.account?.environment === "test"}
             />
           ) : (

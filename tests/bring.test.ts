@@ -620,6 +620,11 @@ describe("frakt med Bring", () => {
     await expect(bookBringShipment(db, siteId, o.id, { product: "5800", weightGrams: 650 }, ownerId)).rejects.toThrow(/allerede laget/);
     expect(bring.find("/booking/api/create")).toHaveLength(1);
 
+    // Bring avviser bestillinger uten mål (BOOK-INPUT-013). Målene på etiketten går foran butikkens vanlige størrelse.
+    const withSize = await paidOrder();
+    await bookBringShipment(db, siteId, withSize.id, { product: "5800", weightGrams: 650, packageCm: { length: 40, width: 30, height: 20 } }, ownerId);
+    expect(JSON.stringify(bring.find("/booking/api/create").at(-1)!.body)).toContain('"dimensions":{"lengthInCm":40,"widthInCm":30,"heightInCm":20}');
+
     // Avviser Bring bestillingen, vises meldingen, og ordren kan prøves igjen.
     const second = await paidOrder();
     bring.world.bookingError = { uniqueId: "x1", code: "BOOK-INPUT-021", messages: [{ lang: "en", message: "Invalid customer number" }, { lang: "no", message: "Ugyldig kundenummer" }] };

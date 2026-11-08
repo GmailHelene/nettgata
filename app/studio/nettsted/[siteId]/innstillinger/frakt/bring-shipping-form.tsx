@@ -169,7 +169,7 @@ export function BringShippingForm({
 
         <fieldset className="space-y-3">
           <legend className="mb-1 text-sm font-medium">Vanlig pakkestørrelse (valgfritt)</legend>
-          <p className="text-xs text-neutral-600">Bring trenger mål for å gi riktig pris på Pakke til hentested og Pakke levert hjem. Skriv målene på esken du bruker mest.</p>
+          <p className="text-xs text-neutral-600">Bring trenger mål for å gi riktig pris og for å lage etiketten. Skriv målene på esken du bruker mest. Står feltene tomme, foreslår vi en vanlig størrelse på etiketten.</p>
           <div className="grid max-w-md grid-cols-3 gap-3">
             {(
               [

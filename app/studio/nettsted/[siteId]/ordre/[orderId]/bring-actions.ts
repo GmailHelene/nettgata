@@ -13,7 +13,7 @@ import type { ActionState } from "../../../../actions";
  * «Lag fraktetikett hos Bring». Å pakke og sende ordre er vanlig arbeid, så alle med tilgang til butikken kan gjøre det,
  * som med «Marker som sendt». I testmodus blir det en testbestilling som Bring verken henter eller fakturerer.
  */
-export async function createBringLabelAction(siteId: string, orderId: string, input: { product: string; weightGrams: number }): Promise<ActionState> {
+export async function createBringLabelAction(siteId: string, orderId: string, input: { product: string; weightGrams: number; packageCm?: { length: number; width: number; height: number } }): Promise<ActionState> {
   try {
     const { site, user } = await requireSiteAccess(siteId);
     if (site.kind !== "nettbutikk") throw new ShopError("Fraktetiketter gjelder bare nettbutikker");

@@ -12,18 +12,21 @@ export const bringProducts = {
     bringName: "Pakke hjem i postkassen",
     description: "Små pakker rett i postkassen. Maks 5 kg og 45 cm lang.",
     maxWeightGrams: 5_000,
+    defaultPackageCm: { length: 30, width: 22, height: 5 },
   },
   "5800": {
     name: "Pakke til hentested",
     bringName: "Pakke til hentested",
     description: "Kunden henter pakken på nærmeste hentested. Maks 35 kg.",
     maxWeightGrams: 35_000,
+    defaultPackageCm: { length: 35, width: 25, height: 15 },
   },
   "5600": {
     name: "Pakke levert hjem",
     bringName: "Pakke hjem pluss",
     description: "Levert hjem på døra, også på kveldstid. Maks 35 kg.",
     maxWeightGrams: 35_000,
+    defaultPackageCm: { length: 35, width: 25, height: 15 },
   },
 } as const;
 
