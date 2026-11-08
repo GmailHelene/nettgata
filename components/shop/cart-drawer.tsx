@@ -147,7 +147,26 @@ export function CartDrawer({ siteId, basePath }: { siteId: string; basePath: str
                 {count === 0 ? (
                   <p className="text-[var(--c-muted)]">Handlekurven er tom.</p>
                 ) : !data ? (
-                  <p>Henter handlekurven...</p>
+                  // Mens serveren svarer, vises det kunden så på varesiden. Prisene som gjelder, kommer fra serveren.
+                  items.every((i) => i.seen) ? (
+                    <div aria-busy="true">
+                      <ul className="divide-y divide-[var(--c-muted)]/20">
+                        {items.map((i) => (
+                          <li key={i.variantId} className="flex justify-between gap-3 py-4">
+                            <span className="font-medium">
+                              {i.seen!.name}
+                              {i.seen!.label && <span className="block text-sm font-normal text-[var(--c-muted)]">{i.seen!.label}</span>}
+                              <span className="block text-sm font-normal text-[var(--c-muted)]">Antall: {i.quantity}</span>
+                            </span>
+                            <span>{formatNok(i.seen!.priceOre * i.quantity)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-2 text-sm text-[var(--c-muted)]">Oppdaterer priser og lager...</p>
+                    </div>
+                  ) : (
+                    <p>Henter handlekurven...</p>
+                  )
                 ) : (
                   <ul className="divide-y divide-[var(--c-muted)]/20">
                     {data.lines.map((l) => (

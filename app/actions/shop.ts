@@ -20,7 +20,7 @@ import { bringQuoteOptions, cartTotals, createOrder, freeShippingApplies, priceL
 import { availablePaymentMethods, checkoutShippingOptions, paymentLabels, readShopSettings } from "@/lib/shop/settings";
 import { kasseTekster } from "@/lib/legal/angrerett";
 import { hasCheckoutTerms } from "@/lib/legal/kundesider";
-import { readSiteInfo } from "@/lib/site-info";
+import { formatAddress, readSiteInfo } from "@/lib/site-info";
 import { orderLimitMessage } from "@/lib/shop/order-limits";
 
 const itemsSchema = z.array(z.object({ variantId: z.string().uuid(), quantity: z.number().int().min(1).max(99) })).max(50);
@@ -107,6 +107,12 @@ export async function getCheckoutData(siteId: string, items: unknown, shippingCo
     freeShippingOverOre: ctx.settings.freeShippingOverOre,
     paymentMethods: availablePaymentMethods(ctx.settings).map((m) => ({ code: m, label: paymentLabels[m] })),
     termsPath: ctx.settings.termsPath,
+    // Hvor og når kunden kan hente, når hun velger et fraktvalg uten adresse («Hent selv»). Fra butikkens egen info.
+    pickupInfo: (() => {
+      const info = readSiteInfo(ctx.site.info);
+      const address = formatAddress(info);
+      return address ? { address, hours: info.openingHours.map((h) => `${h.day} ${h.time}`) } : null;
+    })(),
     // Opplysningene angrerettloven krever i kassen (§§ 16 og 17), laget fra butikkens egen info.
     legal: kasseTekster({ butikk: { navn: ctx.site.name, info: readSiteInfo(ctx.site.info) }, betalingsmater: availablePaymentMethods(ctx.settings) }),
     subtotalOre: totals.subtotalOre,

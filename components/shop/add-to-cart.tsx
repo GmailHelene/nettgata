@@ -27,14 +27,15 @@ export function AddToCart({ siteId, product, cartHref }: { siteId: string; produ
   const soldOut = !variant || (variant.stock !== null && variant.stock <= 0);
   const add = () => {
     if (!variant) return;
-    addToCart(siteId, variant.id, quantity);
+    addToCart(siteId, variant.id, quantity, { name: product.name, label: variant.label || undefined, priceOre: variant.priceOre });
     setAdded(true);
   };
   const max = variant?.stock === null || variant?.stock === undefined ? 99 : Math.max(1, Math.min(99, variant.stock));
 
   return (
     <div className="space-y-5">
-      <p className="text-2xl">{variant ? <Price priceOre={variant.priceOre} beforePriceOre={variant.beforePriceOre} /> : "Ikke tilgjengelig"}</p>
+      {/* Når kunden velger en variant med annen pris, leses den nye prisen opp av skjermleseren. */}
+      <p className="text-2xl" aria-live="polite" aria-atomic="true">{variant ? <Price priceOre={variant.priceOre} beforePriceOre={variant.beforePriceOre} /> : "Ikke tilgjengelig"}</p>
 
       {product.options.map((option, i) => (
         <fieldset key={option.name}>

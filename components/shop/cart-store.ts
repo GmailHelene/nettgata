@@ -3,10 +3,18 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * Handlekurven ligger i nettleseren (localStorage), én per nettsted. Den inneholder bare
- * variant-ID og antall; pris, navn og lager hentes alltid fra serveren.
+ * Handlekurven ligger i nettleseren (localStorage), én per nettsted. Den inneholder variant-ID og antall, og et
+ * øyeblikksbilde av navn og pris fra varesiden (seen), så kurven kan vises med en gang mens serveren svarer.
+ * Pris, navn og lager som gjelder, hentes alltid fra serveren, og ordren regnes alltid ut der.
  */
-export type CartItem = { variantId: string; quantity: number };
+export type CartSeen = { name: string; label?: string; priceOre: number };
+export type CartItem = { variantId: string; quantity: number; seen?: CartSeen };
+
+function cleanSeen(raw: unknown): CartSeen | undefined {
+  const s = raw as Partial<CartSeen> | null;
+  if (!s || typeof s.name !== "string" || !Number.isInteger(s.priceOre)) return undefined;
+  return { name: s.name.slice(0, 120), label: typeof s.label === "string" ? s.label.slice(0, 120) : undefined, priceOre: s.priceOre as number };
+}
 
 const EVENT = "kurv-endret";
 const key = (siteId: string) => `kurv:${siteId}`;
@@ -26,9 +34,9 @@ export function readCart(siteId: string): CartItem[] {
   try {
     const parsed = raw ? JSON.parse(raw) : [];
     if (Array.isArray(parsed)) {
-      items = parsed.filter(
-        (i): i is CartItem => typeof i?.variantId === "string" && Number.isInteger(i?.quantity) && i.quantity > 0 && i.quantity <= 99,
-      );
+      items = parsed
+        .filter((i): i is CartItem => typeof i?.variantId === "string" && Number.isInteger(i?.quantity) && i.quantity > 0 && i.quantity <= 99)
+        .map((i) => ({ variantId: i.variantId, quantity: i.quantity, seen: cleanSeen(i.seen) }));
     }
   } catch {
     items = EMPTY;
@@ -47,12 +55,12 @@ export function writeCart(siteId: string, items: CartItem[]) {
   window.dispatchEvent(new Event(EVENT));
 }
 
-export function addToCart(siteId: string, variantId: string, quantity: number) {
+export function addToCart(siteId: string, variantId: string, quantity: number, seen?: CartSeen) {
   const items = readCart(siteId);
   const existing = items.find((i) => i.variantId === variantId);
   const next = existing
-    ? items.map((i) => (i.variantId === variantId ? { ...i, quantity: Math.min(99, i.quantity + quantity) } : i))
-    : [...items, { variantId, quantity }];
+    ? items.map((i) => (i.variantId === variantId ? { ...i, quantity: Math.min(99, i.quantity + quantity), seen: seen ?? i.seen } : i))
+    : [...items, { variantId, quantity, seen }];
   writeCart(siteId, next);
   window.dispatchEvent(new Event("kurv-lagt-til"));
 }

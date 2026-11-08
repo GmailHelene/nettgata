@@ -285,6 +285,12 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
                       Bring regner med {o.deliveryDays} {o.deliveryDays === 1 ? "virkedag" : "virkedager"}
                     </span>
                   )}
+                  {!o.requiresAddress && data.pickupInfo && (
+                    <span className="block text-sm text-[var(--c-muted)]">
+                      Hentes hos oss: {data.pickupInfo.address}
+                      {data.pickupInfo.hours.length > 0 && <span className="block">Åpent {data.pickupInfo.hours.join(", ")}</span>}
+                    </span>
+                  )}
                 </span>
               </span>
               <span className="text-right">{o.pricePending ? "Pris etter postnummer" : o.priceOre === 0 ? "Gratis" : formatNok(o.priceOre)}</span>

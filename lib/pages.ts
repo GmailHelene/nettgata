@@ -219,10 +219,29 @@ export async function updateSiteSettings(db: Db, siteId: string, input: { name: 
   const info = siteInfoInputSchema.safeParse(input.info);
   if (!info.success) throw new PublishingError(info.error.issues[0].message);
 
-  const [site] = await db.select({ id: sites.id }).from(sites).where(eq(sites.id, siteId)).limit(1);
+  const [site] = await db.select({ id: sites.id, name: sites.name }).from(sites).where(eq(sites.id, siteId)).limit(1);
   if (!site) throw new PublishingError("Fant ikke nettstedet");
   await db.update(sites).set({ name, info: info.data }).where(eq(sites.id, siteId));
+  if (site.name !== name) await renameInSeoTitles(db, siteId, site.name, name);
   await db.insert(auditLog).values({ siteId, userId, action: "site.settings_updated" });
+}
+
+/**
+ * Bransjepakken skriver navnet inn i Google-tittelen på sidene («Kontakt Kari sin krok»). Bytter nettstedet navn,
+ * byttes det gamle navnet ut i kladden til hver side, så det ikke henger igjen. Publiserte versjoner endres aldri:
+ * siden får en upublisert endring, og den nye tittelen gjelder når eieren publiserer.
+ */
+async function renameInSeoTitles(db: Db, siteId: string, from: string, to: string) {
+  const rows = await db.select({ id: pages.id, draft: pages.draft }).from(pages).where(eq(pages.siteId, siteId));
+  for (const row of rows) {
+    const title = row.draft.seo?.title;
+    if (!title?.includes(from)) continue;
+    const next = title.split(from).join(to).slice(0, 70);
+    await db
+      .update(pages)
+      .set({ draft: { ...row.draft, seo: { ...row.draft.seo, title: next } }, draftUpdatedAt: new Date() })
+      .where(eq(pages.id, row.id));
+  }
 }
 
 /**

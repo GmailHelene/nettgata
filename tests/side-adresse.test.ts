@@ -5,7 +5,7 @@ import { demoTheme } from "@/db/demo";
 import { createPgliteDb } from "@/db/pglite";
 import { organizations, pages, sites, users } from "@/db/schema";
 import { pageContentSchema } from "@/lib/content/types";
-import { changePagePath, createPage } from "@/lib/pages";
+import { changePagePath, createPage, updateSiteSettings } from "@/lib/pages";
 import { publishPage } from "@/lib/publishing";
 
 let db: Db;
@@ -53,6 +53,15 @@ describe("ny adresse for en side", () => {
     await createPage(db, siteId, { title: "B", path: "/b" }, userId);
     await expect(changePagePath(db, siteId, a.id, "/b", userId)).rejects.toThrow(/finnes allerede/);
     await expect(changePagePath(db, siteId, a.id, "/studio/x", userId)).rejects.toThrow(/små bokstaver/);
+  });
+
+  it("bytter det gamle navnet i Google-titlene når nettstedet får nytt navn", async () => {
+    const page = await createPage(db, siteId, { title: "Kontakt", path: "/kontakt" }, userId);
+    const [row] = await db.select().from(pages).where(eq(pages.id, page.id));
+    await db.update(pages).set({ draft: { ...row.draft, seo: { title: "Kontakt Frisør" } } }).where(eq(pages.id, page.id));
+    await updateSiteSettings(db, siteId, { name: "Klipp og Krøll", info: {} }, userId);
+    const [after] = await db.select().from(pages).where(eq(pages.id, page.id));
+    expect(after.draft.seo.title).toBe("Kontakt Klipp og Krøll");
   });
 
   it("«Ikke vis i Google» er et gyldig valg på siden", () => {

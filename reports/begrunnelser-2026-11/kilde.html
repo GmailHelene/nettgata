@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="nb"><head><meta charset="utf-8"><title>Nettgata: det vi ikke bygger, og hvorfor</title>
+<style>
+@page { size: A4; margin: 17mm 16mm 18mm 16mm;
+  @bottom-left { content: "Nettgata · begrunnelser november 2026"; font: 8pt "Segoe UI", Arial, sans-serif; color: #6b7480; }
+  @bottom-right { content: "Side " counter(page); font: 8pt "Segoe UI", Arial, sans-serif; color: #6b7480; } }
+* { box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: "Segoe UI", Calibri, Arial, sans-serif; font-size: 10pt; line-height: 1.45; color: #1b232b; margin: 0; }
+h1 { color: #173b6c; font-size: 22pt; margin: 0 0 2mm; }
+h2 { color: #173b6c; font-size: 15pt; margin: 7mm 0 3mm; padding: 0 0 1.5mm 4mm; border-left: 5px solid #e3b04b; break-after: avoid; }
+h3 { color: #173b6c; font-size: 11pt; margin: 0 0 1.5mm; }
+p { margin: 0 0 2.4mm; }
+.lead { font-size: 11pt; }
+.item { background: #f7f3ea; border-radius: 3mm; padding: 3.5mm 5mm; margin: 0 0 3mm; break-inside: avoid; }
+.item.red { background: #fbefd0; border-left: 4px solid #e3b04b; }
+.lbl { font-weight: 700; color: #173b6c; }
+.tag { display: inline-block; font-size: 7pt; font-weight: 700; letter-spacing: .04em; padding: .3mm 1.6mm; border-radius: 1mm; text-transform: uppercase; margin-left: 2mm; vertical-align: 1px; }
+.t-valg { background: #173b6c; color: #fff; }
+.t-feil { background: #8a2b2b; color: #fff; }
+.t-deg { background: #e3b04b; color: #1b232b; }
+.t-senere { background: #2f5a47; color: #fff; }
+small { color: #4a5562; font-size: 8.5pt; }
+ul { margin: 0; padding-left: 5mm; }
+li { margin: 0 0 1.2mm; }
+</style></head><body>
+
+<h1>Det vi ikke bygger, og hvorfor</h1>
+<p class="lead">Testerne i gjennomgangene av studioet og nettbutikken foreslo mer enn vi har bygget. Her står hvert punkt vi har sagt nei til eller utsatt, med grunnen. Noen funn viste seg også å være feil, og de står i en egen del.</p>
+<p><small>Gjelder gjennomgangen av studioet (snitt 6,0 av 10) og agentrunden i nettbutikken 7. november 2026. Sist oppdatert 8. november 2026.</small></p>
+
+<h2>Bevisste valg</h2>
+
+<div class="item"><h3>Undermenyer i menyen på kundenes nettsteder<span class="tag t-senere">Senere</span></h3>
+<p><span class="lbl">Forslaget:</span> menypunkter som folder seg ut med flere sider under.</p>
+<p><span class="lbl">Hvorfor ikke nå:</span> En typisk kunde har fire til sju sider. Med så få sider er undermenyer mest i veien. Folk bommer på dem på mobil, og de er vanskelige å bruke med tastatur og skjermleser, mens vi har lovet WCAG AA i alle seksjoner. En flat meny med tydelige navn er raskere for de besøkende.</p>
+<p><span class="lbl">Når det blir aktuelt:</span> Når en pilotkunde har over ti sider eller ber om det. Da lager vi undermenyer som virker med tastatur fra første dag.</p></div>
+
+<div class="item"><h3>Veiviser i studioet for å skaffe Vipps-avtale<span class="tag t-valg">Valg</span></h3>
+<p><span class="lbl">Forslaget:</span> en steg-for-steg-veiviser inne i Nettgata som skaffer bedriften en Vipps-avtale.</p>
+<p><span class="lbl">Hvorfor ikke:</span> Avtalen inngås hos Vipps MobilePay, med BankID og kontroll av bedriften. Det kan ikke Nettgata gjøre for kunden, og det skal vi heller ikke. En veiviser hos oss ville bare vært en kopi av Vipps sine sider, og den ville blitt feil hver gang Vipps endrer noe. Hjelpesiden forklarer hva kunden skal gjøre hos Vipps. Når nøklene er limt inn, tester Betaling dem med en gang og sier tydelig fra om noe er feil.</p></div>
+
+<div class="item red"><h3>Kortbetaling uten egen avtale med Klarna eller Kustom<span class="tag t-deg">Din beslutning</span></h3>
+<p><span class="lbl">Forslaget:</span> at butikken kan ta kort uten å inngå noen avtale selv, slik Shopify Payments gjør.</p>
+<p><span class="lbl">Hvorfor ikke ennå:</span> Da blir Nettgata betalingsformidler for kundene, med krav om kundekontroll etter hvitvaskingsloven, ansvar ved tilbakeføringer og en egen avtale med for eksempel Stripe Connect. Dette er en forretningsbeslutning med juridiske og økonomiske følger, ikke bare kode.</p>
+<p><span class="lbl">Anbefaling:</span> Bruk Kustom. Kustom-kassen har kort, Vipps og Klarna i én avtale som butikken inngår selv. Pengene går rett til butikken, og Nettgata rører dem aldri. Stripe Connect er bare verdt det hvis mange kunder faller fra fordi de må inngå en avtale.</p></div>
+
+<div class="item"><h3>Feilmelding koblet til hvert enkelt felt<span class="tag t-senere">Senere</span></h3>
+<p><span class="lbl">Forslaget:</span> at feilmeldingen står under feltet den gjelder og er koblet til det med aria-describedby, i alle skjemaene.</p>
+<p><span class="lbl">Hvorfor ikke nå:</span> Feilmeldingene i studioet leses allerede opp av skjermleser med en gang (role="alert"). De sier også hvilket felt det gjelder, for eksempel «Navnet må være mellom 2 og 80 tegn». Det dekker WCAG 3.3.1 og 3.3.3. Å flytte meldingene ut til hvert felt betyr å skrive om 34 skjemaer, og det gir mindre enn det andre vi har brukt tiden på.</p>
+<p><span class="lbl">Plan:</span> Vi gjør det skjema for skjema når et skjema likevel skal endres. Vareskjemaet og kassen er først.</p></div>
+
+<div class="item"><h3>Turnstile (robotsjekk fra Cloudflare) på kontaktskjemaet<span class="tag t-valg">Valg</span></h3>
+<p><span class="lbl">Hvorfor ikke:</span> Skjemaet har tre lag med vern fra før: en usynlig robotfelle, høyst 5 meldinger per IP-adresse per 10 minutter og høyst 50 per nettsted i timen. Det sender ikke e-post til den som fyller det ut, så det kan ikke brukes til å spamme andre. Turnstile legger et skript fra Cloudflare på hver kundeside, og det må settes opp per domene. Det er et personvernspørsmål og mer jobb enn det er verdt nå.</p>
+<p><span class="lbl">Når det blir aktuelt:</span> Hvis et nettsted får mye søppel likevel.</p></div>
+
+<div class="item"><h3>«Betal ved henting» står på i nye nettbutikker<span class="tag t-valg">Valg</span></h3>
+<p><span class="lbl">Funnet:</span> betalingsmåten står på uten at eieren har valgt den.</p>
+<p><span class="lbl">Hvorfor den står på:</span> Kassen må ha minst én betalingsmåte for at eieren skal kunne prøve hele kjøpet før Vipps eller Kustom er koblet til. «Betal ved henting» er den eneste som ikke krever avtale. Den vises bare når kunden velger «Hent selv», og kassen stenger knappen hvis den ikke passer. «Faktura» står ikke på som standard. «Kom i gang» på Hjem er ikke ferdig før ekte betaling er koblet til.</p></div>
+
+<div class="item"><h3>Bildebank med plassholderbilder<span class="tag t-senere">Delvis</span></h3>
+<p><span class="lbl">Det vi gjorde:</span> En vare uten bilde gir ikke lenger en stor grå boks på mobil som skyver pris og kjøpsknapp ut av syne.</p>
+<p><span class="lbl">Hvorfor ikke bildebank:</span> Felles stockbilder får butikkene til å se like ut, og de kan gi kunden et feil inntrykk av varen. Hver bransjepakke må ha bilder vi har rett til å bruke, og det er innholdsarbeid som hører hjemme der. Bildene lages sammen med bransjepakkene, ikke som en felles bank.</p></div>
+
+<h2>Funn som ikke stemte</h2>
+<p>Disse ble sjekket i koden og ble ikke rettet, fordi det ikke var noe galt.</p>
+
+<div class="item"><h3>«Utviklertekst om Fiken og Stripe vises for kunden»<span class="tag t-feil">Feil funn</span></h3>
+<p>Teksten vises bare for plattformadmin. Testerne var logget inn som Helene, så kundene ser den ikke. «Testbetaling» er likevel fjernet helt fra produksjon.</p></div>
+
+<div class="item"><h3>«Kassen har ingen grense mot misbruk»<span class="tag t-feil">Feil funn</span></h3>
+<p>Det var allerede en grense på 10 bestillinger per IP-adresse per 10 minutter, og ubetalte ordre kanselleres hvert tiende minutt, så varene går tilbake på lager. Vi har likevel lagt til to grenser til: 5 bestillinger per e-postadresse i timen og 300 per butikk i timen.</p></div>
+
+<div class="item"><h3>«Kontaktskjemaet mangler spamvern»<span class="tag t-feil">Feil funn</span></h3>
+<p>Skjemaet har både en usynlig robotfelle og grenser per IP-adresse og per nettsted. Se punktet om Turnstile over.</p></div>
+
+<div class="item"><h3>«Butikken selger et falskt gavekort»<span class="tag t-feil">Feil funn</span></h3>
+<p>Det var en vare testagenten selv la inn i testbutikken. Den ligger ikke i noen bransjepakke.</p></div>
+
+<div class="item"><h3>«Priskalkulatoren lover ekstra språk»<span class="tag t-feil">Feil funn</span></h3>
+<p>Dette står ingen steder i koden eller på nettgata.no.</p></div>
+
+<h2>Rettet etter agentrunden i nettbutikken</h2>
+<p>Til sammenligning er dette rettet av funnene fra 7. november:</p>
+<div class="item"><ul>
+<li><b>1 til 4:</b> kjøpsvilkår lages automatisk, døde lenker skjules før publisering, butikkens org.nr. og adresse vises, og hovedmenyen er på plass før publisering.</li>
+<li><b>5:</b> «Kom i gang» viser «Koble til Bring» som anbefalt steg og forklarer hva som skjer uten.</li>
+<li><b>6:</b> «Hent selv» viser butikkens adresse og åpningstider i kassen.</li>
+<li><b>7:</b> Handlekurven vises med en gang med det kunden så på varesiden, mens prisene sjekkes.</li>
+<li><b>9:</b> Når butikken bytter navn, byttes det gamle navnet ut i Google-titlene.</li>
+<li><b>11:</b> Skjermleseren leser opp den nye prisen når kunden velger en annen variant.</li>
+</ul></div>
+
+</body></html>
