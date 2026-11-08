@@ -110,6 +110,41 @@ describe("varer og ordre", () => {
     await expect(createProduct(db, siteId, lue({ variants: [] }), userId)).rejects.toBeInstanceOf(ShopError);
   });
 
+  it("lagring overskriver aldri et salg som skjedde mens varen var åpen", async () => {
+    const p = await createProduct(db, siteId, lue(), userId);
+    const [blue, red] = await variantsOf(p.id);
+    // Noen kjøper en blå lue mens eieren har varen åpen (lageret var 3 da siden ble lastet).
+    await db.update(productVariants).set({ stock: (blue.stock ?? 0) - 1 }).where(eq(productVariants.id, blue.id));
+    const opened = blue.stock;
+    // Eieren endrer bare prisen: lageret fra databasen beholdes.
+    await updateProduct(
+      db,
+      siteId,
+      p.id,
+      lue({ variants: [{ id: blue.id, optionValues: ["Blå"], priceOre: 31900, stock: opened, expectedStock: opened }, { id: red.id, optionValues: ["Rød"], priceOre: red.priceOre, stock: red.stock, expectedStock: red.stock }] }),
+      userId,
+    );
+    const [after] = await db.select().from(productVariants).where(eq(productVariants.id, blue.id));
+    expect(after).toMatchObject({ priceOre: 31900, stock: (opened ?? 0) - 1 });
+    // Eieren har endret lageret selv: lagringen stoppes med en forklaring.
+    await expect(
+      updateProduct(
+        db,
+        siteId,
+        p.id,
+        lue({ variants: [{ id: blue.id, optionValues: ["Blå"], priceOre: 31900, stock: 10, expectedStock: opened }, { id: red.id, optionValues: ["Rød"], priceOre: red.priceOre, stock: red.stock }] }),
+        userId,
+      ),
+    ).rejects.toThrow(/endret siden du åpnet varen/);
+  });
+
+  it("lagrer strekkode, og avviser en strekkode med feil antall siffer", async () => {
+    const p = await createProduct(db, siteId, lue({ variants: [{ optionValues: ["Blå"], priceOre: 100, stock: 1, gtin: "7038 0100 0945 7" }, { optionValues: ["Rød"], priceOre: 100, stock: 1 }] }), userId);
+    const [blue] = await variantsOf(p.id);
+    expect(blue.gtin).toBe("7038010009457");
+    await expect(createProduct(db, siteId, lue({ name: "Annen", variants: [{ optionValues: ["Blå"], priceOre: 100, stock: 1, gtin: "123" }, { optionValues: ["Rød"], priceOre: 100, stock: 1 }] }), userId)).rejects.toThrow(/Strekkoden/);
+  });
+
   it("logger pris bare når den endres, og viser førpris etter nedsettelse", async () => {
     const p = await createProduct(db, siteId, lue(), userId);
     const [blue, red] = await variantsOf(p.id);

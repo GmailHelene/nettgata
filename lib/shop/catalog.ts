@@ -42,10 +42,17 @@ const variantSchema = z.object({
   id: z.string().uuid().optional(),
   optionValues: z.array(z.string().trim().max(40)).max(3),
   sku: z.string().trim().max(60).optional().default(""),
+  gtin: z
+    .string()
+    .transform((v) => v.replace(/\s/g, ""))
+    .refine((v) => v === "" || /^(\d{8}|\d{12,14})$/.test(v), "Strekkoden må være 8, 12, 13 eller 14 siffer")
+    .optional(),
   priceOre: z.number().int().min(0, "Prisen kan ikke være negativ").max(100_000_000),
   stock: z.number().int().min(0).nullable(),
   /** Variantens egen vekt i gram. Null: samme vekt som varen. */
   weightGrams: z.number().int("Vekten må være hele gram").min(0, "Vekten kan ikke være negativ").max(1_000_000, "Vekten kan være maks 1 000 kg").nullable().optional(),
+  /** Lageret da skjemaet ble åpnet. Med det stoppes lagringen hvis noen har handlet i mellomtiden. */
+  expectedStock: z.number().int().nullable().optional(),
 });
 
 export const productInputSchema = z
@@ -60,6 +67,8 @@ export const productInputSchema = z
     categoryId: z.string().uuid().nullable().default(null),
     /** Vekt i gram for varen, til fraktpris fra Bring. Null: vekten mangler. Utelatt: vekten endres ikke. */
     weightGrams: z.number().int("Vekten må være hele gram").min(0, "Vekten kan ikke være negativ").max(1_000_000, "Vekten kan være maks 1 000 kg").nullable().optional(),
+    seoTitle: z.string().trim().max(70, "Tittelen i Google kan være maks 70 tegn").optional(),
+    seoDescription: z.string().trim().max(160, "Beskrivelsen i Google kan være maks 160 tegn").optional(),
     variants: z.array(variantSchema).min(1, "Varen må ha minst én variant").max(100),
   })
   .superRefine((p, ctx) => {
@@ -123,14 +132,21 @@ async function saveVariants(db: Db, productId: string, variants: ReturnType<type
     const current = v.id ? byId.get(v.id) : undefined;
     if (current) {
       keep.add(current.id);
+      // Noen har handlet siden skjemaet ble åpnet. Har eieren ikke rørt lageret, beholdes tallet databasen har nå.
+      // Har eieren endret det, stoppes lagringen, så et salg aldri blir borte.
+      if (v.expectedStock !== undefined && current.stock !== v.expectedStock) {
+        if (v.stock === v.expectedStock) values.stock = current.stock;
+        else throw new ShopError(`Lageret for ${v.optionValues.join(" / ") || "varen"} er endret siden du åpnet varen, kanskje fordi noen har handlet. Last siden på nytt og prøv igjen.`);
+      }
+      const gtin = v.gtin === undefined ? current.gtin : v.gtin || null;
       // Uten vekt i skjemaet beholdes vekten varianten har (for eksempel fra import).
       await db
         .update(productVariants)
-        .set(v.weightGrams === undefined ? { ...values, weightGrams: current.weightGrams } : values)
+        .set(v.weightGrams === undefined ? { ...values, gtin, weightGrams: current.weightGrams } : { ...values, gtin })
         .where(eq(productVariants.id, current.id));
       if (current.priceOre !== v.priceOre) await db.insert(variantPriceHistory).values({ variantId: current.id, priceOre: v.priceOre });
     } else {
-      const [created] = await db.insert(productVariants).values({ productId, ...values }).returning({ id: productVariants.id });
+      const [created] = await db.insert(productVariants).values({ productId, ...values, gtin: v.gtin || null }).returning({ id: productVariants.id });
       keep.add(created.id);
       await db.insert(variantPriceHistory).values({ variantId: created.id, priceOre: v.priceOre });
     }
@@ -155,6 +171,8 @@ export async function createProduct(db: Db, siteId: string, input: ProductInput,
       options: data.options,
       vatRate: data.vatRate,
       weightGrams: data.weightGrams ?? null,
+      seoTitle: data.seoTitle || null,
+      seoDescription: data.seoDescription || null,
       status: data.status,
       categoryId: data.categoryId,
     })
@@ -180,6 +198,8 @@ export async function updateProduct(db: Db, siteId: string, productId: string, i
       options: data.options,
       vatRate: data.vatRate,
       ...(data.weightGrams !== undefined && { weightGrams: data.weightGrams }),
+      ...(data.seoTitle !== undefined && { seoTitle: data.seoTitle || null }),
+      ...(data.seoDescription !== undefined && { seoDescription: data.seoDescription || null }),
       status: data.status,
       categoryId: data.categoryId,
       updatedAt: new Date(),
@@ -196,6 +216,9 @@ export type CatalogVariant = {
   priceOre: number;
   beforePriceOre: number | null;
   stock: number | null;
+  /** Strekkode og varenummer, til produktfeeden og de strukturerte dataene. Mangler i eksempelvarene. */
+  gtin?: string | null;
+  sku?: string | null;
 };
 
 export type CatalogProduct = {
@@ -243,6 +266,8 @@ export async function listCatalog(db: Db, siteId: string, opts: { categoryId?: s
           priceOre: v.priceOre,
           beforePriceOre: beforePrice(history.filter((h) => h.variantId === v.id), now),
           stock: v.stock,
+          gtin: v.gtin,
+          sku: v.sku,
         }));
       if (vs.length === 0) return null;
       return {

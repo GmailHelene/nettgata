@@ -12,7 +12,7 @@ import type { ActionState } from "../../../../actions";
 import { archiveProductAction, saveProductAction } from "../../../../shop-actions";
 
 /** weight er variantens egen vekt i gram. Tom betyr samme vekt som varen. */
-type VariantRow = { id?: string; optionValues: string[]; sku: string; price: string; stock: string; weight: string };
+type VariantRow = { id?: string; optionValues: string[]; sku: string; gtin: string; price: string; stock: string; weight: string; loadedStock?: number | null };
 type OptionRow = { name: string; values: string };
 
 const gramsText = (grams: number | null | undefined) => (grams === null || grams === undefined ? "" : String(grams));
@@ -67,11 +67,16 @@ export function ProductEditor({
       id: v.id,
       optionValues: v.optionValues,
       sku: v.sku ?? "",
+      gtin: v.gtin ?? "",
       price: priceText(v.priceOre),
       stock: v.stock === null || v.stock === undefined ? "" : String(v.stock),
       weight: gramsText(v.weightGrams),
+      // Lageret slik det var da siden ble åpnet. Serveren stopper lagringen hvis noen har handlet i mellomtiden.
+      loadedStock: v.stock ?? null,
     })),
   );
+  const [seoTitle, setSeoTitle] = useState(initial.seoTitle ?? "");
+  const [seoDescription, setSeoDescription] = useState(initial.seoDescription ?? "");
   const [bulkPrice, setBulkPrice] = useState("");
   const [state, setState] = useState<ActionState>(null);
   const [pending, startTransition] = useTransition();
@@ -86,7 +91,7 @@ export function ProductEditor({
     setVariants(
       combinations(parsed).map((combo) => {
         const found = existing.get(keyOf(combo));
-        return found ?? { optionValues: combo, sku: "", price: fallback?.price ?? "", stock: fallback?.stock ?? "", weight: "" };
+        return found ?? { optionValues: combo, sku: "", gtin: "", price: fallback?.price ?? "", stock: fallback?.stock ?? "", weight: "" };
       }),
     );
   };
@@ -118,7 +123,21 @@ export function ProductEditor({
           setState({ ok: false, message: `Skriv vekten i hele gram for ${keyOf(v.optionValues)}, eller la feltet stå tomt` });
           return;
         }
-        builtVariants.push({ id: v.id, optionValues: v.optionValues, sku: v.sku, priceOre, stock, weightGrams: variantWeight });
+        const gtin = v.gtin.replace(/\s/g, "");
+        if (gtin && !/^(\d{8}|\d{12,14})$/.test(gtin)) {
+          setState({ ok: false, message: `Strekkoden for ${keyOf(v.optionValues) || "varen"} må være 8, 12, 13 eller 14 siffer` });
+          return;
+        }
+        builtVariants.push({
+          id: v.id,
+          optionValues: v.optionValues,
+          sku: v.sku,
+          gtin,
+          priceOre,
+          stock,
+          weightGrams: variantWeight,
+          ...(v.id && { expectedStock: v.loadedStock ?? null }),
+        });
       }
       const result = await saveProductAction(siteId, initial.id ?? null, {
         name,
@@ -129,6 +148,8 @@ export function ProductEditor({
         status,
         categoryId: categoryId || null,
         weightGrams,
+        seoTitle,
+        seoDescription,
         variants: builtVariants,
       });
       setState(result);
@@ -148,37 +169,6 @@ export function ProductEditor({
             <span className="mb-1 block text-sm font-medium">Beskrivelse</span>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={6} className={inputClass} />
           </label>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium">Status</span>
-              <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className={inputClass}>
-                <option value="draft">Kladd (vises ikke)</option>
-                <option value="active">I butikken</option>
-                <option value="archived">Arkivert</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium">Kategori</span>
-              <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputClass}>
-                <option value="">Ingen</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium">MVA</span>
-              <select value={vatRate} onChange={(e) => setVatRate(Number(e.target.value))} className={inputClass}>
-                {vatChoices.map((v) => (
-                  <option key={v.rate} value={v.rate}>
-                    {v.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
         </section>
 
         <section className="space-y-3 rounded-lg border bg-white p-5">
@@ -193,31 +183,6 @@ export function ProductEditor({
             />
           ))}
           <ImageInput label={images.length ? "Legg til bilde" : "Hovedbilde"} optional value={null} onChange={(v) => v && setImages([...images, v])} />
-        </section>
-
-        <section className="space-y-3 rounded-lg border bg-white p-5">
-          <h2 className="font-semibold">Valg</h2>
-          <p className="text-sm text-neutral-600">For eksempel Størrelse: S, M, L. Variantene lages automatisk av kombinasjonene.</p>
-          {options.map((o, i) => (
-            <div key={i} className="grid items-end gap-2 sm:grid-cols-[12rem_1fr_auto]">
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium">Navn på valget</span>
-                <input value={o.name} onChange={(e) => applyOptions(options.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} className={inputClass} />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium">Verdier, skilt med komma</span>
-                <input value={o.values} onChange={(e) => applyOptions(options.map((x, j) => (j === i ? { ...x, values: e.target.value } : x)))} className={inputClass} />
-              </label>
-              <button type="button" className="mb-2 text-sm underline" onClick={() => applyOptions(options.filter((_, j) => j !== i))}>
-                Fjern
-              </button>
-            </div>
-          ))}
-          {options.length < 3 && (
-            <button type="button" className="text-sm underline" onClick={() => setOptions([...options, { name: "", values: "" }])}>
-              + Legg til valg (størrelse, farge, materiale)
-            </button>
-          )}
         </section>
 
         <section className="space-y-3 rounded-lg border bg-white p-5">
@@ -262,7 +227,8 @@ export function ProductEditor({
                   <th className="py-2 pr-3 font-medium">Pris (kr, inkl. MVA)</th>
                   <th className="py-2 pr-3 font-medium">På lager</th>
                   {variants.length > 1 && <th className="py-2 pr-3 font-medium">Vekt (gram)</th>}
-                  <th className="py-2 font-medium">Varenummer (valgfritt)</th>
+                  <th className="py-2 pr-3 font-medium">Varenummer (valgfritt)</th>
+                  <th className="py-2 font-medium">Strekkode (GTIN, valgfritt)</th>
                 </tr>
               </thead>
               <tbody>
@@ -270,11 +236,11 @@ export function ProductEditor({
                   <tr key={keyOf(v.optionValues) || i} className="border-t">
                     {variants.length > 1 && <td className="py-2 pr-3 font-medium">{keyOf(v.optionValues)}</td>}
                     <td className="py-2 pr-3">
-                      <input aria-label="Pris" value={v.price} onChange={(e) => updateVariant(i, { price: e.target.value })} inputMode="decimal" className={`${inputClass} w-32`} />
+                      <input aria-label={`Pris${keyOf(v.optionValues) ? ` for ${keyOf(v.optionValues)}` : ""}`} value={v.price} onChange={(e) => updateVariant(i, { price: e.target.value })} inputMode="decimal" className={`${inputClass} w-32`} />
                     </td>
                     <td className="py-2 pr-3">
                       <input
-                        aria-label="På lager"
+                        aria-label={`På lager${keyOf(v.optionValues) ? ` for ${keyOf(v.optionValues)}` : ""}`}
                         value={v.stock}
                         onChange={(e) => updateVariant(i, { stock: e.target.value })}
                         inputMode="numeric"
@@ -295,8 +261,24 @@ export function ProductEditor({
                         />
                       </td>
                     )}
+                    <td className="py-2 pr-3">
+                      <input
+                        aria-label={`Varenummer${keyOf(v.optionValues) ? ` for ${keyOf(v.optionValues)}` : ""}`}
+                        value={v.sku}
+                        onChange={(e) => updateVariant(i, { sku: e.target.value })}
+                        className={`${inputClass} w-40`}
+                      />
+                    </td>
                     <td className="py-2">
-                      <input aria-label="Varenummer" value={v.sku} onChange={(e) => updateVariant(i, { sku: e.target.value })} className={`${inputClass} w-40`} />
+                      <input
+                        aria-label={`Strekkode${keyOf(v.optionValues) ? ` for ${keyOf(v.optionValues)}` : ""}`}
+                        value={v.gtin}
+                        onChange={(e) => updateVariant(i, { gtin: e.target.value })}
+                        inputMode="numeric"
+                        autoComplete="off"
+                        placeholder="13 siffer"
+                        className={`${inputClass} w-40`}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -305,9 +287,99 @@ export function ProductEditor({
           </div>
           <p className="text-xs text-neutral-600">
             La lager stå tomt for varer som lages på bestilling. Setter du ned prisen, viser butikken førpris automatisk etter markedsføringsloven.
+            Strekkoden (EAN) står under strekene på pakken. Google Shopping vil ha den for varer som selges i vanlige butikker.
           </p>
         </section>
 
+        <section className="space-y-3 rounded-lg border bg-white p-5">
+          <h2 className="font-semibold">Størrelser, farger og andre valg</h2>
+          <p className="text-sm text-neutral-600">
+            Bare hvis varen finnes i flere utgaver. For eksempel Størrelse: S, M, L. Variantene lages automatisk, og pris og lager står i tabellen over.
+          </p>
+          {options.map((o, i) => (
+            <div key={i} className="grid items-end gap-2 sm:grid-cols-[12rem_1fr_auto]">
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium">Navn på valget</span>
+                <input value={o.name} onChange={(e) => applyOptions(options.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} className={inputClass} />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium">Verdier, skilt med komma</span>
+                <input value={o.values} onChange={(e) => applyOptions(options.map((x, j) => (j === i ? { ...x, values: e.target.value } : x)))} className={inputClass} />
+              </label>
+              <button type="button" className="mb-2 text-sm underline" onClick={() => applyOptions(options.filter((_, j) => j !== i))}>
+                Fjern
+              </button>
+            </div>
+          ))}
+          {options.length < 3 && (
+            <button type="button" className="text-sm underline" onClick={() => setOptions([...options, { name: "", values: "" }])}>
+              + Legg til valg (størrelse, farge, materiale)
+            </button>
+          )}
+        </section>
+
+        <section className="space-y-4 rounded-lg border bg-white p-5">
+          <h2 className="font-semibold">Status og kategori</h2>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium">Status</span>
+              <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className={inputClass}>
+                <option value="draft">Kladd (vises ikke)</option>
+                <option value="active">I butikken</option>
+                <option value="archived">Arkivert</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium">Kategori</span>
+              <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputClass}>
+                <option value="">Ingen</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium">MVA</span>
+              <select value={vatRate} onChange={(e) => setVatRate(Number(e.target.value))} className={inputClass}>
+                {vatChoices.map((v) => (
+                  <option key={v.rate} value={v.rate}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section aria-labelledby="google-tittel" className="space-y-3 rounded-lg border bg-white p-5">
+          <h2 id="google-tittel" className="font-semibold">
+            Slik vises varen i Google
+          </h2>
+          <p className="text-sm text-neutral-600">Valgfritt. Står feltene tomme, bruker Nettgata navnet og starten av beskrivelsen.</p>
+          <div aria-hidden="true" className="rounded-md border border-dashed p-3">
+            <p className="truncate text-lg text-[#1a0dab]">{seoTitle || name || "Navnet på varen"}</p>
+            <p className="line-clamp-2 text-sm text-neutral-700">{seoDescription || description.slice(0, 160) || "Beskrivelsen av varen vises her."}</p>
+          </div>
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium">Tittel i Google</span>
+            <input value={seoTitle} maxLength={70} onChange={(e) => setSeoTitle(e.target.value)} aria-describedby="seo-tittel-tegn" className={inputClass} />
+            <span id="seo-tittel-tegn" className="mt-1 block text-xs text-neutral-600">
+              {seoTitle.length} av 70 tegn. Rundt 60 vises i søkeresultatet.
+            </span>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium">Beskrivelse i Google</span>
+            <textarea value={seoDescription} maxLength={160} rows={2} onChange={(e) => setSeoDescription(e.target.value)} aria-describedby="seo-beskrivelse-tegn" className={inputClass} />
+            <span id="seo-beskrivelse-tegn" className="mt-1 block text-xs text-neutral-600">
+              {seoDescription.length} av 160 tegn.
+            </span>
+          </label>
+        </section>
+
+        {/* Skjemaet er langt, så lagreknappen følger med nederst. Over bunnmenyen på mobil. */}
+        <div className="sticky bottom-16 z-20 -mx-1 space-y-2 rounded-lg border bg-white/95 px-4 py-3 shadow-sm backdrop-blur lg:bottom-3">
         <FormStatus state={state} />
         <div className="flex flex-wrap gap-3">
           <button disabled={pending} onClick={save} className="rounded-md bg-[#173b6c] px-5 py-3 font-semibold text-white disabled:opacity-60">
@@ -333,6 +405,7 @@ export function ProductEditor({
               Arkiver
             </button>
           )}
+        </div>
         </div>
       </div>
     </SiteIdContext.Provider>

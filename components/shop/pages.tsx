@@ -47,7 +47,15 @@ export async function shopMeta(db: Db, site: typeof sites.$inferSelect, route: S
       return { title: "Bestilling" };
     case "product": {
       const [p] = await db
-        .select({ id: products.id, name: products.name, description: products.description, images: products.images, options: products.options })
+        .select({
+          id: products.id,
+          name: products.name,
+          description: products.description,
+          images: products.images,
+          options: products.options,
+          seoTitle: products.seoTitle,
+          seoDescription: products.seoDescription,
+        })
         .from(products)
         .where(and(eq(products.siteId, site.id), eq(products.slug, route.slug), eq(products.status, "active")))
         .limit(1);
@@ -60,8 +68,9 @@ export async function shopMeta(db: Db, site: typeof sites.$inferSelect, route: S
       const attribute = p.options.find((o) => o.values.length === 1)?.values[0];
       return {
         title: p.name,
-        seoTitle: productTitle({ name: p.name, attribute, price, shopName: site.name }),
-        description: summarize(p.description) ?? productDescription({ name: p.name, description: "", price, shopName: site.name }),
+        // Eierens egen tittel og beskrivelse for Google vinner over de automatiske.
+        seoTitle: p.seoTitle ? `${p.seoTitle} | ${site.name}` : productTitle({ name: p.name, attribute, price, shopName: site.name }),
+        description: p.seoDescription || (summarize(p.description) ?? productDescription({ name: p.name, description: "", price, shopName: site.name })),
         image: image && { src: image.src, alt: image.decorative ? "" : image.alt },
         ...(min !== null && { priceNok: (min / 100).toFixed(2) }),
       };
@@ -182,6 +191,8 @@ function ProductStructuredData({ product, url, siteName, settings }: { product: 
       price: (v.priceOre / 100).toFixed(2),
       availability: v.stock === null || v.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
       ...(v.label && { name: v.label }),
+      ...(v.gtin && { [`gtin${v.gtin.length}`]: v.gtin }),
+      ...(v.sku && { sku: v.sku }),
       ...extras,
     })),
   };

@@ -50,8 +50,9 @@ export function productFeedXml({ origin, siteName, products }: { origin: string;
         ...(onSale ? [`<g:sale_price>${nok(variant.priceOre)}</g:sale_price>`] : []),
         `<g:brand>${escape(siteName)}</g:brand>`,
         "<g:condition>new</g:condition>",
-        // Katalogen har ikke strekkoder ennå. Da skal Google få vite det, ellers avvises varen.
-        "<g:identifier_exists>no</g:identifier_exists>",
+        // Med strekkode får Google den. Uten skal Google få vite at den mangler, ellers avvises varen.
+        ...(variant.gtin ? [`<g:gtin>${escape(variant.gtin)}</g:gtin>`] : ["<g:identifier_exists>no</g:identifier_exists>"]),
+        ...(variant.sku ? [`<g:mpn>${escape(variant.sku)}</g:mpn>`] : []),
         ...(grouped ? [`<g:item_group_id>${escape(product.id)}</g:item_group_id>`, ...variantAttributes(product, variant.optionValues)] : []),
       ];
       return `<item>${fields.join("")}</item>`;

@@ -52,10 +52,13 @@ export default async function ProductPage({ params }: { params: Promise<{ siteId
       status: product.status,
       categoryId: product.categoryId,
       weightGrams: single ? (variants[0].weightGrams ?? product.weightGrams) : product.weightGrams,
+      seoTitle: product.seoTitle ?? "",
+      seoDescription: product.seoDescription ?? "",
       variants: variants.map((v) => ({
         id: v.id,
         optionValues: v.optionValues,
         sku: v.sku ?? "",
+        gtin: v.gtin ?? "",
         priceOre: v.priceOre,
         stock: v.stock,
         weightGrams: single ? null : v.weightGrams,

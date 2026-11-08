@@ -320,6 +320,9 @@ export const products = pgTable(
      * bruker sin egen. Null betyr at vekten mangler: varen kan fortsatt selges, og kassen bruker reserveprisen for Bring.
      */
     weightGrams: integer("weight_grams"),
+    /** Tittel og beskrivelse i Google. Null: navnet og starten av beskrivelsen brukes. */
+    seoTitle: text("seo_title"),
+    seoDescription: text("seo_description"),
     status: productStatusEnum("status").notNull().default("draft"),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: createdAt(),
@@ -336,6 +339,8 @@ export const productVariants = pgTable(
     /** Verdier i samme rekkefølge som produktets options, f.eks. ["M", "Blå"]. */
     optionValues: jsonb("option_values").$type<string[]>().notNull().default([]),
     sku: text("sku"),
+    /** Strekkoden (EAN/GTIN), 8, 12, 13 eller 14 siffer. Går til produktfeeden og de strukturerte dataene. */
+    gtin: text("gtin"),
     priceOre: integer("price_ore").notNull(),
     /** Null betyr at lager ikke følges (tjenester, digitale varer, laget på bestilling). */
     stock: integer("stock"),

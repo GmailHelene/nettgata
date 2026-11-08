@@ -70,3 +70,13 @@ describe("produktfeed", () => {
     expect(xml).not.toContain("image_link");
   });
 });
+
+describe("strekkode i produktfeeden", () => {
+  it("sender GTIN og varenummer når varen har det, ellers identifier_exists=no", () => {
+    const withCode = feed([product({ variants: [{ id: "v1", optionValues: [], label: "", priceOre: 89900, beforePriceOre: null, stock: null, gtin: "7038010009457", sku: "PLEDD-1" }] })]);
+    expect(withCode).toContain("<g:gtin>7038010009457</g:gtin>");
+    expect(withCode).toContain("<g:mpn>PLEDD-1</g:mpn>");
+    expect(withCode).not.toContain("identifier_exists");
+    expect(feed([product()])).toContain("<g:identifier_exists>no</g:identifier_exists>");
+  });
+});
