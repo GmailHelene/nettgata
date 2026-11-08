@@ -93,7 +93,7 @@ export function angreskjema(butikk: Virksomhet): string[] {
 
 /** «Du kan betale med Vipps eller kort, eller når du henter varene.» */
 function betalingssetning(metoder: readonly Betalingsmate[]): string {
-  const navn: Record<"vipps" | "kort" | "klarna" | "kustom" | "faktura", string> = { vipps: "Vipps", kort: "kort", klarna: "Klarna", kustom: "Kustom", faktura: "faktura" };
+  const navn: Record<"vipps" | "kort" | "stripe" | "klarna" | "kustom" | "faktura", string> = { vipps: "Vipps", kort: "kort", stripe: "kort", klarna: "Klarna", kustom: "Kustom", faktura: "faktura" };
   const unike = [...new Set(metoder)];
   const vanlige = unike.filter((m): m is keyof typeof navn => m in navn).map((m) => navn[m]);
   const henting = unike.includes("ved-henting");

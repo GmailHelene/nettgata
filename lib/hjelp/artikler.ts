@@ -383,12 +383,13 @@ export const helpArticles: HelpArticle[] = [
   },
   {
     slug: "vipps-klarna",
-    title: "Ta betalt med Vipps, Klarna og Kustom",
+    title: "Ta betalt med Stripe, Vipps og Kustom",
     category: "nettbutikk",
     summary: "Du har egen avtale, og pengene går rett til kontoen din.",
-    intro: ["Du trenger en avtale med Vipps MobilePay om Vipps på nett, med Klarna eller med Kustom. Pengene går rett til butikken, aldri via Nettgata."],
+    intro: ["Kort kobler du til med en knapp, og Stripe setter opp kontoen din. For Vipps trenger du en avtale med Vipps MobilePay om Vipps på nett. Pengene går rett til butikken, aldri via Nettgata."],
     steps: [
       "Gå til «Betaling».",
+      "Under Kort: trykk «Koble til Stripe» og fyll ut skjemaet hos Stripe. Kort vises i kassen når Stripe har godkjent kontoen.",
       "Under Vipps: hent client_id, client_secret, abonnementsnøkkelen og salgsstednummeret (MSN) i portal.vippsmobilepay.com.",
       "Under Klarna: lag en API-nøkkel i Klarna Merchant Portal og lim inn brukernavn og passord med en gang. Klarna viser passordet bare én gang.",
       "Under Kustom: logg inn i Kustom Portal, gå til API-innstillingene og trykk «Generate new». Lim inn API-brukernavnet og API-passordet med en gang. Kustom viser passordet bare én gang.",
@@ -397,6 +398,8 @@ export const helpArticles: HelpArticle[] = [
     notes: [
       "«Hvor finner jeg nøklene?» på siden viser stegene for hver av dem.",
       "Beløpet reserveres når kunden betaler, og trekkes når du markerer ordren som sendt eller hentet.",
+      "En reservasjon på kort varer i omtrent sju dager. Send ordren innen den tid, ellers må kunden betale på nytt.",
+      "Stripe tar sitt eget gebyr per kjøp og betaler ut til bankkontoen din. Du ser alt på dashboard.stripe.com. Nettgata tar ingen andel.",
       "Betaling ved henting og faktura velger du nederst på samme side, under «Innstillinger» og «Betaling».",
       "Bare eieren kan legge inn nøklene.",
       "Vil du prøve først, lag testnøkler i Kustom playground og velg Test. Da trekkes ingen ekte penger.",
@@ -412,7 +415,7 @@ export const helpArticles: HelpArticle[] = [
     steps: [
       "Gå til «Ordre». Ordre som er «Betalt, klar til sending» venter på deg.",
       "Pakk varene. Plukkliste og pakkseddel finner du fra ordren og ordrelisten.",
-      "Trykk «Marker som sendt». Med Vipps, Klarna og Kustom trekkes beløpet nå, og kunden får e-post om at pakken er på vei.",
+      "Trykk «Marker som sendt». Med kort, Vipps, Klarna og Kustom trekkes beløpet nå, og kunden får e-post om at pakken er på vei.",
       "Skal kunden ha pengene tilbake, trykk «Refunder».",
     ],
     notes: [

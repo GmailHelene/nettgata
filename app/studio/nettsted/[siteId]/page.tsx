@@ -223,7 +223,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ siteI
     if (fiken?.needsReconnect) tasks.push({ text: "Fiken er koblet fra. Koble til Fiken på nytt for å sende ordre dit", href: `${base}/innstillinger/regnskap#fiken-tittel`, tone: "warning" });
     else if (fiken && !fiken.companySlug) tasks.push({ text: "Velg hvilket selskap i Fiken ordrene skal til", href: `${base}/innstillinger/regnskap#fiken-tittel` });
     bringReady = Boolean(settings.bringShipping);
-    paymentReady = availablePaymentMethods(settings).some((m) => m === "vipps" || m === "klarna" || m === "kustom");
+    paymentReady = availablePaymentMethods(settings).some((m) => m === "vipps" || m === "stripe" || m === "klarna" || m === "kustom");
     if (counts.paid) tasks.push({ text: `${counts.paid} ${counts.paid === 1 ? "ordre er betalt og klar" : "ordre er betalt og klare"} til sending`, href: `${base}/ordre?status=klar` });
     if (counts.pending_payment) tasks.push({ text: `${counts.pending_payment} ordre venter på betaling`, href: `${base}/ordre?status=venter` });
     if (low.length) tasks.push({ text: `${low.length}${low.length === 8 ? "+" : ""} varianter har ${settings.lowStockAt} eller færre igjen`, href: `${base}/varer?lager=lite` });
@@ -246,7 +246,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ siteI
     ...(isShop
       ? [
           { label: "Legg inn den første varen", detail: "Navn, bilde, pris og antall på lager", href: `${base}/varer/ny`, done: productCount > 0 },
-          { label: "Koble til betaling", detail: "Kustom eller Vipps, med butikkens egen avtale", href: `${base}/betaling`, done: paymentReady },
+          { label: "Koble til betaling", detail: "Kort med Stripe, eller Vipps", href: `${base}/betaling`, done: paymentReady },
           {
             label: "Koble til Bring",
             detail: "Uten Bring betaler kunden fast posttakst, og du lager fraktetikettene selv. Med Bring får kunden riktig pris og hentested.",

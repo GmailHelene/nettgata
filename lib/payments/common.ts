@@ -51,16 +51,19 @@ export const asNumber = (value: unknown): number | undefined => (typeof value ==
  * - vipps:<miljø>:<referanse>
  * - klarna:<miljø>:hpp:<økt-ID> før kunden har betalt, klarna:<miljø>:order:<ordre-ID> etterpå
  * - kustom:<miljø>:<ordre-ID> (samme ID i Checkout API og Order Management)
+ * - stripe:<miljø>:<konto-ID>:<Checkout-økt>. Kontoen lagres, så refusjon alltid går mot kontoen som tok betalingen.
  * Miljøet lagres, så en ordre betalt i testmiljøet aldri trekkes eller refunderes med produksjonsnøklene.
  */
 export type PaymentRef =
   | { provider: "vipps"; environment: PaymentEnvironment; reference: string }
   | { provider: "klarna"; environment: PaymentEnvironment; kind: "hpp" | "order"; id: string }
-  | { provider: "kustom"; environment: PaymentEnvironment; id: string };
+  | { provider: "kustom"; environment: PaymentEnvironment; id: string }
+  | { provider: "stripe"; environment: PaymentEnvironment; accountId: string; sessionId: string };
 
 export function formatPaymentRef(ref: PaymentRef): string {
   if (ref.provider === "vipps") return `vipps:${ref.environment}:${ref.reference}`;
   if (ref.provider === "kustom") return `kustom:${ref.environment}:${ref.id}`;
+  if (ref.provider === "stripe") return `stripe:${ref.environment}:${ref.accountId}:${ref.sessionId}`;
   return `klarna:${ref.environment}:${ref.kind}:${ref.id}`;
 }
 
@@ -73,6 +76,8 @@ export function parsePaymentRef(value: string | null | undefined): PaymentRef | 
   if (klarna) return { provider: "klarna", environment: klarna[1] as PaymentEnvironment, kind: klarna[2] as "hpp" | "order", id: klarna[3] };
   const kustom = /^kustom:(test|production):([A-Za-z0-9-]{1,100})$/.exec(value);
   if (kustom) return { provider: "kustom", environment: kustom[1] as PaymentEnvironment, id: kustom[2] };
+  const stripe = /^stripe:(test|production):(acct_[A-Za-z0-9]+):(cs_[A-Za-z0-9_]{1,200})$/.exec(value);
+  if (stripe) return { provider: "stripe", environment: stripe[1] as PaymentEnvironment, accountId: stripe[2], sessionId: stripe[3] };
   return null;
 }
 

@@ -76,6 +76,8 @@ function betaling(input: PersonvernInput, metoder: readonly Betalingsmate[]): st
     kustom:
       "Velger du Kustom, betaler du i kassen til Kustom AB. Vi sender hva du kjøper og ordrenummeret til Kustom, og det du fyller inn i kassen, går rett til Kustom. Kustom er selv behandlingsansvarlig for opplysningene de bruker til betalingen, og har sin egen personvernerklæring. Vi får navn, adresse og e-postadresse tilbake, slik at vi kan sende varene.",
     kort: `Betaler du med kort, legger du inn kortet hos betalingsleverandøren vår${kort ? `, ${kort}` : ""}. Vi ser aldri hele kortnummeret ditt og lagrer det ikke.`,
+    stripe:
+      "Betaler du med kort, legger du inn kortet på betalingssiden til Stripe. Vi sender beløpet, ordrenummeret og e-postadressen din til Stripe. Kortnummeret går rett til Stripe, og vi ser det aldri. Stripe har sin egen personvernerklæring for opplysningene de behandler.",
     faktura:
       "Velger du faktura, sender vi fakturaen til e-postadressen din. Fakturaen er en del av regnskapet vårt og lagres like lenge som bestillingen.",
     "ved-henting": "Betaler du når du henter varene, registrerer vi bare at bestillingen er betalt.",

@@ -264,3 +264,21 @@ regnskapsprogrammet.
 - `lib/billing/state.ts`: hva som lagres, hvem som regnes som betalende, og teksten kunden ser
 - `app/api/stripe/webhook/route.ts`: webhooken
 - `app/studio/nettsted/[siteId]/abonnement/`: fanen Abonnement
+
+## Kort i kundenes nettbutikker (Stripe Connect)
+
+Dette er noe annet enn abonnementet over. Her betaler butikkens kunder butikken.
+
+- Butikken trykker **Koble til Stripe** under Betaling og fyller ut skjemaet hos Stripe. Koden ligger i `lib/payments/stripe.ts`,
+  og `sites.shop.stripeConnect` holder konto-ID og status. Ingen hemmeligheter per butikk. Plattformnøkkelen er samme
+  `STRIPE_SECRET_KEY` som abonnementet bruker.
+- Kontoen opprettes med `controller.losses.payments=stripe`, `controller.fees.payer=account`,
+  `controller.requirement_collection=stripe` og `controller.stripe_dashboard.type=full`. Stripe kontrollerer bedriften og står
+  for tap. Butikken betaler gebyrene og bruker sitt eget dashbord.
+- Betalingene er direkte betaling på butikkens konto (`Stripe-Account`-hodet). Ingen `application_fee`, så Nettgata tar ingen andel.
+- Checkout med `capture_method=manual`: beløpet reserveres ved kjøp og trekkes ved «sendt». En kortreservasjon varer normalt sju dager.
+- Status hentes alltid fra Stripe: når kunden kommer tilbake, og av bakgrunnsjobben hvert tiende minutt. Derfor trengs ingen webhook for dette.
+
+**Sett opp:** Connect slås på i Stripe-dashbordet (Connect, Get started, «Your merchants collect payments directly»), først i sandkassen
+og så i live. Sandkassen er slått på. For å prøve lokalt: dobbeltklikk `scripts/Test kort lokalt.cmd`.
+

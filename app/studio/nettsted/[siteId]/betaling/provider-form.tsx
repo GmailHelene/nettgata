@@ -4,13 +4,13 @@ import { useState, useTransition } from "react";
 import { FormStatus } from "@/components/studio/form-status";
 import { inputClass } from "@/components/studio/info-fields";
 import type { ProviderView } from "@/lib/payments/config";
-import type { OnlineProvider, PaymentEnvironment } from "@/lib/payments/state";
+import type { KeyProvider, PaymentEnvironment } from "@/lib/payments/state";
 import type { ActionState } from "../../../actions";
 import { removePaymentKeysAction, savePaymentKeysAction, testPaymentConnectionAction } from "./actions";
 
 type Field = { name: string; label: string; secret?: boolean; numeric?: boolean; hint?: string };
 
-const setup: Record<OnlineProvider, { name: string; intro: string; hintLabel: string; testLabel: string; fields: Field[]; help: React.ReactNode }> = {
+const setup: Record<KeyProvider, { name: string; intro: string; hintLabel: string; testLabel: string; fields: Field[]; help: React.ReactNode }> = {
   vipps: {
     name: "Vipps",
     intro: "Kunden godkjenner betalingen i Vipps-appen. Beløpet reserveres med en gang og trekkes når du markerer ordren som sendt eller hentet.",
@@ -100,7 +100,7 @@ function Status({ view }: { view: ProviderView | null }) {
  * Ett kort per betalingsløsning. Nøklene skrives inn her og sendes til serveren, men kommer aldri tilbake:
  * studioet ser bare om løsningen er koblet til, hvilket miljø og de fire siste tegnene.
  */
-export function ProviderForm({ siteId, provider, view, canEdit }: { siteId: string; provider: OnlineProvider; view: ProviderView | null; canEdit: boolean }) {
+export function ProviderForm({ siteId, provider, view, canEdit }: { siteId: string; provider: KeyProvider; view: ProviderView | null; canEdit: boolean }) {
   const info = setup[provider];
   const [editing, setEditing] = useState(false);
   const [environment, setEnvironment] = useState<PaymentEnvironment>(view?.environment ?? "test");

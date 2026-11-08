@@ -1,12 +1,15 @@
 "use server";
 
 import { eq } from "drizzle-orm";
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { getDb } from "@/db";
 import { sites } from "@/db/schema";
-import { removePaymentKeys, savePaymentKeys, testPaymentConnection } from "@/lib/payments/config";
-import { onlineProviders, providerNames, type OnlineProvider } from "@/lib/payments/state";
+import { isPlatformHost } from "@/lib/hosts";
+import { platformUrl } from "@/lib/site-url";
+import { disconnectStripe, removePaymentKeys, savePaymentKeys, startStripeOnboarding, testPaymentConnection } from "@/lib/payments/config";
+import { keyProviders, providerNames, type KeyProvider } from "@/lib/payments/state";
 import { hit } from "@/lib/rate-limit";
 import { requireSiteAccess } from "@/lib/session";
 import { ShopError } from "@/lib/shop/catalog";
@@ -14,8 +17,8 @@ import { availablePaymentMethods, readShopSettings } from "@/lib/shop/settings";
 import type { ActionState } from "../../../actions";
 
 /** Nøklene bestemmer hvor pengene går. Derfor kan bare eieren av butikken (og plattformadmin) endre dem. */
-async function ownerAccess(siteId: string, provider: OnlineProvider) {
-  if (!onlineProviders.includes(provider)) throw new ShopError("Ukjent betalingsløsning");
+async function ownerAccess(siteId: string, provider: KeyProvider | "stripe") {
+  if (provider !== "stripe" && !keyProviders.includes(provider)) throw new ShopError("Ukjent betalingsløsning");
   const { site, user, role } = await requireSiteAccess(siteId);
   if (site.kind !== "nettbutikk") throw new ShopError("Betaling med Vipps og Klarna gjelder bare nettbutikker");
   if (role !== "owner") throw new ShopError("Bare eieren av butikken kan endre betalingsoppsettet.");
@@ -43,7 +46,7 @@ const refresh = (siteId: string) => revalidatePath(`/studio/nettsted/${siteId}`,
  */
 export async function savePaymentKeysAction(
   siteId: string,
-  provider: OnlineProvider,
+  provider: KeyProvider,
   input: Record<string, string>,
 ): Promise<{ ok: boolean; message: string; saved: boolean }> {
   let saved = false;
@@ -62,7 +65,7 @@ export async function savePaymentKeysAction(
   }
 }
 
-export async function testPaymentConnectionAction(siteId: string, provider: OnlineProvider): Promise<ActionState> {
+export async function testPaymentConnectionAction(siteId: string, provider: KeyProvider): Promise<ActionState> {
   try {
     const { site, user, db } = await ownerAccess(siteId, provider);
     const test = await testPaymentConnection(db, site.id, provider, user.id);
@@ -75,7 +78,7 @@ export async function testPaymentConnectionAction(siteId: string, provider: Onli
   }
 }
 
-export async function removePaymentKeysAction(siteId: string, provider: OnlineProvider): Promise<ActionState> {
+export async function removePaymentKeysAction(siteId: string, provider: KeyProvider): Promise<ActionState> {
   try {
     const { site, user, db } = await ownerAccess(siteId, provider);
     await removePaymentKeys(db, site.id, provider, user.id);
@@ -86,6 +89,32 @@ export async function removePaymentKeysAction(siteId: string, provider: OnlinePr
     return left.length
       ? { ok: true, message: `Nøklene til ${name} er fjernet, og ${name} vises ikke lenger i kassen.` }
       : { ok: true, message: `Nøklene til ${name} er fjernet. Kassen har ingen betalingsmåter nå, så velg minst én under Innstillinger.` };
+  } catch (err) {
+    return toState(err);
+  }
+}
+
+/** Oppretter butikkens Stripe-konto første gang og gir lenken til Stripes registrering. */
+export async function startStripeAction(siteId: string): Promise<{ ok: boolean; message: string; url?: string }> {
+  try {
+    const { site, user, db } = await ownerAccess(siteId, "stripe");
+    const host = (await headers()).get("host") ?? "";
+    const base = host && isPlatformHost(host) ? `${process.env.NODE_ENV === "production" ? "https" : "http"}://${host}` : platformUrl();
+    const page = `${base}/studio/nettsted/${site.id}/betaling`;
+    const url = await startStripeOnboarding(db, site, user, { returnUrl: `${page}?stripe=ferdig`, refreshUrl: `${page}?stripe=utlopt` });
+    refresh(site.id);
+    return { ok: true, message: "Sender deg til Stripe...", url };
+  } catch (err) {
+    return toState(err) ?? { ok: false, message: "Noe gikk galt. Prøv igjen." };
+  }
+}
+
+export async function disconnectStripeAction(siteId: string): Promise<ActionState> {
+  try {
+    const { site, user, db } = await ownerAccess(siteId, "stripe");
+    await disconnectStripe(db, site.id, user.id);
+    refresh(site.id);
+    return { ok: true, message: "Kort er tatt ut av kassen. Stripe-kontoen din er urørt." };
   } catch (err) {
     return toState(err);
   }

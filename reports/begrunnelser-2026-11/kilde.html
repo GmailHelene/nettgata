@@ -40,10 +40,10 @@ li { margin: 0 0 1.2mm; }
 <p><span class="lbl">Forslaget:</span> en steg-for-steg-veiviser inne i Nettgata som skaffer bedriften en Vipps-avtale.</p>
 <p><span class="lbl">Hvorfor ikke:</span> Avtalen inngås hos Vipps MobilePay, med BankID og kontroll av bedriften. Det kan ikke Nettgata gjøre for kunden, og det skal vi heller ikke. En veiviser hos oss ville bare vært en kopi av Vipps sine sider, og den ville blitt feil hver gang Vipps endrer noe. Hjelpesiden forklarer hva kunden skal gjøre hos Vipps. Når nøklene er limt inn, tester Betaling dem med en gang og sier tydelig fra om noe er feil.</p></div>
 
-<div class="item red"><h3>Kortbetaling uten egen avtale med Klarna eller Kustom<span class="tag t-deg">Din beslutning</span></h3>
-<p><span class="lbl">Forslaget:</span> at butikken kan ta kort uten å inngå noen avtale selv, slik Shopify Payments gjør.</p>
-<p><span class="lbl">Hvorfor ikke ennå:</span> Da blir Nettgata betalingsformidler for kundene, med krav om kundekontroll etter hvitvaskingsloven, ansvar ved tilbakeføringer og en egen avtale med for eksempel Stripe Connect. Dette er en forretningsbeslutning med juridiske og økonomiske følger, ikke bare kode.</p>
-<p><span class="lbl">Anbefaling:</span> Bruk Kustom. Kustom-kassen har kort, Vipps og Klarna i én avtale som butikken inngår selv. Pengene går rett til butikken, og Nettgata rører dem aldri. Stripe Connect er bare verdt det hvis mange kunder faller fra fordi de må inngå en avtale.</p></div>
+<div class="item"><h3>Kortbetaling uten egen avtale med Klarna eller Kustom<span class="tag t-senere">Bygget</span></h3>
+<p><span class="lbl">Forslaget:</span> at butikken kan ta kort uten å skaffe seg en avtale og lime inn nøkler.</p>
+<p><span class="lbl">Det vi gjorde:</span> Butikken trykker «Koble til Stripe» og fyller ut skjemaet hos Stripe. Kortbetalingen skjer direkte på butikkens egen Stripe-konto. Stripe kontrollerer bedriften og står for tap, butikken betaler gebyrene og får pengene rett på bankkontoen.</p>
+<p><span class="lbl">Hvorfor akkurat slik:</span> Nettgata rører aldri pengene og tar ingen andel. Dermed blir Nettgata ikke betalingsformidler, og løftet om 0 % gebyr står. Stripe gjør kundekontrollen, så det ansvaret ligger hos dem.</p></div>
 
 <div class="item"><h3>Feilmelding koblet til hvert enkelt felt<span class="tag t-senere">Senere</span></h3>
 <p><span class="lbl">Forslaget:</span> at feilmeldingen står under feltet den gjelder og er koblet til det med aria-describedby, i alle skjemaene.</p>

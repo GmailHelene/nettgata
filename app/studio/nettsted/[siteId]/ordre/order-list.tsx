@@ -49,7 +49,7 @@ export function OrderList({ siteId, base, rows, bulk }: { siteId: string; base: 
   const toggleAll = () => setSelected(allSelected ? [] : selectable.slice(0, MAX).map((r) => r.id));
 
   const run = (kind: "create" | "print" | "fulfil") => {
-    if (kind === "fulfil" && !confirm(`Markere ${fulfilCount} ordre som sendt? Med Vipps og Kustom trekkes beløpet nå, og kundene får «Pakken er på vei».`)) return;
+    if (kind === "fulfil" && !confirm(`Markere ${fulfilCount} ordre som sendt? Med kort, Vipps og Kustom trekkes beløpet nå, og kundene får «Pakken er på vei».`)) return;
     setCreated(null);
     setPrinted(null);
     setFulfilled(null);

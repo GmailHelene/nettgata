@@ -54,7 +54,8 @@ export interface StripeClient {
   post<T>(path: string, params?: StripeParams, options?: { idempotencyKey?: string }): Promise<T>;
 }
 
-export function createStripeClient(secretKey: string, options: { fetch?: typeof fetch; timeoutMs?: number } = {}): StripeClient {
+/** stripeAccount gjør kallet på vegne av en tilkoblet konto (Connect): betalingen hører til den kontoen, ikke plattformen. */
+export function createStripeClient(secretKey: string, options: { fetch?: typeof fetch; timeoutMs?: number; stripeAccount?: string } = {}): StripeClient {
   // Slås opp ved hvert kall, så tester kan bytte ut fetch.
   const doFetch: typeof fetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
   const timeoutMs = options.timeoutMs ?? 15_000;
@@ -65,6 +66,7 @@ export function createStripeClient(secretKey: string, options: { fetch?: typeof 
     const headers: Record<string, string> = { authorization: `Bearer ${secretKey}`, "stripe-version": STRIPE_API_VERSION };
     if (method === "POST") headers["content-type"] = "application/x-www-form-urlencoded";
     if (idempotencyKey) headers["idempotency-key"] = idempotencyKey;
+    if (options.stripeAccount) headers["stripe-account"] = options.stripeAccount;
 
     let res: Response;
     try {

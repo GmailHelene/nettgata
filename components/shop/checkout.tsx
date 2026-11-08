@@ -20,6 +20,7 @@ const input = "w-full rounded-[var(--radius)] border border-[var(--c-muted)] bg-
 const paymentNotes: Partial<Record<PaymentMethod, string>> = {
   klarna: "Kort, faktura eller delbetaling",
   kustom: "Velg betalingsmåte i Kustom-kassen",
+  stripe: "Betal på den sikre betalingssiden til Stripe",
 };
 
 /**

@@ -268,7 +268,7 @@ export function ShopSettingsForm({
             Betalingsmåter butikken ordner selv
           </legend>
           <p className="mb-2 text-xs text-neutral-600">
-            Vises i kassen ved siden av Vipps og Kustom. Du får ikke betalt på
+            Vises i kassen ved siden av kort, Vipps og Kustom. Du får ikke betalt på
             nettet for disse.
           </p>
           <div className="space-y-2">

@@ -8,7 +8,8 @@ import { PaymentError } from "./common";
 import { decryptPaymentSecret, encryptPaymentSecret } from "./crypto";
 import { klarnaClient, type KlarnaCredentials } from "./klarna";
 import { kustomClient, type KustomCredentials } from "./kustom";
-import { paymentEnvironments, providerNames, readStoredProvider, type OnlineProvider, type PaymentEnvironment, type StoredProvider } from "./state";
+import { paymentEnvironments, providerNames, readStoredProvider, readStripeConnect, type KeyProvider, type PaymentEnvironment, type StoredProvider, type StripeConnect } from "./state";
+import { stripePlatform, stripePlatformEnvironment } from "./stripe";
 import { vippsClient, type VippsCredentials } from "./vipps";
 
 // ---------- Skjemaene i studioet ----------
@@ -72,7 +73,7 @@ export type KlarnaKeysInput = z.input<typeof klarnaKeysSchema>;
 export type KustomKeysInput = z.input<typeof kustomKeysSchema>;
 
 /** Krypteringen er bundet til butikk, løsning og miljø. */
-const encryptionContext = (siteId: string, provider: OnlineProvider, environment: PaymentEnvironment) =>
+const encryptionContext = (siteId: string, provider: KeyProvider, environment: PaymentEnvironment) =>
   `nettgata-betaling:${siteId}:${provider}:${environment}`;
 
 /** Oppsettet for én løsning, eller et tomt objekt. Tåler at feltet mangler eller har feil form. */
@@ -84,7 +85,7 @@ const providersObject = sql`(case when jsonb_typeof(${sites.shop} -> 'paymentPro
  * Lagrer nøklene kryptert under sites.shop.paymentProviders. Alt skjer i én SQL-setning som bare rører denne løsningen,
  * så butikkinnstillinger som lagres samtidig, ikke går tapt. Nye nøkler må testes før løsningen vises i kassen.
  */
-export async function savePaymentKeys(db: Db, siteId: string, provider: OnlineProvider, input: unknown, userId: string | null): Promise<StoredProvider> {
+export async function savePaymentKeys(db: Db, siteId: string, provider: KeyProvider, input: unknown, userId: string | null): Promise<StoredProvider> {
   let plain: string;
   let environment: PaymentEnvironment;
   let hint: string;
@@ -124,7 +125,7 @@ export async function savePaymentKeys(db: Db, siteId: string, provider: OnlinePr
   return stored;
 }
 
-export async function removePaymentKeys(db: Db, siteId: string, provider: OnlineProvider, userId: string | null) {
+export async function removePaymentKeys(db: Db, siteId: string, provider: KeyProvider, userId: string | null) {
   await db
     .update(sites)
     .set({ shop: sql`${sites.shop} || jsonb_build_object('paymentProviders', ${providersObject} - ${provider}::text)` })
@@ -143,7 +144,7 @@ export async function updateShopSettings(db: Db, siteId: string, settings: ShopS
   await db
     .update(sites)
     .set({
-      shop: sql`${JSON.stringify(data)}::jsonb || (case when jsonb_typeof(${sites.shop} -> 'paymentProviders') = 'object' then jsonb_build_object('paymentProviders', ${sites.shop} -> 'paymentProviders') else '{}'::jsonb end) || (case when jsonb_typeof(${sites.shop} -> 'fiken') = 'object' then jsonb_build_object('fiken', ${sites.shop} -> 'fiken') else '{}'::jsonb end) || (case when jsonb_typeof(${sites.shop} -> 'bring') = 'object' then jsonb_build_object('bring', ${sites.shop} -> 'bring') else '{}'::jsonb end)`,
+      shop: sql`${JSON.stringify(data)}::jsonb || (case when jsonb_typeof(${sites.shop} -> 'paymentProviders') = 'object' then jsonb_build_object('paymentProviders', ${sites.shop} -> 'paymentProviders') else '{}'::jsonb end) || (case when jsonb_typeof(${sites.shop} -> 'fiken') = 'object' then jsonb_build_object('fiken', ${sites.shop} -> 'fiken') else '{}'::jsonb end) || (case when jsonb_typeof(${sites.shop} -> 'bring') = 'object' then jsonb_build_object('bring', ${sites.shop} -> 'bring') else '{}'::jsonb end) || (case when jsonb_typeof(${sites.shop} -> 'stripeConnect') = 'object' then jsonb_build_object('stripeConnect', ${sites.shop} -> 'stripeConnect') else '{}'::jsonb end)`,
     })
     .where(eq(sites.id, siteId));
 }
@@ -160,7 +161,7 @@ export type ProviderAccess =
  * lagres eller sendes videre. Returnerer null hvis nøklene mangler eller ikke kan leses (for eksempel etter at
  * SESSION_SECRET er byttet). Da må eieren legge dem inn på nytt.
  */
-export async function loadCredentials(site: { id: string; shop: unknown }, provider: OnlineProvider): Promise<ProviderAccess | null> {
+export async function loadCredentials(site: { id: string; shop: unknown }, provider: KeyProvider): Promise<ProviderAccess | null> {
   const stored = readStoredProvider(site.shop, provider);
   if (!stored) return null;
   try {
@@ -187,8 +188,8 @@ export type ProviderView = {
   ready: boolean;
 };
 
-export function paymentSetupView(shop: unknown): Record<OnlineProvider, ProviderView | null> {
-  const view = (provider: OnlineProvider): ProviderView | null => {
+export function paymentSetupView(shop: unknown): Record<KeyProvider, ProviderView | null> {
+  const view = (provider: KeyProvider): ProviderView | null => {
     const stored = readStoredProvider(shop, provider);
     if (!stored) return null;
     return {
@@ -209,7 +210,7 @@ export function paymentSetupView(shop: unknown): Record<OnlineProvider, Provider
  * Prøver nøklene mot Vipps eller Klarna uten å opprette noe. Resultatet lagres på løsningen, men bare hvis
  * nøklene ikke er byttet mens testen pågikk. Først når testen har lyktes, vises løsningen i kassen.
  */
-export async function testPaymentConnection(db: Db, siteId: string, provider: OnlineProvider, userId: string | null): Promise<{ ok: boolean; message: string }> {
+export async function testPaymentConnection(db: Db, siteId: string, provider: KeyProvider, userId: string | null): Promise<{ ok: boolean; message: string }> {
   const [site] = await db.select({ id: sites.id, shop: sites.shop }).from(sites).where(eq(sites.id, siteId)).limit(1);
   const stored = site ? readStoredProvider(site.shop, provider) : null;
   if (!site || !stored) throw new ShopError(`${providerNames[provider]} er ikke koblet til. Lim inn nøklene først.`);
@@ -239,4 +240,84 @@ export async function testPaymentConnection(db: Db, siteId: string, provider: On
     .where(and(eq(sites.id, siteId), sql`${sites.shop} -> 'paymentProviders' -> ${provider}::text ->> 'secret' = ${stored.secret}`));
   await db.insert(auditLog).values({ siteId, userId, action: "payment.keys_tested", detail: { provider, environment: stored.environment, ok } });
   return { ok, message };
+}
+
+// ---------- Kort med Stripe ----------
+
+const stripeKey = () => process.env.STRIPE_SECRET_KEY?.trim() ?? "";
+
+/** Kontoen for miljøet plattformen kjører i. En testkonto gjelder ikke når plattformen står i produksjon, og omvendt. */
+export function currentStripeConnect(shop: unknown): StripeConnect | null {
+  const connect = readStripeConnect(shop);
+  return connect && connect.environment === stripePlatformEnvironment() ? connect : null;
+}
+
+async function saveStripeConnect(db: Db, siteId: string, connect: StripeConnect) {
+  await db
+    .update(sites)
+    .set({ shop: sql`${sites.shop} || jsonb_build_object('stripeConnect', ${JSON.stringify(connect)}::jsonb)` })
+    .where(and(eq(sites.id, siteId), eq(sites.kind, "nettbutikk")));
+}
+
+export type StripeView = { environment: PaymentEnvironment; chargesEnabled: boolean; detailsSubmitted: boolean };
+
+/** Det studioet får vite om Stripe-koblingen. available er false når plattformen mangler Stripe-nøkkelen. */
+export function stripeSetupView(shop: unknown): { available: boolean; connection: StripeView | null } {
+  const connect = currentStripeConnect(shop);
+  return {
+    available: stripePlatformEnvironment() !== null,
+    connection: connect && { environment: connect.environment, chargesEnabled: connect.chargesEnabled, detailsSubmitted: connect.detailsSubmitted },
+  };
+}
+
+/**
+ * Oppretter butikkens Stripe-konto første gang og gir lenken til Stripes registrering. Finnes kontoen, fortsetter
+ * eieren der de slapp. Idempotensnøkkelen hindrer at to raske trykk lager to kontoer.
+ */
+export async function startStripeOnboarding(
+  db: Db,
+  site: { id: string; name: string; shop: unknown },
+  user: { id: string; email: string },
+  urls: { returnUrl: string; refreshUrl: string },
+): Promise<string> {
+  const environment = stripePlatformEnvironment();
+  if (!environment) throw new ShopError("Kort med Stripe er ikke slått på ennå.");
+  const platform = stripePlatform(stripeKey());
+  let connect = currentStripeConnect(site.shop);
+  if (!connect) {
+    const account = await platform.createAccount({ siteId: site.id, email: user.email, businessName: site.name }, `konto-${site.id}-${environment}`);
+    connect = {
+      accountId: account.accountId,
+      environment,
+      chargesEnabled: account.chargesEnabled,
+      detailsSubmitted: account.detailsSubmitted,
+      connectedAt: new Date().toISOString(),
+    };
+    await saveStripeConnect(db, site.id, connect);
+    await db.insert(auditLog).values({ siteId: site.id, userId: user.id, action: "payment.stripe_account_created", detail: { accountId: account.accountId, environment } });
+  }
+  return platform.onboardingLink(connect.accountId, urls);
+}
+
+/**
+ * Henter kontoens status fra Stripe og lagrer den hvis den har endret seg. Kort vises i kassen bare når Stripe sier
+ * at kontoen kan ta imot betalinger. Svarer ikke Stripe, står forrige kjente status.
+ */
+export async function syncStripeAccount(db: Db, site: { id: string; shop: unknown }, userId: string | null = null): Promise<StripeConnect | null> {
+  const connect = currentStripeConnect(site.shop);
+  if (!connect) return null;
+  const account = await stripePlatform(stripeKey()).readAccount(connect.accountId);
+  if (account.chargesEnabled === connect.chargesEnabled && account.detailsSubmitted === connect.detailsSubmitted) return connect;
+  const updated = { ...connect, chargesEnabled: account.chargesEnabled, detailsSubmitted: account.detailsSubmitted };
+  await saveStripeConnect(db, site.id, updated);
+  if (account.chargesEnabled !== connect.chargesEnabled) {
+    await db.insert(auditLog).values({ siteId: site.id, userId, action: "payment.stripe_status_changed", detail: { accountId: connect.accountId, chargesEnabled: account.chargesEnabled } });
+  }
+  return updated;
+}
+
+/** Tar kort ut av kassen. Stripe-kontoen er butikkens egen og blir stående hos Stripe. */
+export async function disconnectStripe(db: Db, siteId: string, userId: string | null) {
+  await db.update(sites).set({ shop: sql`${sites.shop} - 'stripeConnect'` }).where(eq(sites.id, siteId));
+  await db.insert(auditLog).values({ siteId, userId, action: "payment.stripe_disconnected", detail: {} });
 }

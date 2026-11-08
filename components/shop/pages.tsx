@@ -332,13 +332,13 @@ export async function OrderPage({ db, siteId, orderId, token, basePath }: { db: 
   if (online) {
     const after =
       order.status === "paid"
-        ? order.paymentMethod === "vipps" || order.paymentMethod === "kustom"
+        ? order.paymentMethod === "vipps" || order.paymentMethod === "kustom" || order.paymentMethod === "stripe"
           ? " Beløpet er reservert og trekkes når varene sendes eller hentes."
           : " Klarna sender deg informasjon om betalingen når varene er sendt."
         : order.status === "refunded"
           ? " Pengene er betalt tilbake til deg."
           : "";
-    paymentText = `Betalt med ${label}.${after}`;
+    paymentText = `Betalt med ${order.paymentMethod === "stripe" ? "kort" : label}.${after}`;
   }
   if (testMode) paymentText += " Dette var en betaling i testmiljøet, og ingen ekte penger er trukket.";
 

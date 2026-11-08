@@ -8,10 +8,11 @@ import { isOnlinePayment, readShopSettings } from "@/lib/shop/settings";
 import { carrierLabel, trackingUrl } from "@/lib/shop/tracking";
 import { publicSiteUrl } from "@/lib/site-url";
 import { formatPaymentRef, idempotencyUuid, parsePaymentRef, PaymentError, sameToken, type PaymentRef } from "./common";
-import { loadCredentials } from "./config";
+import { currentStripeConnect, loadCredentials, syncStripeAccount } from "./config";
 import { klarnaClient, klarnaOrderBody, type KlarnaClient } from "./klarna";
 import { kustomClient, type KustomClient } from "./kustom";
 import { providerNames, readStoredProvider } from "./state";
+import { stripePayments, type StripeIntent, type StripePayments } from "./stripe";
 import { vippsClient, vippsReference, type VippsClient, type VippsPayment } from "./vipps";
 
 type Order = typeof orders.$inferSelect;
@@ -27,6 +28,8 @@ const LIMITS = {
   klarnaMs: 60 * 60_000,
   /** Kustom-kassen er åpen i 48 timer. Vi gir opp etter en time. Valideringen hindrer at en kansellert ordre betales senere. */
   kustomMs: 60 * 60_000,
+  /** Stripes betalingsside stenges etter en time (expires_at). Da er ordren ikke lenger noe kunden kan betale. */
+  stripeMs: 60 * 60_000,
   /** Nøklene er fjernet eller byttet til et annet miljø, så betalingen kan ikke sjekkes. */
   unverifiableTestMs: 60 * 60_000,
   unverifiableProductionMs: 24 * 60 * 60_000,
@@ -36,7 +39,20 @@ const LIMITS = {
 const KLARNA_CLOSED = ["CANCELLED", "EXPIRED", "CLOSED"];
 
 type Clients = Map<string, Promise<AnyClient | null>>;
-type AnyClient = { provider: "vipps"; client: VippsClient } | { provider: "klarna"; client: KlarnaClient } | { provider: "kustom"; client: KustomClient };
+type AnyClient =
+  | { provider: "vipps"; client: VippsClient }
+  | { provider: "klarna"; client: KlarnaClient }
+  | { provider: "kustom"; client: KustomClient }
+  | { provider: "stripe"; client: StripePayments };
+
+/** Stripe-klient for butikkens konto, i miljøet plattformen kjører i. Null hvis kontoen ikke er koblet til. */
+function stripeFor(site: Site, expectedAccount?: string): StripePayments | null {
+  const connect = currentStripeConnect(site.shop);
+  const key = process.env.STRIPE_SECRET_KEY?.trim();
+  if (!connect || !key) return null;
+  if (expectedAccount && connect.accountId !== expectedAccount) return null;
+  return stripePayments(key, connect.accountId, connect.environment);
+}
 
 export type PaymentContext = {
   now?: Date;
@@ -76,6 +92,10 @@ function clientFor(site: Site, ref: PaymentRef, ctx: PaymentContext): Promise<An
   const cached = ctx.clients?.get(key);
   if (cached) return cached;
   const created = (async (): Promise<AnyClient | null> => {
+    if (ref.provider === "stripe") {
+      const client = stripeFor(site, ref.accountId);
+      return client && client.environment === ref.environment ? { provider: "stripe", client } : null;
+    }
     const access = await loadCredentials(site, ref.provider);
     if (!access || access.environment !== ref.environment) return null;
     if (access.provider === "vipps") return { provider: "vipps", client: vippsClient(access.environment, access.credentials) };
@@ -126,6 +146,7 @@ export function kustomUrls(site: Site, origin: string, order: { id: string; acce
  */
 export async function startPayment(db: Db, site: Site, order: Order, returnTo: string): Promise<string> {
   if (!isOnlinePayment(order.paymentMethod)) throw new ShopError("Betalingsmåten sendes ikke videre");
+  if (order.paymentMethod === "stripe") return startStripe(db, site, order, returnTo);
   const provider = order.paymentMethod;
   const name = providerNames[provider];
   const failed = () => new PaymentError(`Vi fikk ikke kontakt med ${name}. Ingenting er trukket. Prøv igjen, eller velg en annen betalingsmåte.`);
@@ -194,6 +215,40 @@ export async function startPayment(db: Db, site: Site, order: Order, returnTo: s
   }
 }
 
+/** Kunden sendes til Stripes betalingsside. Referansen lagres når Stripe har svart, for da først finnes økten. */
+async function startStripe(db: Db, site: Site, order: Order, returnTo: string): Promise<string> {
+  const stripe = currentStripeConnect(site.shop)?.chargesEnabled ? stripeFor(site) : null;
+  if (!stripe) {
+    await cancelUnpaidOrder(db, site.id, order.id, { provider: "stripe", reason: "not_connected" });
+    throw new PaymentError("Kortbetaling er ikke tilgjengelig akkurat nå. Ingenting er trukket. Velg en annen betalingsmåte.");
+  }
+  try {
+    const { sessionId, url } = await stripe.createCheckout(
+      {
+        orderId: order.id,
+        orderNumber: order.number,
+        amountOre: order.totalOre,
+        description: `Ordre ${order.number} hos ${site.name}`,
+        customerEmail: order.customerEmail,
+        returnUrl: returnTo,
+        expiresAt: new Date(Date.now() + LIMITS.stripeMs),
+      },
+      `start-${order.id}`,
+    );
+    if (!(await setPaymentRef(db, order.id, formatPaymentRef({ provider: "stripe", environment: stripe.environment, accountId: stripe.accountId, sessionId })))) {
+      await stripe.expireSession(sessionId).catch(() => undefined);
+      throw new PaymentError("Ordren ble endret før betalingen startet");
+    }
+    return url;
+  } catch (err) {
+    await cancelUnpaidOrder(db, site.id, order.id, { provider: "stripe", reason: "start_failed", ...errorInfo(err) });
+    logFailure("Stripe-betalingen kunne ikke startes", order.id, err);
+    // Stripe kan ha stengt kontoen. Da skal ikke kort stå i kassen for neste kunde.
+    await syncStripeAccount(db, site).catch(() => undefined);
+    throw new PaymentError("Vi fikk ikke kontakt med kortbetalingen. Ingenting er trukket. Prøv igjen, eller velg en annen betalingsmåte.");
+  }
+}
+
 const errorInfo = (err: unknown) => (err instanceof PaymentError ? { status: err.info.status ?? null, code: err.info.code ?? null } : {});
 
 /** Logger bare meldingen, aldri forespørselen eller nøklene. */
@@ -250,6 +305,7 @@ async function syncLoaded(db: Db, site: Site, order: Order, ctx: PaymentContext)
     if (access.provider === "vipps" && ref.provider === "vipps") return await syncVipps(db, site, order, ref, access.client, ctx, age, cancel);
     if (access.provider === "klarna" && ref.provider === "klarna") return await syncKlarna(db, site, order, ref, access.client, ctx, age, cancel);
     if (access.provider === "kustom" && ref.provider === "kustom") return await syncKustom(db, site, order, ref, access.client, ctx, age, cancel);
+    if (access.provider === "stripe" && ref.provider === "stripe") return await syncStripe(db, site, order, ref, access.client, ctx, age, cancel);
   } catch (err) {
     // Finnes ikke betalingen hos løsningen med dagens nøkler, kan den aldri bli betalt. Den ryddes bort etter fristen.
     const limit = ref.environment === "test" ? LIMITS.unverifiableTestMs : LIMITS.unverifiableProductionMs;
@@ -505,6 +561,48 @@ async function syncKustom(
   return { status, paid: false, cancelled: false, providerState: ko.status };
 }
 
+/** Stripe: betalingen er godkjent når reservasjonen står klar, eller når beløpet allerede er trukket. */
+const STRIPE_APPROVED = ["requires_capture", "succeeded"];
+
+async function syncStripe(
+  db: Db,
+  site: Site,
+  order: Order,
+  ref: Extract<PaymentRef, { provider: "stripe" }>,
+  stripe: StripePayments,
+  ctx: PaymentContext,
+  age: number,
+  cancel: Cancel,
+): Promise<SyncResult> {
+  const details = { provider: "stripe", environment: ref.environment, reference: ref.sessionId };
+  let session = await stripe.getSession(ref.sessionId);
+  if (session.status === "open" && ctx.sweep && age > LIMITS.stripeMs) {
+    await stripe.expireSession(ref.sessionId).catch((err) => logFailure("Stripe-betalingen kunne ikke stenges", order.id, err));
+    // Fullførte kunden i samme øyeblikk, gjelder det.
+    session = await stripe.getSession(ref.sessionId);
+    if (session.status === "open") return { status: order.status, paid: false, cancelled: false, providerState: session.status };
+  }
+  if (session.status === "expired") return cancel("expired", details);
+  const intent = session.intent;
+  if (session.status !== "complete" || !intent) return { status: order.status, paid: false, cancelled: false, providerState: session.status };
+  if (intent.status === "canceled") return cancel("released_at_provider", details);
+  if (!STRIPE_APPROVED.includes(intent.status)) return { status: order.status, paid: false, cancelled: false, providerState: intent.status };
+
+  // Beløp, valuta og ordre må stemme. Ellers hører ikke betalingen til denne ordren.
+  if (intent.currency !== "NOK" || intent.amountOre !== order.totalOre || intent.orderId !== order.id) {
+    await audit(db, site.id, null, "payment.amount_mismatch", { orderId: order.id, ...details, expectedOre: order.totalOre, authorizedOre: intent.amountOre, currency: intent.currency });
+    await releaseStripeIntent(db, site, order, ref, stripe, intent, null).catch((err) => logFailure("Stripe-betalingen kunne ikke frigjøres", order.id, err));
+    return cancel("amount_mismatch", details);
+  }
+
+  if (await markOrderPaid(db, site.id, order.id, { ...details, amountOre: order.totalOre })) {
+    return { status: "paid", paid: true, cancelled: false, providerState: intent.status };
+  }
+  const status = await currentStatus(db, order.id);
+  if (status === "cancelled") await releaseStripeIntent(db, site, order, ref, stripe, intent, null).catch((err) => logFailure("Stripe-betalingen kunne ikke frigjøres", order.id, err));
+  return { status, paid: false, cancelled: false, providerState: intent.status };
+}
+
 // ---------- Trekk, kansellering og refusjon ----------
 
 /** Gir pengene tilbake hos Vipps: refunderer det som er trukket, og frigjør det som bare er reservert. */
@@ -600,6 +698,48 @@ async function releaseKustom(
   return { refundedOre: Math.max(refundable, 0), releasedOre: Math.max(reserved, 0) };
 }
 
+/** Frigjør det som bare er reservert hos Stripe, og betaler tilbake det som er trukket. */
+async function releaseStripeIntent(
+  db: Db,
+  site: Site,
+  order: Order,
+  ref: Extract<PaymentRef, { provider: "stripe" }>,
+  stripe: StripePayments,
+  intent: StripeIntent,
+  userId: string | null,
+): Promise<{ refundedOre: number; releasedOre: number }> {
+  const details = { orderId: order.id, provider: "stripe", environment: ref.environment, reference: intent.id };
+  if (intent.status === "requires_capture") {
+    await stripe.cancelIntent(intent.id, `frigjor-${order.id}`);
+    await audit(db, site.id, userId, "payment.released", { ...details, amountOre: intent.amountOre });
+    return { refundedOre: 0, releasedOre: intent.amountOre };
+  }
+  const refundable = intent.status === "succeeded" ? intent.receivedOre - intent.refundedOre : 0;
+  if (refundable > 0) {
+    await stripe.refund(intent.id, refundable, `refund-${order.id}`);
+    await audit(db, site.id, userId, "payment.refunded", { ...details, amountOre: refundable });
+  }
+  return { refundedOre: Math.max(refundable, 0), releasedOre: 0 };
+}
+
+/** Gir pengene tilbake hos Stripe. Står betalingssiden åpen, stenges den først, så kunden ikke kan betale etterpå. */
+async function releaseStripe(
+  db: Db,
+  site: Site,
+  order: Order,
+  ref: Extract<PaymentRef, { provider: "stripe" }>,
+  stripe: StripePayments,
+  userId: string | null,
+): Promise<{ refundedOre: number; releasedOre: number }> {
+  let session = await stripe.getSession(ref.sessionId);
+  if (session.status === "open") {
+    await stripe.expireSession(ref.sessionId);
+    session = await stripe.getSession(ref.sessionId);
+  }
+  if (!session.intent || session.status !== "complete") return { refundedOre: 0, releasedOre: 0 };
+  return releaseStripeIntent(db, site, order, ref, stripe, session.intent, userId);
+}
+
 /**
  * Klient for en ordre som allerede er betalt eller venter. Mangler nøklene, går det an å fortsette bare for
  * betalinger i testmiljøet, der det ikke finnes ekte penger.
@@ -674,6 +814,17 @@ async function capturePayment(db: Db, site: Site, order: Order, userId: string |
     await audit(db, site.id, userId, "payment.captured", { orderId: order.id, provider: "kustom", environment: ref.environment, reference: ref.id, amountOre: missing });
     return missing;
   }
+
+  if (access.provider === "stripe" && ref.provider === "stripe") {
+    const intent = (await access.client.getSession(ref.sessionId)).intent;
+    if (!intent) throw new PaymentError("Kunden har ikke fullført kortbetalingen, så beløpet kan ikke trekkes.");
+    if (intent.status === "succeeded") return 0;
+    if (intent.status !== "requires_capture") throw new PaymentError("Reservasjonen på kortet er frigjort eller utløpt, så beløpet kan ikke trekkes. Ta kontakt med kunden om ny betaling.");
+    if (intent.amountOre !== total) throw new PaymentError("Beløpet hos Stripe stemmer ikke med ordren. Sjekk betalingen i Stripe.");
+    await access.client.capture(intent.id, total, `capture-${order.id}`);
+    await audit(db, site.id, userId, "payment.captured", { orderId: order.id, provider: "stripe", environment: ref.environment, reference: intent.id, amountOre: total });
+    return total;
+  }
   return 0;
 }
 
@@ -684,10 +835,11 @@ async function releasePayment(db: Db, site: Site, order: Order, userId: string |
   if (access.provider === "vipps" && ref.provider === "vipps") return releaseVipps(db, site, order, ref, access.client, userId);
   if (access.provider === "klarna" && ref.provider === "klarna") return releaseKlarna(db, site, order, ref, access.client, userId);
   if (access.provider === "kustom" && ref.provider === "kustom") return releaseKustom(db, site, order, ref, access.client, userId);
+  if (access.provider === "stripe" && ref.provider === "stripe") return releaseStripe(db, site, order, ref, access.client, userId);
   return { refundedOre: 0, releasedOre: 0 };
 }
 
-export type PartRefundResult = { provider: "vipps" | "klarna" | "kustom" | null; skipped: boolean };
+export type PartRefundResult = { provider: "vipps" | "klarna" | "kustom" | "stripe" | null; skipped: boolean };
 
 /**
  * Betaler tilbake en del av beløpet for en ordre der pengene er trukket (lib/shop/refunds.ts). refundId er nøkkelen
@@ -744,6 +896,14 @@ export async function refundPartOfPayment(
     await access.client.refund(ref.id, amountOre, await idempotencyUuid(`kustom-delrefusjon:${refundId}`));
     await audit(db, site.id, userId, "payment.partially_refunded", { ...details, provider: "kustom", reference: ref.id });
     return { provider: "kustom", skipped: false };
+  }
+  if (access.provider === "stripe" && ref.provider === "stripe") {
+    const intent = (await access.client.getSession(ref.sessionId)).intent;
+    if (!intent || intent.status !== "succeeded") throw new PaymentError("Beløpet er ikke trukket fra kortet ennå, så ingenting kan refunderes.");
+    check(intent.receivedOre - intent.refundedOre);
+    await access.client.refund(intent.id, amountOre, `delrefusjon-${refundId}`);
+    await audit(db, site.id, userId, "payment.partially_refunded", { ...details, provider: "stripe", reference: intent.id });
+    return { provider: "stripe", skipped: false };
   }
   throw new PaymentError(`Betalingen hører ikke til ${name}, så den kan ikke refunderes herfra.`);
 }
@@ -875,7 +1035,7 @@ export async function sweepPayments(db: Db, opts: { now?: Date; limit?: number; 
     .select({ order: orders, site: sites })
     .from(orders)
     .innerJoin(sites, eq(orders.siteId, sites.id))
-    .where(and(eq(orders.status, "pending_payment"), inArray(orders.paymentMethod, ["vipps", "klarna", "kustom"])))
+    .where(and(eq(orders.status, "pending_payment"), inArray(orders.paymentMethod, ["vipps", "klarna", "kustom", "stripe"])))
     .orderBy(asc(orders.createdAt))
     .limit(opts.limit ?? 100);
   const ctx: PaymentContext = { now: opts.now, sweep: true, clients: new Map() };

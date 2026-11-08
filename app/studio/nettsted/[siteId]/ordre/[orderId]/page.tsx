@@ -65,7 +65,7 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
   const left = refundable(order, lines, refunds.filter((r) => r.status === "ferdig"));
   const shares = allocateDiscount(lines.map((l) => l.totalOre), order.discountOre);
   const pendingRefund = refunds.find((r) => r.status === "behandles") ?? null;
-  const online = order.paymentMethod === "vipps" || order.paymentMethod === "klarna" || order.paymentMethod === "kustom";
+  const online = order.paymentMethod === "vipps" || order.paymentMethod === "klarna" || order.paymentMethod === "kustom" || order.paymentMethod === "stripe";
   const status = orderStatusLabel[order.status];
 
   // Frakt med Bring: hva kunden valgte i kassen, og etiketten hvis den er laget.
@@ -267,7 +267,7 @@ export default async function OrderPage({ params }: { params: Promise<{ siteId: 
           )}
           <p className="mt-2 text-sm text-neutral-600">
             Betaling: {paymentLabels[order.paymentMethod as PaymentMethod] ?? order.paymentMethod}
-            {/^(vipps|klarna|kustom):test:/.test(order.paymentRef ?? "") && " (testmiljø, ingen ekte penger)"}
+            {/^(vipps|klarna|kustom|stripe):test:/.test(order.paymentRef ?? "") && " (testmiljø, ingen ekte penger)"}
           </p>
         </div>
         {order.note && (
