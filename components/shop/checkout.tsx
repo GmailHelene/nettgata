@@ -19,7 +19,7 @@ const input = "w-full rounded-[var(--radius)] border border-[var(--c-muted)] bg-
 /** Kort forklaring under betalingsmåten i kassen. */
 const paymentNotes: Partial<Record<PaymentMethod, string>> = {
   klarna: "Kort, faktura eller delbetaling",
-  kustom: "Velg betalingsmåte i Kustom-kassen",
+  kustom: "Velg mellom kort, Vipps, delbetaling eller å betale senere",
   stripe: "Betal på den sikre betalingssiden til Stripe",
 };
 
@@ -170,7 +170,8 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
     setAppliedCode(codeInput.trim());
   };
 
-  const onlineLabel = isOnlinePayment(payment) ? data.paymentMethods.find((m) => m.code === payment)?.label : undefined;
+  // Kunden sendes til Stripe, så det er Stripe som skal stå her, ikke betalingsmåten «Kort».
+  const onlineLabel = payment === "stripe" ? "Stripe" : isOnlinePayment(payment) ? data.paymentMethods.find((m) => m.code === payment)?.label : undefined;
 
   const submit = (form: FormData) =>
     startSubmit(async () => {
@@ -390,7 +391,7 @@ export function Checkout({ siteId, basePath, preview }: { siteId: string; basePa
                   aria-describedby={note ? `betaling-${m.code}` : undefined}
                 />
                 <span>
-                  {m.label}
+                  {m.code === "kustom" ? "Kustom / Klarna" : m.label}
                   {note && (
                     <span id={`betaling-${m.code}`} className="block text-sm text-[var(--c-muted)]">
                       {note}

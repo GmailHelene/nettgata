@@ -15,7 +15,7 @@ const sizes = {
 export function Gallery({ images }: { images: ProductImage[] }) {
   const [active, setActive] = useState(0);
   // Uten bilder: ingen stor grå boks på mobil, der den skjøv pris og kjøpsknapp ut av syne. På PC holder den plassen i oppsettet.
-  if (images.length === 0) return <div aria-hidden="true" className="hidden aspect-square w-full rounded-[var(--radius)] bg-[var(--c-surface)] md:block" />;
+  if (images.length === 0) return <div role="img" aria-label="Bilde kommer" className="ng-art hidden aspect-square w-full rounded-[var(--radius)] md:block" />;
   const current = images[Math.min(active, images.length - 1)];
 
   return (

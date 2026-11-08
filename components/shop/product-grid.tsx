@@ -34,9 +34,10 @@ export function ProductCard({
   return (
     <Link href={href(basePath, p.slug)} className="group block">
       <div className="relative aspect-[4/5] overflow-hidden rounded-[var(--radius)] bg-[var(--c-surface)]">
-        {image?.src === EXAMPLE_IMAGE_SRC ? (
-          // Eksempelvarer i temagalleriet har ikke bilder, men tegnes i temaets farger (ng-art).
-          <div role="img" aria-label="Eksempelbilde" className="ng-art absolute inset-0" />
+        {!image || image.src === EXAMPLE_IMAGE_SRC ? (
+          // Eksempelvarer og varer uten bilde tegnes i temaets farger (ng-art), så butikken ikke får tomme flater.
+          // En tegning og ikke et foto, så kunden ikke tror det er bilde av selve varen.
+          <div role="img" aria-label={image ? "Eksempelbilde" : "Bilde kommer"} className="ng-art absolute inset-0" />
         ) : (
           image && (
             // eslint-disable-next-line @next/next/no-img-element
