@@ -29,7 +29,8 @@ const codeFrom = (name: string, taken: string[]) => {
 const selectable: { method: PaymentMethod; note?: string; disabled?: boolean }[] = [
   { method: "ved-henting" },
   { method: "faktura", note: "Du sender faktura selv etter bestillingen" },
-  { method: "test", note: "Vises bare under utvikling, aldri i produksjon" },
+  // Testbetaling finnes bare under utvikling. I produksjon vises den ikke for noen, heller ikke for plattformadmin.
+  ...(process.env.NODE_ENV === "production" ? [] : [{ method: "test" as const, note: "Vises bare under utvikling, aldri i produksjon" }]),
 ];
 
 export function ShopSettingsForm({ siteId, initial, pages }: { siteId: string; initial: ShopSettings; pages: { path: string; title: string; published: boolean }[] }) {

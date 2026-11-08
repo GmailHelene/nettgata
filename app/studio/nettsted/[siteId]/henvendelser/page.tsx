@@ -6,6 +6,7 @@ import { canViewInquiryImages, imagesFor, inquiryImageSrc } from "@/lib/henvende
 import { requireSiteAccess } from "@/lib/session";
 import { HelpLink } from "@/components/studio/help";
 import { deleteInquiryAction, markInquiryReadAction } from "../../../site-actions";
+import { ConfirmButton } from "@/components/studio/confirm-button";
 import { SiteNav } from "../site-nav";
 
 export default async function InquiriesPage({ params }: { params: Promise<{ siteId: string }> }) {
@@ -86,7 +87,13 @@ export default async function InquiriesPage({ params }: { params: Promise<{ site
                   </form>
                 )}
                 <form action={deleteInquiryAction.bind(null, site.id, q.id)}>
-                  <button className="text-sm text-red-800 underline">Slett</button>
+                  <ConfirmButton
+                    className="ml-auto min-h-6 text-sm text-red-800 underline"
+                    label={`Slett henvendelsen fra ${q.name || q.email}`}
+                    question={`Slette henvendelsen fra ${q.name || q.email}? Den kan ikke hentes tilbake.`}
+                  >
+                    Slett
+                  </ConfirmButton>
                 </form>
               </div>
             </li>

@@ -7,6 +7,7 @@ import { formatOsloDateTime } from "@/lib/oslo-time";
 import { requireSiteAccess } from "@/lib/session";
 import { SiteNav } from "../../site-nav";
 import { deleteSubscriberAction } from "../actions";
+import { ConfirmButton } from "@/components/studio/confirm-button";
 import { NewsletterTabs } from "../newsletter-tabs";
 
 const statusStyle: Record<SubscriberStatus, string> = {
@@ -109,9 +110,9 @@ export default async function SubscribersPage({
               <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusStyle[s.status]}`}>{subscriberStatuses[s.status]}</span>
               {canDelete && (
                 <form action={deleteSubscriberAction.bind(null, site.id, s.id)}>
-                  <button className="text-sm text-[#a13a2c] underline" aria-label={`Slett ${s.email}`}>
+                  <ConfirmButton className="text-sm text-[#a13a2c] underline" label={`Slett ${s.email}`} question={`Slette ${s.email} fra listen? Det kan ikke angres.`}>
                     Slett
-                  </button>
+                  </ConfirmButton>
                 </form>
               )}
             </li>

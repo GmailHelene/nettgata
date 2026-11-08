@@ -22,7 +22,7 @@ export default async function BringPage({ params }: { params: Promise<{ siteId: 
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-12">
-      <SiteNav siteId={site.id} name={site.name} shop active="innstillinger" />
+      <SiteNav siteId={site.id} name={site.name} shop active="innstillinger" title="Frakt med Bring" />
       <Link href={`/studio/nettsted/${site.id}/innstillinger`} className="text-sm underline">
         Innstillinger
       </Link>

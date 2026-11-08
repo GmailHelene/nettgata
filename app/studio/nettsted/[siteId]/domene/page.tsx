@@ -24,7 +24,7 @@ export default async function DomainPage({ params }: { params: Promise<{ siteId:
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-12">
-      <SiteNav siteId={site.id} name={site.name} shop={site.kind === "nettbutikk"} active="innstillinger" />
+      <SiteNav siteId={site.id} name={site.name} shop={site.kind === "nettbutikk"} active="innstillinger" title="Domene" />
       <Link href={`/studio/nettsted/${site.id}/innstillinger`} className="text-sm underline">
         Tilbake til innstillinger
       </Link>

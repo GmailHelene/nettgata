@@ -251,7 +251,7 @@ export function PageEditor({ siteId, preview, pageId, path, initialTitle, initia
   return (
     <SiteIdContext.Provider value={siteId}>
       <div className="mt-4">
-        <div className="sticky top-0 z-20 -mx-5 mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-neutral-50/95 px-5 py-3 backdrop-blur">
+        <div className="sticky top-14 z-20 -mx-5 mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-neutral-50/95 px-5 py-3 backdrop-blur">
           <p className="mr-auto min-w-0 text-sm text-neutral-700">
             <span className="font-medium text-neutral-900">{path}</span> · {publishedNumber ? `Live: versjon ${publishedNumber}` : "Ikke publisert"}
             {" · "}
@@ -329,7 +329,7 @@ export function PageEditor({ siteId, preview, pageId, path, initialTitle, initia
           </div>
         )}
 
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           <div>
             <label className="mb-6 block">
               <span className="mb-1 block text-sm font-medium">Sidetittel</span>

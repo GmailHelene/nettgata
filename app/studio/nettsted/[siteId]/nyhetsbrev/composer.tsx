@@ -87,7 +87,7 @@ export function NewsletterComposer({
     });
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <div className="space-y-5">
         {!emailOn && <p className={ui.error}>E-post er ikke slått på ennå. Det som sendes, lagres bare i loggen og kommer ikke fram.</p>}
         <label className="block">

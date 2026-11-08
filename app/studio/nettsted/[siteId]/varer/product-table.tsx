@@ -45,7 +45,7 @@ export function ProductTable({
 
   return (
     <div>
-      <div className="sticky top-0 z-10 mb-2 flex min-h-12 flex-wrap items-center gap-2 rounded-lg border bg-white px-4 py-2" aria-live="polite">
+      <div className="sticky top-14 z-10 mb-2 flex min-h-12 flex-wrap items-center gap-2 rounded-lg border bg-white px-4 py-2" aria-live="polite">
         <label className="mr-2 flex items-center gap-2 text-sm">
           <input
             type="checkbox"

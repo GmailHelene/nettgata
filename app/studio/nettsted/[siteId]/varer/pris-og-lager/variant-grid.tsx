@@ -88,7 +88,7 @@ export function VariantGrid({ siteId, rows }: { siteId: string; rows: GridRow[] 
 
   return (
     <div>
-      <div className="sticky top-0 z-10 mb-3 flex flex-wrap items-center gap-3 rounded-lg border bg-white p-3">
+      <div className="sticky top-14 z-10 mb-3 flex flex-wrap items-center gap-3 rounded-lg border bg-white p-3">
         <label htmlFor="grid-filter" className="sr-only">
           Finn vare
         </label>

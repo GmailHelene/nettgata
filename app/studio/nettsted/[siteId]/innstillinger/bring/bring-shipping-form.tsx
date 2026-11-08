@@ -132,7 +132,9 @@ export function BringShippingForm({
                 </label>
                 {row.enabled && (
                   <label className="block">
-                    <span className="mb-1 block text-xs">Reservepris (kr)</span>
+                    <span className="mb-1 block text-xs">
+                      Reservepris (kr)<span className="sr-only"> for {product.name}</span>
+                    </span>
                     <input
                       value={row.fallback}
                       required
