@@ -117,6 +117,7 @@ export function ImageInput({
   optional,
   withFocus = false,
   onChange,
+  onUploadMany,
 }: {
   label: string;
   value: ImageValue | null | undefined;
@@ -124,6 +125,8 @@ export function ImageInput({
   /** Fokuspunkt for bilder som beskjæres. Ikke for logoen, som alltid vises hel. */
   withFocus?: boolean;
   onChange: (v: ImageValue | null) => void;
+  /** Satt: flere bilder kan velges eller dras inn samtidig, og hvert ferdige bilde gis hit. */
+  onUploadMany?: (v: ImageValue) => void;
 }) {
   const siteId = useContext(SiteIdContext);
   const isExample = value?.src === EXAMPLE_IMAGE_SRC;
@@ -132,6 +135,31 @@ export function ImageInput({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
+
+  const [progress, setProgress] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+
+  // Ett og ett bilde, så en treg linje ikke gir tidsavbrudd, og så det som er ferdig, beholdes hvis ett feiler.
+  const uploadMany = async (files: File[]) => {
+    if (!siteId || !onUploadMany || busy) return;
+    const list = files.filter((f) => f.type.startsWith("image/")).slice(0, 20);
+    if (list.length === 0) return;
+    setBusy(true);
+    setError(null);
+    const failed: string[] = [];
+    for (const [i, file] of list.entries()) {
+      setProgress(`Laster opp ${i + 1} av ${list.length}...`);
+      try {
+        onUploadMany({ src: await uploadImage(siteId, file), alt: "" });
+      } catch {
+        failed.push(file.name);
+      }
+    }
+    setProgress(null);
+    setBusy(false);
+    if (fileRef.current) fileRef.current.value = "";
+    if (failed.length) setError(`${failed.length === 1 ? "Dette bildet" : "Disse bildene"} kom ikke med: ${failed.join(", ")}. Prøv igjen.`);
+  };
 
   const upload = async (file: File) => {
     if (!siteId) return;
@@ -150,7 +178,27 @@ export function ImageInput({
   };
 
   return (
-    <fieldset className="rounded-md border border-neutral-300 p-3">
+    <fieldset
+      className={`rounded-md border p-3 ${dragging ? "border-[#173b6c] bg-[#eef3f9]" : "border-neutral-300"}`}
+      onDragOver={
+        onUploadMany
+          ? (e) => {
+              e.preventDefault();
+              setDragging(true);
+            }
+          : undefined
+      }
+      onDragLeave={onUploadMany ? () => setDragging(false) : undefined}
+      onDrop={
+        onUploadMany
+          ? (e) => {
+              e.preventDefault();
+              setDragging(false);
+              uploadMany([...e.dataTransfer.files]);
+            }
+          : undefined
+      }
+    >
       <legend className="px-1 text-sm font-medium">
         {label}
         {optional && <span className="font-normal text-neutral-600"> (valgfritt)</span>}
@@ -167,17 +215,23 @@ export function ImageInput({
           </div>
         )}
         <div className="min-w-48 flex-1 space-y-2">
+          {onUploadMany && <p className="text-sm text-neutral-700">Du kan velge flere bilder samtidig, eller dra dem hit.</p>}
           {isExample && <p className="text-sm text-amber-900">Bytt ut eksempelbildet med et eget bilde før du publiserer.</p>}
           <div className="flex flex-wrap gap-3 text-sm">
             <label className="cursor-pointer rounded-md border border-[#173b6c] px-3 py-1.5 font-semibold has-[:focus-visible]:outline-2">
-              {busy ? "Laster opp..." : hasImage ? "Bytt bilde" : "Last opp bilde"}
+              {busy ? (progress ?? "Laster opp...") : hasImage ? "Bytt bilde" : onUploadMany ? "Last opp bilder" : "Last opp bilde"}
               <input
                 ref={fileRef}
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
                 className="sr-only"
                 disabled={busy}
-                onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
+                multiple={Boolean(onUploadMany)}
+                onChange={(e) => {
+                  const files = [...(e.target.files ?? [])];
+                  if (onUploadMany) uploadMany(files);
+                  else if (files[0]) upload(files[0]);
+                }}
               />
             </label>
             {siteId && (

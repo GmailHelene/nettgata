@@ -148,6 +148,13 @@
       "when": 1794104118723,
       "tag": "0020_vare_seo_gtin",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794150009658,
+      "tag": "0021_samlinger",
+      "breakpoints": true
     }
   ]
 }

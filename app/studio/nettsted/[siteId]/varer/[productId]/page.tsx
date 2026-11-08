@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { productCategories, productVariants, products } from "@/db/schema";
+import { productCollections, productCategories, productVariants, products } from "@/db/schema";
 import { requireSiteAccess } from "@/lib/session";
 import type { ProductInput } from "@/lib/shop/catalog";
 import { readSiteInfo } from "@/lib/site-info";
@@ -29,6 +29,7 @@ export default async function ProductPage({ params }: { params: Promise<{ siteId
     vatRate: 25,
     status: "active",
     categoryId: null,
+    collectionIds: [],
     weightGrams: null,
     variants: [{ optionValues: [], priceOre: 0, stock: null, weightGrams: null }],
   };
@@ -52,6 +53,7 @@ export default async function ProductPage({ params }: { params: Promise<{ siteId
       vatRate: product.vatRate,
       status: product.status,
       categoryId: product.categoryId,
+      collectionIds: (await db.select({ id: productCollections.categoryId }).from(productCollections).where(eq(productCollections.productId, product.id))).map((c) => c.id),
       weightGrams: single ? (variants[0].weightGrams ?? product.weightGrams) : product.weightGrams,
       seoTitle: product.seoTitle ?? "",
       seoDescription: product.seoDescription ?? "",

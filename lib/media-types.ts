@@ -16,6 +16,9 @@ export const mediaKeyPattern = new RegExp(`^${uuid}/${uuid}\\.(webp|jpg|png|gif|
 /** Slik lagres et bilde i innholdet: /media/<key> */
 export const mediaSrcPattern = new RegExp(`^/media/${uuid}/${uuid}\\.(webp|jpg|png|gif|avif)$`);
 
+/** Ferdige bilder i bransjepakkene (lib/packs/bilder.ts). Ligger i public/maler/ og har ingen mindre utgaver. */
+export const packImageSrcPattern = /^\/maler\/[a-z]+\/[1-9]\.webp$/;
+
 /**
  * Mindre utgaver som lagres ved opplasting, så mobilen slipper å hente hele bildet. Originalen er
  * maks 2000 px bred. Bilder lastet opp før dette har bare originalen, og bilderuten svarer da med den.

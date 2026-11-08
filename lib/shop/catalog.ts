@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Db } from "@/db";
-import { auditLog, productCategories, productVariants, products, variantPriceHistory, type ProductImage } from "@/db/schema";
+import { productCollections, auditLog, productCategories, productVariants, products, variantPriceHistory, type ProductImage } from "@/db/schema";
 import { imageFocusSchema } from "@/lib/content/fields";
 import { mediaSrcPattern } from "@/lib/media-types";
 import { vatRates } from "./money";
@@ -65,6 +65,8 @@ export const productInputSchema = z
     vatRate: z.number().refine((v) => (vatRates as readonly number[]).includes(v), "Ugyldig MVA-sats"),
     status: z.enum(["draft", "active", "archived"]),
     categoryId: z.string().uuid().nullable().default(null),
+    /** Samlingene varen står i. Utelatt: varen står bare i categoryId. */
+    collectionIds: z.array(z.string().uuid()).max(50, "Varen kan stå i maks 50 samlinger").optional(),
     /** Vekt i gram for varen, til fraktpris fra Bring. Null: vekten mangler. Utelatt: vekten endres ikke. */
     weightGrams: z.number().int("Vekten må være hele gram").min(0, "Vekten kan ikke være negativ").max(1_000_000, "Vekten kan være maks 1 000 kg").nullable().optional(),
     seoTitle: z.string().trim().max(70, "Tittelen i Google kan være maks 70 tegn").optional(),
@@ -156,9 +158,23 @@ async function saveVariants(db: Db, productId: string, variants: ReturnType<type
   if (removed.length) await db.delete(productVariants).where(inArray(productVariants.id, removed));
 }
 
+/** Samlingene varen skal stå i, kontrollert mot butikken. Den første blir varens hovedkategori. */
+async function resolveCollections(db: Db, siteId: string, data: { categoryId: string | null; collectionIds?: string[] }): Promise<string[]> {
+  const ids = [...new Set(data.collectionIds ?? (data.categoryId ? [data.categoryId] : []))];
+  if (ids.length === 0) return [];
+  const found = await db.select({ id: productCategories.id }).from(productCategories).where(and(eq(productCategories.siteId, siteId), inArray(productCategories.id, ids)));
+  if (found.length !== ids.length) throw new ShopError("Fant ikke samlingen");
+  return ids;
+}
+
+async function setCollections(db: Db, productId: string, ids: string[]) {
+  await db.delete(productCollections).where(eq(productCollections.productId, productId));
+  if (ids.length) await db.insert(productCollections).values(ids.map((categoryId) => ({ productId, categoryId }))).onConflictDoNothing();
+}
+
 export async function createProduct(db: Db, siteId: string, input: ProductInput, userId: string) {
   const data = parse(input);
-  await assertCategory(db, siteId, data.categoryId);
+  const collections = await resolveCollections(db, siteId, data);
   const slug = await uniqueSlug(db, siteId, data.slug || data.name);
   const [product] = await db
     .insert(products)
@@ -174,9 +190,10 @@ export async function createProduct(db: Db, siteId: string, input: ProductInput,
       seoTitle: data.seoTitle || null,
       seoDescription: data.seoDescription || null,
       status: data.status,
-      categoryId: data.categoryId,
+      categoryId: collections[0] ?? null,
     })
     .returning();
+  await setCollections(db, product.id, collections);
   await saveVariants(db, product.id, data.variants);
   await db.insert(auditLog).values({ siteId, userId, action: "product.created", detail: { productId: product.id } });
   return product;
@@ -186,7 +203,7 @@ export async function updateProduct(db: Db, siteId: string, productId: string, i
   const data = parse(input);
   const [product] = await db.select().from(products).where(and(eq(products.id, productId), eq(products.siteId, siteId))).limit(1);
   if (!product) throw new ShopError("Fant ikke varen");
-  await assertCategory(db, siteId, data.categoryId);
+  const collections = await resolveCollections(db, siteId, data);
   const slug = data.slug && data.slug !== product.slug ? await uniqueSlug(db, siteId, data.slug, product.id) : product.slug;
   await db
     .update(products)
@@ -201,10 +218,11 @@ export async function updateProduct(db: Db, siteId: string, productId: string, i
       ...(data.seoTitle !== undefined && { seoTitle: data.seoTitle || null }),
       ...(data.seoDescription !== undefined && { seoDescription: data.seoDescription || null }),
       status: data.status,
-      categoryId: data.categoryId,
+      categoryId: collections[0] ?? null,
       updatedAt: new Date(),
     })
     .where(eq(products.id, product.id));
+  await setCollections(db, product.id, collections);
   await saveVariants(db, product.id, data.variants);
   await db.insert(auditLog).values({ siteId, userId, action: "product.updated", detail: { productId } });
 }
@@ -230,6 +248,8 @@ export type CatalogProduct = {
   options: { name: string; values: string[] }[];
   vatRate: number;
   categoryId: string | null;
+  /** Adressene til samlingene varen står i. Mangler i eksempelvarene. */
+  collectionSlugs?: string[];
   variants: CatalogVariant[];
   fromPriceOre: number;
   inStock: boolean;
@@ -239,11 +259,19 @@ export type CatalogProduct = {
 /** Aktive varer med varianter, priser og førpris, klare for nettstedet. */
 export async function listCatalog(db: Db, siteId: string, opts: { categoryId?: string; slug?: string; ids?: string[] } = {}) {
   const conditions = [eq(products.siteId, siteId), eq(products.status, "active")];
-  if (opts.categoryId) conditions.push(eq(products.categoryId, opts.categoryId));
+  if (opts.categoryId) conditions.push(inArray(products.id, db.select({ id: productCollections.productId }).from(productCollections).where(eq(productCollections.categoryId, opts.categoryId))));
   if (opts.slug) conditions.push(eq(products.slug, opts.slug));
   if (opts.ids?.length) conditions.push(inArray(products.id, opts.ids));
   const rows = await db.select().from(products).where(and(...conditions)).orderBy(asc(products.sortOrder), asc(products.name));
   if (rows.length === 0) return [];
+
+  const memberships = await db
+    .select({ productId: productCollections.productId, slug: productCategories.slug })
+    .from(productCollections)
+    .innerJoin(productCategories, eq(productCollections.categoryId, productCategories.id))
+    .where(inArray(productCollections.productId, rows.map((r) => r.id)));
+  const slugsByProduct = new Map<string, string[]>();
+  for (const m of memberships) slugsByProduct.set(m.productId, [...(slugsByProduct.get(m.productId) ?? []), m.slug]);
 
   const variants = await db
     .select()
@@ -279,6 +307,7 @@ export async function listCatalog(db: Db, siteId: string, opts: { categoryId?: s
         options: p.options,
         vatRate: p.vatRate,
         categoryId: p.categoryId,
+        collectionSlugs: slugsByProduct.get(p.id) ?? [],
         variants: vs,
         fromPriceOre: Math.min(...vs.map((v) => v.priceOre)),
         inStock: vs.some((v) => v.stock === null || v.stock > 0),
@@ -359,6 +388,11 @@ export async function bulkUpdateProducts(db: Db, siteId: string, ids: string[], 
     .set({ ...parsed.data, updatedAt: new Date() })
     .where(and(eq(products.siteId, siteId), inArray(products.id, parsedIds.data)))
     .returning({ id: products.id });
+  // «Flytt til» erstatter samlingene varene står i.
+  if ("categoryId" in parsed.data) {
+    const target = parsed.data.categoryId;
+    for (const { id } of updated) await setCollections(db, id, target ? [target] : []);
+  }
   if (updated.length) await db.insert(auditLog).values({ siteId, userId, action: "product.bulk", detail: { count: updated.length, ...parsed.data } });
   return updated.length;
 }

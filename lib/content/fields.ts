@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { fileSrcPattern, MAX_FILE_BYTES, mediaSrcPattern, type ImageFocus } from "@/lib/media-types";
+import { fileSrcPattern, MAX_FILE_BYTES, mediaSrcPattern, packImageSrcPattern, type ImageFocus } from "@/lib/media-types";
 import { youtubeId } from "@/lib/embeds";
 
 /**
@@ -22,6 +22,8 @@ export type Field = (
   /** PDF fra eget lager, for eksempel menyen. Verdien er FileValue. */
   | { key: string; label: string; type: "file"; optional?: boolean }
   | { key: string; label: string; type: "select"; options: { value: string; label: string }[] }
+  /** En av butikkens samlinger. Verdien er adressen (slug). Tom: alle varer. */
+  | { key: string; label: string; type: "collection" }
   /** `optional`: listen kan mangle helt, for eksempel i innhold som er lagret før listen fantes. */
   | { key: string; label: string; type: "list"; itemLabel: string; fields: Field[]; max?: number; optional?: boolean }
 ) & {
@@ -119,7 +121,7 @@ function fieldToZod(field: Field, mode: ValidationMode): z.ZodType {
           error: `${field.label}: bytt ut eksempelbildet med et eget bilde`,
           abort: true,
         })
-        .refine((v) => v === EXAMPLE_IMAGE_SRC || mediaSrcPattern.test(v), `${field.label}: ugyldig bilde`);
+        .refine((v) => v === EXAMPLE_IMAGE_SRC || mediaSrcPattern.test(v) || packImageSrcPattern.test(v), `${field.label}: ugyldig bilde`);
       const image = z.object({
         src,
         alt: z.string().trim().max(200, `${field.label}: alt-teksten er for lang`),
@@ -141,6 +143,8 @@ function fieldToZod(field: Field, mode: ValidationMode): z.ZodType {
       });
       return optional ? file.nullable().optional().default(null) : file.nullable().refine((v) => v !== null, `${field.label}: last opp en PDF`);
     }
+    case "collection":
+      return z.string().trim().max(120).optional().default("");
     case "select":
       return z
         .enum(field.options.map((o) => o.value) as [string, ...string[]])

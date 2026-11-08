@@ -375,6 +375,8 @@ export const helpArticles: HelpArticle[] = [
     ],
     notes: [
       "«Kladd» vises ikke i butikken. «Arkivert» er tatt ut av salg, men står i ordrene.",
+      "En vare kan stå i flere samlinger. Du lager dem nederst på siden Varer, og kan vise en samling i en vareseksjon på forsiden.",
+      "Du kan velge flere bilder samtidig, eller dra dem inn i bildefeltet.",
       "Under «Pris og lager» endrer du mange varer på en gang.",
       "«Importer CSV» tar inn varer fra et regneark. Du ser alt som vil skje før noe lagres.",
       "Sett vekten på varen hvis du bruker Bring. Fraktprisen regnes ut fra vekten.",

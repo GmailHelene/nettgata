@@ -1,7 +1,9 @@
 "use client";
 
+import { useContext, useEffect, useState } from "react";
 import { FileInput } from "@/components/studio/file-input";
-import { ImageInput } from "@/components/studio/image-input";
+import { ImageInput, SiteIdContext } from "@/components/studio/image-input";
+import { listCollectionsAction } from "../../../../shop-actions";
 import type { Field, FileValue, ImageValue, TextFormat } from "@/lib/content/fields";
 
 export type Value = Record<string, unknown>;
@@ -17,7 +19,34 @@ export function emptyValue(fields: Field[]): Value {
 
 export const inputClass = "w-full rounded-md border border-neutral-400 bg-white px-3 py-2";
 
+/** Velger en av butikkens samlinger. Listen hentes fra serveren, siden den er forskjellig for hver butikk. */
+function CollectionSelect({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const siteId = useContext(SiteIdContext);
+  const [options, setOptions] = useState<{ slug: string; name: string }[]>([]);
+  useEffect(() => {
+    if (siteId) listCollectionsAction(siteId).then(setOptions, () => setOptions([]));
+  }, [siteId]);
+  return (
+    <label className="block">
+      <span className="mb-1 block text-sm font-medium">{label}</span>
+      <select className={inputClass} value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">Alle varer</option>
+        {value && !options.some((o) => o.slug === value) && <option value={value}>{value}</option>}
+        {options.map((o) => (
+          <option key={o.slug} value={o.slug}>
+            {o.name}
+          </option>
+        ))}
+      </select>
+      {options.length === 0 && <span className="mt-1 block text-xs text-neutral-600">Samlinger lager du nederst på siden Varer.</span>}
+    </label>
+  );
+}
+
 function FieldInput({ field, value, onChange }: { field: Field; value: unknown; onChange: (v: unknown) => void }) {
+  if (field.type === "collection") {
+    return <CollectionSelect label={field.label} value={typeof value === "string" ? value : ""} onChange={onChange} />;
+  }
   if (field.type === "select") {
     return (
       <label className="block">

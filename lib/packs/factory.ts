@@ -1,5 +1,6 @@
 import { EXAMPLE_IMAGE_SRC, type ImageValue } from "@/lib/content/fields";
 import type { Section } from "@/lib/content/types";
+import { packImages } from "./bilder";
 import type { Pack, PackInput, PackPage } from "./index";
 
 /** Tekstene en side trenger: firmanavnet, stedet og « i <sted>» når stedet ikke står i navnet fra før. */
@@ -45,7 +46,8 @@ export type Profile = {
 
 const image = (alt: string): ImageValue => ({ src: EXAMPLE_IMAGE_SRC, alt });
 const items = (list: Item[]) => list.map(([navn, beskrivelse, pris = ""]) => ({ navn, beskrivelse, pris }));
-const galleryItems = (alt: string, count: number) => Array.from({ length: count }, () => ({ bilde: image(alt), tekst: "" }));
+const galleryItems = (key: string, alt: string, count: number) =>
+  Array.from({ length: count }, () => ({ bilde: packImages[key]?.gallery ?? image(alt), tekst: "" }));
 const clip = (text: string, max: number) => (text.length > max ? text.slice(0, max) : text);
 
 function copyFor({ name, city }: PackInput): Copy {
@@ -119,7 +121,7 @@ export function servicePack(profile: Profile): Pack {
                   undertekst: hero.text,
                   knappTekst: hero.button,
                   knappLenke: hero.link ?? "/kontakt",
-                  bilde: image(hero.image),
+                  bilde: packImages[profile.key]?.hero ?? image(hero.image),
                 },
               },
               {
@@ -137,13 +139,13 @@ export function servicePack(profile: Profile): Pack {
                 props: {
                   overskrift: `Om ${c.name}`,
                   brodtekst: profile.about.text,
-                  bilde: image(profile.about.image),
+                  bilde: packImages[profile.key]?.about ?? image(profile.about.image),
                   knappTekst: "Les mer om oss",
                   knappLenke: "/om-oss",
                 },
               },
               ...(gallery
-                ? [{ id: "galleri", type: "galleri", variant: "rutenett", props: { overskrift: gallery.heading, bilder: galleryItems(gallery.image, 3) } } satisfies Section]
+                ? [{ id: "galleri", type: "galleri", variant: "rutenett", props: { overskrift: gallery.heading, bilder: galleryItems(profile.key, gallery.image, 3) } } satisfies Section]
                 : []),
               ...(local.hours ? [hoursSection] : []),
               cta(profile),
@@ -180,7 +182,7 @@ export function servicePack(profile: Profile): Pack {
                 id: "om",
                 type: "bildetekst",
                 variant: "bilde-venstre",
-                props: { overskrift: `Om ${c.name}`, brodtekst: profile.about.text, bilde: image(profile.about.image) },
+                props: { overskrift: `Om ${c.name}`, brodtekst: profile.about.text, bilde: packImages[profile.key]?.about ?? image(profile.about.image) },
               },
               ...(local.team ? [team(local.team)] : []),
               {
@@ -201,7 +203,7 @@ export function servicePack(profile: Profile): Pack {
           showInMenu: true,
           content: {
             seo: { title: clip(`${gallery.page.title} | ${c.name}`, 70) },
-            sections: [{ id: "galleri", type: "galleri", variant: "rutenett", props: { overskrift: gallery.heading, bilder: galleryItems(gallery.image, 6) } }],
+            sections: [{ id: "galleri", type: "galleri", variant: "rutenett", props: { overskrift: gallery.heading, bilder: galleryItems(profile.key, gallery.image, 6) } }],
           },
         });
       }

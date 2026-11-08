@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import type { Db } from "@/db";
-import { auditLog, productCategories, productVariants, products } from "@/db/schema";
+import { productCollections, auditLog, productCategories, productVariants, products } from "@/db/schema";
 import { parseCsv } from "@/lib/csv";
 import { createProduct, productInputSchema, productSlug, ShopError, updateVariants, type ProductInput, type VariantChange } from "./catalog";
 import { formatNok, parseNok, vatRates } from "./money";
@@ -284,6 +284,8 @@ export async function applyImport(db: Db, siteId: string, text: string, userId: 
       .update(products)
       .set({ ...(p.status && { status: p.status }), ...(p.category && { categoryId: categoryId(p.category) }), updatedAt: new Date() })
       .where(eq(products.id, p.productId));
+    const collection = p.category ? categoryId(p.category) : null;
+    if (collection) await db.insert(productCollections).values({ productId: p.productId, categoryId: collection }).onConflictDoNothing();
   }
   if (prepared.variantChanges.length) await updateVariants(db, siteId, prepared.variantChanges, userId);
   await db.insert(auditLog).values({

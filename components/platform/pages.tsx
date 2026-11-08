@@ -547,7 +547,7 @@ function Showcase({ keys }: { keys?: string[] }) {
 /*
  * Bare det som er bygget og i bruk (markedsføringsloven). Sjekk koden før noe legges til her.
  * Ikke bygget, skal ikke stå: Fiken for butikkene, alt-tekst fra AI, helsesjekk, publisering til Facebook
- * og Instagram, full eksport, nyhetsbrev (under arbeid).
+ * og Instagram, nyhetsbrev (under arbeid).
  */
 function Features({ shop = false }: { shop?: boolean }) {
   const f = {
@@ -692,7 +692,7 @@ function Faq({ items }: { items: [string, string][] }) {
 
 /**
  * Spørsmålene på forsiden. De står synlig på siden og går også inn som FAQPage i de strukturerte dataene.
- * Svarene lover bare det som er bygget: det finnes ingen full eksport ennå, så «du får med deg alt» står ikke her.
+ * Svarene lover bare det som er bygget. «Last ned alt» finnes under Innstillinger, for eieren av nettstedet.
  */
 export const landingFaq: [string, string][] = [
   [
@@ -809,6 +809,20 @@ function Landing({ env }: { env: PlatformEnv }) {
         tone="kalk"
       >
         <Showcase keys={["klinikk", "galleri", "hytte", "puls", "nordlys", "fjord"]} />
+      </Section>
+      <Section eyebrow="Trygt valg" title="Det er din bedrift, og det skal være din nettside">
+        <ul className="grid gap-x-10 gap-y-9 md:grid-cols-3">
+          {[
+            ["Sier du opp, tar du med deg alt", "Last ned sidene, tekstene, bildene, varene og ordrene når du vil. Domenet står i ditt navn hele tiden."],
+            ["Vi tar ingenting av salget", "Pengene går rett til deg. I nettbutikken betaler du bare gebyret til Vipps eller kortleverandøren."],
+            ["Du snakker med Helene, ikke en chatbot", "Du får skriftlig svar innen én virkedag fra hun som har laget Nettgata."],
+          ].map(([title, text]) => (
+            <li key={title} className="border-t-2 border-[#1b232b] pt-4">
+              <h3 className={`${heading} text-lg leading-snug`}>{title}</h3>
+              <p className={`mt-1.5 leading-relaxed ${muted}`}>{text}</p>
+            </li>
+          ))}
+        </ul>
       </Section>
       <Section eyebrow="Inkludert" title="Alt du trenger, uten plugins og tillegg">
         <Features />

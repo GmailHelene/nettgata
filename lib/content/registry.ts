@@ -142,6 +142,7 @@ export const sectionRegistry: Record<SectionType, SectionDefinition> = {
           { value: "lager", label: "På lager nå" },
         ],
       },
+      { key: "samling", label: "Bare varer fra samlingen", type: "collection" },
       { key: "knappTekst", label: "Knappetekst til alle varer", type: "text", max: 40, optional: true },
     ],
   },

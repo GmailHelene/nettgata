@@ -5,7 +5,7 @@ import { EXAMPLE_IMAGE_SRC, isSafeHref, type FileValue, type ImageValue } from "
 import { readFormFields } from "@/lib/content/form-fields";
 import { sectionRegistry } from "@/lib/content/registry";
 import { mapLinks, youtubeEmbedUrl, youtubeId } from "@/lib/embeds";
-import { fileSrcPattern, focusStyle, mediaSrcPattern, mediaSrcSet } from "@/lib/media-types";
+import { fileSrcPattern, focusStyle, mediaSrcPattern, mediaSrcSet, packImageSrcPattern } from "@/lib/media-types";
 import { formatSpecialDate, visibleSpecialHours } from "@/lib/opening-hours";
 import { listPlaces, parseServiceArea } from "@/lib/seo/auto";
 import { breadcrumbItems } from "@/lib/seo/schema";
@@ -32,7 +32,7 @@ const str = (p: Props, key: string) => (typeof p[key] === "string" ? (p[key] as 
 const list = (p: Props, key: string) => (Array.isArray(p[key]) ? (p[key] as Props[]) : []);
 const image = (p: Props, key: string): ImageValue | null => {
   const v = p[key] as ImageValue | null | undefined;
-  return v && typeof v.src === "string" && (mediaSrcPattern.test(v.src) || v.src === EXAMPLE_IMAGE_SRC) ? v : null;
+  return v && typeof v.src === "string" && (mediaSrcPattern.test(v.src) || packImageSrcPattern.test(v.src) || v.src === EXAMPLE_IMAGE_SRC) ? v : null;
 };
 
 /**
@@ -351,7 +351,8 @@ function Tjenester({ section, first }: { section: Section; first: boolean }) {
 function Produkter({ section, ctx, first }: { section: Section; ctx: RenderContext; first: boolean }) {
   const p = section.props;
   if (!ctx.shop) return null;
-  const all = ctx.products;
+  const collection = str(p, "samling");
+  const all = collection ? ctx.products.filter((x) => x.collectionSlugs?.includes(collection)) : ctx.products;
   const selection = str(p, "utvalg") || "utvalgte";
   const items = (
     selection === "nyeste"
@@ -368,7 +369,7 @@ function Produkter({ section, ctx, first }: { section: Section; ctx: RenderConte
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <Heading first={first}>{str(p, "overskrift")}</Heading>
           {str(p, "knappTekst") && (
-            <Link href={siteHref(ctx.basePath, "/produkter")} className="mb-6 font-semibold underline underline-offset-4">
+            <Link href={siteHref(ctx.basePath, collection ? `/produkter?kategori=${encodeURIComponent(collection)}` : "/produkter")} className="mb-6 font-semibold underline underline-offset-4">
               {str(p, "knappTekst")} →
             </Link>
           )}

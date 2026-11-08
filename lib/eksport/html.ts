@@ -1,4 +1,4 @@
-import { mediaFileKeyPattern } from "@/lib/media-types";
+import { mediaFileKeyPattern, packImageSrcPattern } from "@/lib/media-types";
 
 /**
  * Gjør de publiserte sidene om til statiske HTML-filer som kan åpnes fra en mappe eller legges ut et annet sted.
@@ -54,6 +54,8 @@ export function rewriteUrl(raw: string, fromFile: string, options: RewriteOption
     const file = pathname.slice(1);
     return { url: relative(fromFile, file), asset: { kind: "static", path: pathname } };
   }
+  // Ferdige bilder fra bransjepakkene ligger som vanlige filer, og må med i ZIP-en for at siden skal virke uten Nettgata.
+  if (packImageSrcPattern.test(pathname)) return { url: relative(fromFile, pathname.slice(1)), asset: { kind: "static", path: pathname } };
   if (pathname.startsWith("/media/")) {
     const key = pathname.slice("/media/".length);
     if (mediaFileKeyPattern.test(key)) return { url: relative(fromFile, `media/${key}`), asset: { kind: "media", key } };

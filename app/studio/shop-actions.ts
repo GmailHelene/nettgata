@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { asc, and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { unstable_rethrow } from "next/navigation";
@@ -92,11 +92,18 @@ export async function archiveProductAction(siteId: string, productId: string): P
   }
 }
 
+/** Samlingene til vareseksjonen i sideredigereren. */
+export async function listCollectionsAction(siteId: string): Promise<{ slug: string; name: string }[]> {
+  const { site } = await requireSiteAccess(siteId);
+  const db = await getDb();
+  return db.select({ slug: productCategories.slug, name: productCategories.name }).from(productCategories).where(eq(productCategories.siteId, site.id)).orderBy(asc(productCategories.sortOrder), asc(productCategories.name));
+}
+
 export async function createCategoryAction(siteId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
   try {
     const { site } = await requireSiteAccess(siteId);
     const name = String(formData.get("name") ?? "").trim();
-    if (!name || name.length > 60) return { ok: false, message: "Kategorien må ha et navn (maks 60 tegn)" };
+    if (!name || name.length > 60) return { ok: false, message: "Samlingen må ha et navn (maks 60 tegn)" };
     const slug = productSlug(name);
     if (!slug) return { ok: false, message: "Navnet må inneholde bokstaver eller tall" };
     const db = await getDb();

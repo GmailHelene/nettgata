@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import {
+import { type AnyPgColumn,
   boolean,
   date,
   integer,
@@ -295,6 +295,19 @@ export const productCategories = pgTable(
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("product_categories_site_slug_idx").on(t.siteId, t.slug)],
+);
+
+/**
+ * Hvilke samlinger en vare står i. En vare kan stå i flere. products.categoryId er den første av dem,
+ * så eksport og varelister som viser én kategori, fortsatt virker.
+ */
+export const productCollections = pgTable(
+  "product_collections",
+  {
+    productId: uuid("product_id").notNull().references((): AnyPgColumn => products.id, { onDelete: "cascade" }),
+    categoryId: uuid("category_id").notNull().references(() => productCategories.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.productId, t.categoryId] }), index("product_collections_category_idx").on(t.categoryId)],
 );
 
 export type ProductOption = { name: string; values: string[] };

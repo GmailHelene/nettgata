@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gte, ilike, inArray, lt, ne, or, type SQL } from "drizzle-orm";
 import type { Db } from "@/db";
-import { orders, productCategories, productVariants, products } from "@/db/schema";
+import { productCollections, orders, productCategories, productVariants, products } from "@/db/schema";
 import { csvKroner, toCsv } from "@/lib/csv";
 import { addDays, formatOsloDateTime, osloDate, parseOsloDate } from "@/lib/oslo-time";
 import { paymentLabels, type PaymentMethod } from "./settings";
@@ -158,7 +158,7 @@ export type AdminProduct = Awaited<ReturnType<typeof listProductsAdmin>>[number]
 /** Varer med lageroppsummering. Søket treffer både varenavn og varenummer (SKU). */
 export async function listProductsAdmin(db: Db, siteId: string, query: ReturnType<typeof parseProductQuery>, lowStockAt: number) {
   const conditions: SQL[] = [eq(products.siteId, siteId), inArray(products.status, [...productStatusFilters[query.status].statuses])];
-  if (query.categoryId) conditions.push(eq(products.categoryId, query.categoryId));
+  if (query.categoryId) conditions.push(inArray(products.id, db.select({ id: productCollections.productId }).from(productCollections).where(eq(productCollections.categoryId, query.categoryId))));
   if (query.search) {
     const pattern = `%${escapeLike(query.search)}%`;
     const bySku = db.select({ id: productVariants.productId }).from(productVariants).where(ilike(productVariants.sku, pattern));

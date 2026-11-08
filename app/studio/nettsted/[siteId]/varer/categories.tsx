@@ -11,7 +11,8 @@ export function Categories({ siteId, categories }: { siteId: string; categories:
 
   return (
     <section className="mt-10 rounded-lg border bg-white p-5">
-      <h2 className="mb-3 font-semibold">Kategorier</h2>
+      <h2 className="mb-1 font-semibold">Samlinger</h2>
+      <p className="mb-3 text-sm text-neutral-600">Samle varene i grupper. Kundene kan filtrere på dem, og du kan vise en samling i en vareseksjon på forsiden.</p>
       {categories.length > 0 && (
         <ul className="mb-4 flex flex-wrap gap-2">
           {categories.map((c) => (
@@ -20,10 +21,10 @@ export function Categories({ siteId, categories }: { siteId: string; categories:
               <button
                 type="button"
                 disabled={pending}
-                aria-label={`Slett kategorien ${c.name}`}
+                aria-label={`Slett samlingen ${c.name}`}
                 className="rounded-full px-2 hover:bg-neutral-300"
                 onClick={() => {
-                  if (confirm(`Slette kategorien «${c.name}»? Varene blir liggende uten kategori.`)) {
+                  if (confirm(`Slette samlingen «${c.name}»? Varene blir ikke slettet.`)) {
                     startTransition(() => deleteCategoryAction(siteId, c.id));
                   }
                 }}
@@ -36,8 +37,8 @@ export function Categories({ siteId, categories }: { siteId: string; categories:
       )}
       <form action={action} className="flex items-end gap-2">
         <label className="block flex-1">
-          <span className="mb-1 block text-sm font-medium">Ny kategori</span>
-          <input name="name" placeholder="F.eks. Luer" className={inputClass} />
+          <span className="mb-1 block text-sm font-medium">Ny samling</span>
+          <input name="name" placeholder="F.eks. Julepynt" className={inputClass} />
         </label>
         <button disabled={creating} className="rounded-md border border-[#173b6c] px-4 py-2 text-sm font-semibold">
           Legg til

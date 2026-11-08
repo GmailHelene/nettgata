@@ -68,7 +68,7 @@ export function ProductEditor({
   }, [dirty]);
   const [description, setDescription] = useState(initial.description ?? "");
   const [images, setImages] = useState<ImageValue[]>(initial.images ?? []);
-  const [categoryId, setCategoryId] = useState(initial.categoryId ?? "");
+  const [collectionIds, setCollectionIds] = useState<string[]>(initial.collectionIds ?? (initial.categoryId ? [initial.categoryId] : []));
   const [vatRate, setVatRate] = useState(initial.vatRate);
   const [status, setStatus] = useState(initial.status);
   const [options, setOptions] = useState<OptionRow[]>((initial.options ?? []).map((o) => ({ name: o.name, values: o.values.join(", ") })));
@@ -157,7 +157,8 @@ export function ProductEditor({
         options: options.map((o) => ({ name: o.name.trim(), values: splitValues(o.values) })),
         vatRate,
         status,
-        categoryId: categoryId || null,
+        categoryId: collectionIds[0] ?? null,
+        collectionIds,
         weightGrams,
         seoTitle,
         seoDescription,
@@ -196,7 +197,7 @@ export function ProductEditor({
               onChange={(v) => setImages(v ? images.map((x, j) => (j === i ? v : x)) : images.filter((_, j) => j !== i))}
             />
           ))}
-          <ImageInput label={images.length ? "Legg til bilde" : "Hovedbilde"} optional value={null} onChange={(v) => v && setImages([...images, v])} />
+          <ImageInput label={images.length ? "Legg til bilde" : "Hovedbilde"} optional value={null} onChange={(v) => v && setImages((list) => [...list, v])} onUploadMany={(v) => setImages((list) => [...list, v].slice(0, 20))} />
         </section>
 
         <section className="space-y-3 rounded-lg border bg-white p-5">
@@ -343,17 +344,27 @@ export function ProductEditor({
                 <option value="archived">Arkivert</option>
               </select>
             </label>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium">Kategori</span>
-              <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputClass}>
-                <option value="">Ingen</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <fieldset className="sm:col-span-2">
+              <legend className="mb-1 text-sm font-medium">Samlinger</legend>
+              {categories.length === 0 ? (
+                <p className="text-sm text-neutral-600">Du har ingen samlinger ennå. Lag dem nederst på siden Varer.</p>
+              ) : (
+                <div className="flex flex-wrap gap-x-5 gap-y-2">
+                  {categories.map((c) => (
+                    <label key={c.id} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={collectionIds.includes(c.id)}
+                        onChange={(e) => setCollectionIds((ids) => (e.target.checked ? [...ids, c.id] : ids.filter((id) => id !== c.id)))}
+                        className="size-4 accent-[#173b6c]"
+                      />
+                      {c.name}
+                    </label>
+                  ))}
+                </div>
+              )}
+              <p className="mt-1 text-xs text-neutral-600">En vare kan stå i flere samlinger, for eksempel både «Julepynt» og «Gaver under 300 kr».</p>
+            </fieldset>
             <label className="block">
               <span className="mb-1 block text-sm font-medium">MVA</span>
               {chargesVat ? (
