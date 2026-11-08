@@ -96,7 +96,7 @@ export default async function StudioHome() {
         {houses.length === 0 && !canCreate ? (
           <div className={`${ui.card} max-w-xl p-6`}>
             <h2 className={`${heading} text-xl`}>Du har ingen nettsteder ennå</h2>
-            <p className={`mt-2 ${ui.muted}`}>Har du fått en invitasjon på e-post, åpner du lenken i den, så dukker nettstedet opp her.</p>
+            <p className={`mt-2 ${ui.muted}`}>Når e-posten er bekreftet, kan du lage nettstedet ditt her.</p>
           </div>
         ) : (
           <ul className="grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">

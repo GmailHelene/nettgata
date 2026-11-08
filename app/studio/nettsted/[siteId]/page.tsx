@@ -1,3 +1,4 @@
+import { hasExampleText } from "@/lib/content/examples";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { and, count, desc, eq, isNull, lt } from "drizzle-orm";
@@ -250,6 +251,11 @@ export default async function OverviewPage({ params }: { params: Promise<{ siteI
   }
   if (unread) tasks.push({ text: `${unread} ${unread === 1 ? "ny henvendelse" : "nye henvendelser"}`, href: `${base}/henvendelser` });
 
+  // Eksempeltekst stopper publisering, så kunden skal se det før hen betaler, ikke etterpå.
+  const draftPages = await db.select({ id: pages.id, draft: pages.draft }).from(pages).where(eq(pages.siteId, site.id));
+  const unfinishedByPage = draftPages.map((p) => ({ id: p.id, count: p.draft.sections.filter((x) => !x.hidden && hasExampleText(x)).length }));
+  const unfinishedSections = unfinishedByPage.reduce((sum, p) => sum + p.count, 0);
+  const firstUnfinished = unfinishedByPage.find((p) => p.count > 0)?.id;
   const subscribed = hasActiveSubscription(site.billing);
   const primary = domainRows.find((d) => d.isPrimary && d.status === "active");
   const pendingRoot = [...new Set(domainRows.filter((r) => r.status === "pending" && r.kind !== "apex").map(rootOf))][0];
@@ -280,12 +286,20 @@ export default async function OverviewPage({ params }: { params: Promise<{ siteI
         ]
       : []),
     {
+      label: "Fyll inn det som er ditt",
+      detail: unfinishedSections
+        ? `${unfinishedSections} ${unfinishedSections === 1 ? "del" : "deler"} har eksempeltekst igjen. Den må byttes ut før siden kan publiseres.`
+        : "Alle eksempeltekster er byttet ut",
+      href: firstUnfinished ? `${base}/side/${firstUnfinished}` : `${base}/sider`,
+      done: unfinishedSections === 0,
+    },
+    { label: "Velg abonnement", detail: "Gratis å bygge. Abonnement for å åpne og bruke eget domene.", href: `${base}/abonnement`, done: subscribed },
+    {
       label: "Publiser sidene",
       detail: `${unpublished} ${unpublished === 1 ? "side er" : "sider er"} ikke publisert ennå`,
       href: `${base}/sider`,
       done: unpublished === 0,
     },
-    { label: "Velg abonnement", detail: "Gratis å bygge. Abonnement for å åpne og bruke eget domene.", href: `${base}/abonnement`, done: subscribed },
     {
       label: "Koble til eget domene",
       detail: pendingRoot ? `${displayHost(pendingRoot)} venter på DNS-pekerne` : "For eksempel dinbedrift.no",

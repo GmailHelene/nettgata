@@ -104,8 +104,7 @@ const nav = [
   ["/#priser", "Priser"],
 ] as const;
 
-/** `leadHref`: skjemaet ligger nederst på de fleste sidene. Der det ikke gjør det (vilkår og personvern), går knappen til forsiden. */
-export function PlatformChrome({ env, children, leadHref = "#kom-i-gang" }: { env: PlatformEnv; children: ReactNode; leadHref?: string }) {
+export function PlatformChrome({ env, children }: { env: PlatformEnv; children: ReactNode }) {
   // Archivo er salgssidens font for både overskrifter og brødtekst. Forhåndslastes bare her, ikke på kundesidene (app/fonts.ts).
   preload("/fonts/archivo-latin.woff2", { as: "font", type: "font/woff2", crossOrigin: "anonymous" });
   return (
@@ -133,9 +132,9 @@ export function PlatformChrome({ env, children, leadHref = "#kom-i-gang" }: { en
             <Link href="/studio" className="hidden text-[0.95rem] hover:underline sm:inline">
               Logg inn
             </Link>
-            <a href={leadHref} className="rounded-lg bg-[#173b6c] px-4 py-2 font-semibold text-white transition-colors hover:bg-[#0f2c55]">
-              Få nettside
-            </a>
+            <Link href="/studio/registrer" className="rounded-lg bg-[#173b6c] px-4 py-2 font-semibold text-white transition-colors hover:bg-[#0f2c55]">
+              Prøv gratis
+            </Link>
           </div>
         </div>
         <nav aria-label="Hovedmeny for mobil" className="border-t border-[#1b232b]/10 md:hidden">
@@ -386,10 +385,12 @@ function StreetHero() {
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4">
           <div className="flex flex-wrap gap-3">
-            <a href="#kom-i-gang" className={button}>
-              Få nettside
+            <Link href="/studio/registrer" className={button}>
+              Prøv gratis
+            </Link>
+            <a href="#kom-i-gang" className={buttonGhost}>
+              Få det satt opp
             </a>
-            <TrialLink />
             <Link href="/temaer" className={buttonGhost}>
               Se temaene
             </Link>
@@ -444,10 +445,12 @@ function Hero({
           )}
           <p className={`mt-6 max-w-xl text-lg leading-relaxed ${muted}`}>{text}</p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <a href="#kom-i-gang" className={button}>
-              Få nettside
+            <Link href="/studio/registrer" className={button}>
+              Prøv gratis
+            </Link>
+            <a href="#kom-i-gang" className={buttonGhost}>
+              Få det satt opp
             </a>
-            <TrialLink />
             <Link href="/temaer" className={buttonGhost}>
               Se temaene
             </Link>
@@ -596,8 +599,7 @@ function Owner() {
             meste 12 millioner i omsetning.
           </p>
           <p>
-            Jeg har hatt alle rollene en nettbutikk har, og koding har jeg lært meg selv de siste tre årene. Nettgata er det verktøyet jeg skulle ønske
-            jeg hadde da jeg startet i stua.
+            Jeg har hatt alle rollene en nettbutikk har. Nettgata er det verktøyet jeg skulle ønske jeg hadde da jeg startet i stua.
           </p>
           <p>Du skriver til meg, ikke til et kundesenter, og du får svar innen én virkedag. Vil du heller at jeg setter alt opp, gjør jeg det.</p>
           <p className="text-base text-white/75">
@@ -627,12 +629,12 @@ function PriceCard({ name, price, yearly, items, highlight }: { name: string; pr
           </li>
         ))}
       </ul>
-      <a
-        href="#kom-i-gang"
+      <Link
+        href="/studio/registrer"
         className={`mt-8 rounded-lg px-5 py-3 text-center font-semibold transition-colors ${highlight ? "bg-white text-[#173b6c] hover:bg-white/90" : "bg-[#173b6c] text-white hover:bg-[#0f2c55]"}`}
       >
-        Få {name.toLowerCase()}
-      </a>
+        Prøv {name.toLowerCase()} gratis
+      </Link>
     </div>
   );
 }
@@ -700,6 +702,10 @@ function Faq({ items }: { items: [string, string][] }) {
  * Svarene lover bare det som er bygget. «Last ned alt» finnes under Innstillinger, for eieren av nettstedet.
  */
 export const landingFaq: [string, string][] = [
+  [
+    "Hva skjer hvis du blir syk, eller Nettgata legges ned?",
+    "Nettsiden din går på Cloudflare uansett om jeg er på jobb, og det tas kopi av alt hver natt. Du kan når som helst laste ned sidene, tekstene, bildene, varene og ordrene, og domenet står i ditt navn. Da kan du flytte til en annen løsning uten å starte på nytt.",
+  ],
   [
     "Hva koster en nettside hos Nettgata?",
     "199 kr i måneden eks. mva, eller 169 kr i måneden når du betaler for et år om gangen. Nettbutikk koster 399 kr i måneden. Alle temaer og bransjepakker er med, og det er ingen bindingstid. Vil du ha alt satt opp for deg, koster oppstarten 3 900 kr.",
@@ -786,8 +792,11 @@ function Landing({ env }: { env: PlatformEnv }) {
   return (
     <>
       <StreetHero />
-      <Section eyebrow="Slik virker det" title="Fra org.nr. til ferdig nettside" tone="kalk">
+      <Section eyebrow="Slik virker det" title="Fra org.nr. til nettside" tone="kalk">
         <Steps />
+      </Section>
+      <Section id="priser" eyebrow="Priser" title="To abonnement. Alt er med." intro="Ingen pakker med skjulte begrensninger. Alle temaer og bransjepakker følger med uansett hva du velger.">
+        <Pricing />
       </Section>
       <Section eyebrow="Bransjer" title="Finn bransjen din" intro="Hver bransjepakke har sidene, tekstene og prislisten bransjen trenger. Velg din, så ser du hva som ligger klart.">
         <GenreSigns />
@@ -833,9 +842,6 @@ function Landing({ env }: { env: PlatformEnv }) {
         <Features />
       </Section>
       <Owner />
-      <Section id="priser" eyebrow="Priser" title="To abonnement. Alt er med." intro="Ingen pakker med skjulte begrensninger. Alle temaer og bransjepakker følger med uansett hva du velger.">
-        <Pricing />
-      </Section>
       <Section eyebrow="Spørsmål" title="Det folk lurer på" tone="kalk">
         <Faq items={landingFaq} />
       </Section>
@@ -1218,7 +1224,7 @@ export function renderPlatformPage(route: PlatformRoute, env: PlatformEnv): Reac
       <LegalPage doc={route.doc} crumbs={crumbs} />
     ) : null;
   return body ? (
-    <PlatformChrome env={env} leadHref={route.kind === "juridisk" ? "/#kom-i-gang" : "#kom-i-gang"}>
+    <PlatformChrome env={env}>
       <JsonLd data={platformJsonLd(route, platformOrigin(PLATFORM_DEFAULT_ORIGIN), visibleFaq(route))} />
       {body}
     </PlatformChrome>
