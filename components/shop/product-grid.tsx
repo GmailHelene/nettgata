@@ -80,7 +80,7 @@ export function ProductCard({
 
 export function ProductGrid({ products, basePath }: { products: CatalogProduct[]; basePath: string }) {
   return (
-    <ul className="grid grid-cols-2 gap-x-5 gap-y-10 md:grid-cols-3 lg:grid-cols-4">
+    <ul className="ng-product-grid grid grid-cols-2 gap-x-5 gap-y-10 md:grid-cols-3 lg:grid-cols-4">
       {products.map((p) => (
         <li key={p.id}>
           <ProductCard product={p} basePath={basePath} />

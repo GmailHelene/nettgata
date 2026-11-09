@@ -359,3 +359,100 @@ a.gata-facade:focus-visible {
     transform: none;
   }
 }
+
+/* Oppbygging fra temaet (data-oppbygging). Gjelder innholdet, ikke topp og bunn. */
+[data-oppbygging="meny"] section .ng-container {
+  max-width: 42rem;
+}
+[data-oppbygging="hylla"] section .ng-container {
+  max-width: 80rem;
+}
+@media (min-width: 1024px) {
+  [data-oppbygging="hylla"] .ng-product-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    row-gap: 1.75rem;
+  }
+}
+
+/* Delene lenger ned på siden. Lister og kort får ulik form per oppbygging. */
+[data-oppbygging="meny"] section ul.grid,
+[data-oppbygging="timeplan"] section ul.grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+[data-oppbygging="meny"] section ul.grid .ng-card {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dotted var(--c-muted);
+  border-radius: 0;
+  padding-inline: 0;
+}
+[data-oppbygging="timeplan"] section ul.grid .ng-card {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--c-muted);
+  border-radius: 0;
+}
+[data-oppbygging="vakt"] section .ng-card {
+  border-left: 6px solid var(--c-primary);
+}
+[data-oppbygging="avis"] section ul.grid > li + li {
+  border-left: 1px solid var(--c-muted);
+  padding-left: 1.25rem;
+}
+[data-oppbygging="avis"] section .ng-card {
+  background: transparent;
+  padding: 0;
+}
+[data-oppbygging="plakat"] section ul.grid {
+  gap: 0;
+}
+[data-oppbygging="plakat"] section .ng-h2 {
+  font-size: calc(var(--h2-size, 2.4rem) * 1.5);
+}
+[data-oppbygging="prosjekt"] section ul.grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+}
+[data-oppbygging="produkt"] section .ng-container {
+  max-width: 46rem;
+}
+[data-oppbygging="kontor"] section ul.grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+}
+@media (min-width: 768px) {
+  [data-oppbygging="delt"] main > section:not(:first-child) .ng-container {
+    margin-left: 50%;
+    max-width: 50%;
+  }
+  [data-oppbygging="delt"] main > section:not(:first-child) ul.grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  [data-oppbygging="sidemeny"] {
+    display: grid;
+    grid-template-columns: 13rem minmax(0, 1fr);
+  }
+  [data-oppbygging="sidemeny"] > header {
+    grid-row: 1 / span 2;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    border-right: 1px solid color-mix(in srgb, var(--c-muted) 35%, transparent);
+  }
+  [data-oppbygging="sidemeny"] .ng-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.5rem;
+  }
+  [data-oppbygging="sidemeny"] .ng-header-nav ul,
+  [data-oppbygging="sidemeny"] .ng-header-nav {
+    flex-direction: column;
+    align-items: flex-start;
+    flex-wrap: nowrap;
+  }
+  [data-oppbygging="sidemeny"] .ng-header-nav ul {
+    row-gap: 0.5rem;
+  }
+  [data-oppbygging="sidemeny"] > footer {
+    grid-column: 2;
+  }
+}

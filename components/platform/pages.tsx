@@ -46,6 +46,18 @@ export type PlatformEnv = { tagId: string; sendTo: string };
 
 /** Eksempler i temagalleriet. Generiske navn, så ingen forveksles med ekte bedrifter. */
 const showcase = [
+  { theme: "vakt", pack: "elektriker", name: "Elektrikeren" },
+  { theme: "plakaten", pack: "kafe", name: "Konsertkafeen" },
+  { theme: "timeplan", pack: "massasje", name: "Studioet" },
+  { theme: "avisen", pack: "regnskap", name: "Lokalavisa" },
+  { theme: "sidemeny", pack: "maler", name: "Maleren" },
+  { theme: "prosjektet", pack: "snekker", name: "Snekkeren" },
+  { theme: "gardsdisken", pack: "restaurant", name: "Gårdsdisken" },
+  { theme: "ettprodukt", pack: "hudpleie", name: "Hudkremen" },
+  { theme: "lokalkontor", pack: "renhold", name: "Renholdsfirmaet" },
+  { theme: "menykortet", pack: "restaurant", name: "Restauranten" },
+  { theme: "delt", pack: "hudpleie", name: "Hudpleieren" },
+  { theme: "hylla", pack: "klaer", name: "Klesbutikken" },
   { theme: "atelier", pack: "frisor", name: "Salongen" },
   { theme: "verksted", pack: "rorlegger", name: "Rørleggeren" },
   { theme: "bistro", pack: "kafe", name: "Kafeen" },
@@ -480,7 +492,7 @@ function Section({ id, eyebrow, title, intro, children, tone = "plain" }: { id?:
 function Steps() {
   const steps = [
     ["Fortell hvem du er", "Org.nr. er nok. Navn og adresse hentes fra Brønnøysundregistrene, og bransjen blir foreslått ut fra næringskoden."],
-    ["Velg bransje og tema", "45 bransjepakker og 12 temaer med fire fargevarianter hver. Du ser din egen side i hvert tema før du velger."],
+    ["Velg bransje og tema", "45 bransjepakker og 24 temaer med fire fargevarianter hver. Du ser din egen side i hvert tema før du velger."],
     ["Fyll inn og publiser", "Sidene er laget og tekstene skrevet. Bytt ut det som skal være ditt, last opp bilder og trykk Publiser."],
   ];
   return (
@@ -712,7 +724,7 @@ export const landingFaq: [string, string][] = [
   ],
   ["Hvem eier nettsiden og domenet?", "Du. Domenet registreres i ditt navn, så det tar du med deg om du sier opp. Tekstene og bildene du legger inn, er dine."],
   ["Kan jeg bruke domenet jeg har fra før?", "Ja. Du endrer to innstillinger hos den som har domenet ditt i dag, og du får hjelp om du trenger det. Resten, også den sikre tilkoblingen (https), ordnes automatisk."],
-  ["Hva koster domenet?", "Domenet kjøper du selv hos en forhandler, for eksempel Domeneshop, slik at det står i ditt navn. En .no-adresse koster vanligvis noen hundrelapper i året, og Nettgata tar ingenting for koblingen."],
+  ["Hva koster domenet?", "Du trenger ikke kjøpe domene for å komme i gang, for alle får en gratis adresse på formen dittnavn.nettgata.no. Vil du ha eget domene, kjøper du det selv hos en forhandler, for eksempel Domeneshop, slik at det står i ditt navn. En .no-adresse koster vanligvis noen hundrelapper i året, og Nettgata tar ingenting for koblingen."],
   [
     "Kan jeg flytte fra Wix, Squarespace eller WordPress?",
     "Ja. Med oppstarten flyttes tekstene og bildene over for deg. Gjør du det selv, legger du dem inn i studioet. De gamle adressene sendes videre til de nye, så du ikke mister plasseringen i Google.",
@@ -818,7 +830,7 @@ function Landing({ env }: { env: PlatformEnv }) {
       </Section>
       <Section
         eyebrow="Temaer"
-        title="Tolv temaer, med fire fargevarianter hver"
+        title="24 temaer, med fire fargevarianter hver"
         intro="Fem av dem står i gata øverst. Her er seks til. Hvert tema har egne fonter, knapper, menyer og bildestiler, og bytter du senere, står tekstene og bildene dine urørt."
         tone="kalk"
       >
@@ -913,7 +925,7 @@ function ThemesPage({ env, crumbs }: { env: PlatformEnv; crumbs: Crumb[] }) {
         <Eyebrow>Temaer</Eyebrow>
         <h1 className={`${heading} max-w-3xl text-4xl leading-[1.04] text-balance sm:text-5xl`}>Finn utseendet som passer bedriften din</h1>
         <p className={`mt-5 max-w-2xl text-lg leading-relaxed ${muted}`}>
-          Tolv ferdige design for nettsiden, med fire fargevarianter hver. Miniatyrene er ekte nettsider fra bransjepakkene. I studioet ser du din egen
+          24 ferdige design for nettsiden, med fire fargevarianter hver. Miniatyrene er ekte nettsider fra bransjepakkene. I studioet ser du din egen
           side i hvert tema, både på datamaskin og mobil, før du velger. Bytter du tema senere, står tekstene og bildene urørt.
         </p>
       </section>

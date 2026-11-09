@@ -232,8 +232,8 @@ const titles: Record<Exclude<PlatformRoute["kind"], "bransje" | "juridisk">, [st
     "Nettbutikk for små bedrifter, med varer, lager, rabattkoder, frakt med Bring, og betaling med Vipps og kort rett til deg. 399 kr i måneden eks. mva.",
   ],
   temaer: [
-    "12 design for nettsiden din, fire farger hver | Nettgata",
-    "Se 12 ferdige design for nettsiden, med fire fargevarianter hver. Miniatyrene er ekte sider fra bransjepakkene, og du kan bytte tema når du vil.",
+    "24 design for nettsiden din, fire farger hver | Nettgata",
+    "Se 24 ferdige design for nettsiden, med fire fargevarianter hver. Miniatyrene er ekte sider fra bransjepakkene, og du kan bytte tema når du vil.",
   ],
   bransjer: [
     "Nettside for din bransje, 45 bransjepakker | Nettgata",

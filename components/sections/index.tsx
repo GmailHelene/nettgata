@@ -23,7 +23,7 @@ import { MobileMenu } from "@/components/site/mobile-menu";
 import { socialLabels, type SiteLayout } from "@/lib/site-layout";
 import { ProductCarousel, ProductGrid } from "@/components/shop/product-grid";
 import type { CatalogProduct } from "@/lib/shop/catalog";
-import { themeRootProps, type Theme } from "@/lib/theme";
+import { themeRootProps, type Theme , resolveTheme, type ResolvedTheme } from "@/lib/theme";
 
 type Props = Record<string, unknown>;
 /** Luft over og under en seksjon. Temaets «luft» skalerer den (--space). */
@@ -131,7 +131,7 @@ function Button({ href, basePath, children }: { href: string; basePath: string; 
 }
 
 export function Container({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`mx-auto max-w-5xl px-5 ${className}`}>{children}</div>;
+  return <div className={`ng-container mx-auto max-w-5xl px-5 ${className}`}>{children}</div>;
 }
 
 /**
@@ -146,7 +146,7 @@ export function Heading({ children, level = 2, first = false, h1 = true }: { chi
   return <Tag className={`ng-h ${level === 1 ? "ng-h1" : "ng-h2 mb-6"}`}>{children}</Tag>;
 }
 
-function Hero({ section, isFirst, h1, basePath }: { section: Section; isFirst: boolean; h1: boolean; basePath: string }) {
+function Hero({ section, isFirst, h1, basePath, arrangement = "standard", phone = "" }: { section: Section; isFirst: boolean; h1: boolean; basePath: string; arrangement?: ResolvedTheme["layout"]; phone?: string }) {
   const p = section.props;
   const bilde = image(p, "bilde");
   const variant = bilde ? section.variant : section.variant === "sentrert" ? "sentrert" : "standard";
@@ -155,7 +155,7 @@ function Hero({ section, isFirst, h1, basePath }: { section: Section; isFirst: b
     <div className={centered ? "mx-auto max-w-3xl" : "max-w-3xl"}>
       <Heading level={isFirst ? 1 : 2} h1={h1}>{str(p, "overskrift")}</Heading>
       {str(p, "undertekst") && (
-        <p className={`mt-5 text-lg ${variant === "bakgrunn" ? "text-white" : "text-[var(--c-muted)]"}`}>{str(p, "undertekst")}</p>
+        <p className={`mt-5 text-lg ${variant === "bakgrunn" || (bilde && ["plakat", "disk"].includes(arrangement)) ? "text-white" : "text-[var(--c-muted)]"}`}>{str(p, "undertekst")}</p>
       )}
       {str(p, "knappTekst") && (
         <div className="mt-8">
@@ -167,6 +167,110 @@ function Hero({ section, isFirst, h1, basePath }: { section: Section; isFirst: b
     </div>
   );
 
+  // Oppbyggingen fra temaet går foran variantene, slik at temaene blir ulike i form og ikke bare i farge.
+  if (arrangement === "delt" && bilde) {
+    return (
+      <section className="grid md:grid-cols-2">
+        <Img value={bilde} eager={isFirst && h1} sizes={imageSizes.half} className="h-72 w-full object-cover md:h-[38rem]" />
+        <div className="flex min-w-0 items-center px-5 py-12 md:px-14">{text}</div>
+      </section>
+    );
+  }
+  if (arrangement === "meny") {
+    return (
+      <section className="py-[calc(4rem*var(--space,1))]">
+        <Container className="text-center">
+          <div className="mx-auto max-w-2xl">{text}</div>
+          {bilde && <Img value={bilde} eager={isFirst && h1} sizes={imageSizes.full} className="mt-10 aspect-[21/9] w-full object-cover" />}
+        </Container>
+      </section>
+    );
+  }
+  if (arrangement === "vakt") {
+    return (
+      <section className="py-[calc(3.5rem*var(--space,1))]">
+        <Container className="grid items-center gap-10 md:grid-cols-[3fr_2fr]">
+          <div>
+            {text}
+            {phone && (
+              <p className="mt-6 text-2xl font-bold">
+                <a href={`tel:${phone.replace(/\s/g, "")}`} className="underline underline-offset-4">Ring {phone}</a>
+              </p>
+            )}
+          </div>
+          {bilde && <Img value={bilde} eager={isFirst && h1} sizes={imageSizes.half} className="ng-feature aspect-square w-full object-cover" />}
+        </Container>
+      </section>
+    );
+  }
+  if (arrangement === "hylla") {
+    return (
+      <section className="py-6">
+        <Container className="grid items-center gap-6 md:grid-cols-[2fr_3fr]">
+          <div>{text}</div>
+          {bilde && <Img value={bilde} eager={isFirst && h1} sizes={imageSizes.half} className="h-56 w-full object-cover" />}
+        </Container>
+      </section>
+    );
+  }
+  if (arrangement === "avis" && bilde) {
+    return (
+      <section className="py-[calc(3rem*var(--space,1))]">
+        <Container className="grid gap-8 border-y-4 border-double border-[var(--c-text)] py-8 md:grid-cols-[2fr_1fr]">
+          <div>{text}</div>
+          <Img value={bilde} eager={isFirst && h1} sizes={imageSizes.half} className="aspect-[3/4] w-full object-cover" />
+        </Container>
+      </section>
+    );
+  }
+  if ((arrangement === "prosjekt" || arrangement === "sidemeny") && bilde) {
+    return (
+      <section>
+        <Img value={bilde} eager={isFirst && h1} sizes={imageSizes.full} className="h-72 w-full object-cover md:h-[30rem]" />
+        <Container className="py-10">{text}</Container>
+      </section>
+    );
+  }
+  if (arrangement === "disk" && bilde) {
+    return (
+      <section className="px-5 py-8">
+        <div className="ng-hero-dark relative isolate mx-auto max-w-6xl overflow-hidden rounded-[2rem] px-6 py-24 text-center text-white">
+          <Img value={bilde} eager={isFirst && h1} sizes={imageSizes.full} className="absolute inset-0 -z-20 h-full w-full object-cover" />
+          <div className="absolute inset-0 -z-10 bg-black/60" />
+          <div className="mx-auto max-w-2xl">{text}</div>
+        </div>
+      </section>
+    );
+  }
+  if (arrangement === "produkt" && bilde) {
+    return (
+      <section className="py-10 text-center">
+        <Container>
+          <Img value={bilde} eager={isFirst && h1} sizes={imageSizes.full} className="mx-auto mb-10 aspect-square w-full max-w-xl object-cover" />
+          <div className="mx-auto max-w-2xl">{text}</div>
+        </Container>
+      </section>
+    );
+  }
+  if ((arrangement === "timeplan" || arrangement === "kontor") && bilde) {
+    return (
+      <section className="py-8">
+        <Container className="grid items-center gap-8 md:grid-cols-2">
+          <div>{text}</div>
+          <Img value={bilde} eager={isFirst && h1} sizes={imageSizes.half} className="h-52 w-full object-cover" />
+        </Container>
+      </section>
+    );
+  }
+  if (arrangement === "plakat" && bilde) {
+    return (
+      <section className="ng-hero-dark relative isolate flex min-h-[38rem] items-end overflow-hidden py-16 text-white">
+        <Img value={bilde} eager={isFirst && h1} sizes={imageSizes.full} className="absolute inset-0 -z-20 h-full w-full object-cover" />
+        <div className="absolute inset-0 -z-10 bg-black/65" />
+        <Container className="w-full">{text}</Container>
+      </section>
+    );
+  }
   if (variant === "bakgrunn" && bilde) {
     // Mørk hinne over bildet sikrer lesbar hvit tekst uansett hva bildet viser.
     return (
@@ -949,6 +1053,8 @@ export type RenderContext = {
   shop: boolean;
   products: CatalogProduct[];
   layout: SiteLayout;
+  /** Temaets oppbygging. Settes av PageRenderer. */
+  arrangement?: ResolvedTheme["layout"];
   /** Blogginnleggene (sidene under /blogg), nyeste først. Hentes bare når siden trenger dem. */
   posts?: PostSummary[];
   /** Egen timebestilling: tjenester og ansatte. Null eller mangler når nettstedet ikke har noen aktiv tjeneste. */
@@ -1202,6 +1308,11 @@ export function SiteChrome({
         {children}
       </main>
       <SiteFooter ctx={ctx} />
+      {resolveTheme(theme).layout === "vakt" && !ctx.shop && ctx.site.info.phone && (
+        <a href={`tel:${ctx.site.info.phone.replace(/\s/g, "")}`} className="fixed inset-x-0 bottom-0 z-30 bg-[var(--c-primary)] py-3 text-center font-semibold text-[var(--c-on-primary)] md:hidden">
+          Ring {ctx.site.info.phone}
+        </a>
+      )}
     </div>
   );
 }
@@ -1256,11 +1367,11 @@ function MorePosts({ ctx }: { ctx: RenderContext }) {
 export function PageRenderer({
   content,
   theme,
-  ctx,
   canonicalUrl,
   editor,
   embedded,
   pageTitle,
+  ctx: baseCtx,
 }: {
   content: PageContent;
   theme: Theme;
@@ -1273,6 +1384,7 @@ export function PageRenderer({
   /** Miniatyr inne i en annen side (temagalleriet og salgssidene). */
   embedded?: boolean;
 }) {
+  const ctx: RenderContext = { ...baseCtx, arrangement: resolveTheme(theme).layout };
   return (
     <SiteChrome theme={theme} ctx={ctx} canonicalUrl={canonicalUrl} embedded={embedded}>
       {!editor && !embedded && pageTitle && ctx.path.split("/").filter(Boolean).length > 1 && <Breadcrumbs ctx={ctx} title={pageTitle} />}
@@ -1312,7 +1424,7 @@ function renderSection(section: Section, i: number, ctx: RenderContext, h1 = tru
   const first = i === 0 && h1;
   switch (section.type) {
     case "hero":
-      return <Hero key={section.id} section={section} isFirst={i === 0} h1={h1} basePath={ctx.basePath} />;
+      return <Hero key={section.id} section={section} isFirst={i === 0} h1={h1} basePath={ctx.basePath} arrangement={ctx.arrangement} phone={ctx.site.info.phone} />;
     case "tekst":
       return <Tekst key={section.id} section={section} first={first} />;
     case "bildetekst":

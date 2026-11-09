@@ -43,6 +43,7 @@ export const styleOptions = {
   header: { label: "Toppmeny", options: { klassisk: "Logo til venstre", sentrert: "Logo i midten", farget: "Farget meny" } },
   decor: { label: "Pynt på overskrifter", options: { ingen: "Ingen", strek: "Strek under", understrek: "Tusjstrek" } },
   radius: { label: "Hjørner", options: { skarp: "Skarpe", myk: "Myke", rund: "Runde" } },
+  layout: { label: "Oppbygging", options: { standard: "Vanlig", vakt: "Telefon først", meny: "Smal spalte", delt: "Delt skjerm", hylla: "Tett og bredt", plakat: "Plakat", timeplan: "Liste først", avis: "Avis", sidemeny: "Meny på siden", prosjekt: "Store prosjektbilder", disk: "Bilde i ramme", produkt: "Ett stort bilde", kontor: "Ryddige kort" } },
 } as const;
 
 type StyleKey = keyof typeof styleOptions;
@@ -69,11 +70,13 @@ export const themeSchema = z.object({
   spacing: z.enum(optionKeys("spacing")).optional(),
   header: z.enum(optionKeys("header")).optional(),
   decor: z.enum(optionKeys("decor")).optional(),
+  /** Hvordan sidene er bygget opp, ikke bare hvordan de ser ut. Innholdet er det samme, så temaet kan byttes fritt. */
+  layout: z.enum(optionKeys("layout")).optional(),
   /** Temaet og fargevarianten innstillingene kom fra. Brukes bare til å vise valget i studioet. */
   preset: z.object({ theme: z.string().max(40), palette: z.string().max(40) }).optional(),
 });
 export type Theme = z.infer<typeof themeSchema>;
-export type ThemeStyle = Pick<Theme, "headings" | "scale" | "buttons" | "cards" | "images" | "spacing" | "header" | "decor">;
+export type ThemeStyle = Pick<Theme, "headings" | "scale" | "buttons" | "cards" | "images" | "spacing" | "header" | "decor" | "layout">;
 export type ResolvedTheme = Required<Omit<Theme, "preset">> & Pick<Theme, "preset">;
 
 const defaults = {
@@ -85,6 +88,7 @@ const defaults = {
   spacing: "normal",
   header: "klassisk",
   decor: "ingen",
+  layout: "standard",
 } as const satisfies Required<ThemeStyle>;
 
 /** Nøytral reserve hvis et lagret tema skulle være ødelagt. Siden skal vises uansett. */
@@ -131,6 +135,7 @@ export function resolveTheme(raw: Partial<Theme> | null | undefined): ResolvedTh
     spacing: pick("spacing", t.spacing, defaults.spacing),
     header: pick("header", t.header, defaults.header),
     decor: pick("decor", t.decor, defaults.decor),
+    layout: pick("layout", t.layout, defaults.layout),
     preset: t.preset,
   };
 }
@@ -225,6 +230,7 @@ export function themeRootProps(raw: Partial<Theme>): ThemeRootProps {
     "data-bilder": t.images,
     "data-topp": t.header,
     "data-dekor": t.decor,
+    "data-oppbygging": t.layout,
     "data-mork": isDark(t) ? "" : undefined,
   };
 }

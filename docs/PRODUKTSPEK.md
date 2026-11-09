@@ -34,7 +34,7 @@ Nybegynneren ser aldri lag 3. Utvikleren blir aldri stoppet av lag 1.
 | Nettside | 199 kr | 169 kr |
 | Nettbutikk | 399 kr | 339 kr |
 
-Alt inkludert i begge: hosting i EU, SSL, backup, sikkerhet, staging og publisering, SEO, cookiefri statistikk, skjema, blogg, nyhetsbrev, ukentlig AI-rapport, alle bransjepakker. Første års .no-domene inkludert ved årlig betaling. Nettbutikk legger til varer, Vipps og kort, Bring, Fiken og produktfeed. 0 % gebyr på salg.
+Alt inkludert i begge: hosting i EU, SSL, backup, sikkerhet, staging og publisering, SEO, cookiefri statistikk, skjema, blogg, nyhetsbrev, ukentlig AI-rapport, alle bransjepakker. Domenet kommer i tillegg: kunden bestiller og betaler det selv hos en domeneforhandler, og står alltid som innehaver. Nettbutikk legger til varer, Vipps og kort, Bring, Fiken og produktfeed. 0 % gebyr på salg.
 
 **Ett tillegg:** daglig AI-team med sosiale medier, 249 kr/mnd.
 
