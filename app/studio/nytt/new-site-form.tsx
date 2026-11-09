@@ -149,7 +149,7 @@ export function NewSiteForm() {
 
       <section hidden={step !== 1} className="space-y-4">
         <div>
-          <h2 ref={(el) => void (headings.current[1] = el)} tabIndex={-1} className={`${heading} text-2xl outline-none`}>Hva driver dere med?</h2>
+          <h2 ref={(el) => void (headings.current[1] = el)} tabIndex={-1} className={`${heading} text-2xl outline-none`}>Hva driver du med?</h2>
           <p className={`mt-1 ${ui.muted}`}>Bransjen bestemmer sidene og tekstutkastene. Utseendet velger du i neste steg, og alt kan endres senere.</p>
         </div>
         <GenrePicker value={packKey} onChange={choosePack} suggestion={suggestion} />

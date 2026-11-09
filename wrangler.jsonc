@@ -32,6 +32,8 @@
     // Plattformens ekstra adresser som sender videre til hovedadressen (custom-worker.ts).
     "PLATFORM_ALIASES": "nettgata.com,www.nettgata.com,www.nettgata.no",
     "PLATFORM_CANONICAL_HOST": "nettgata.no",
+    // Trafikken på nettgata.no vises under dette nettstedet i studioet (ikke publisert, bare til tallene).
+    "PLATFORM_STATS_SITE_ID": "6be5a4b1-b351-4674-8d1e-7c4933655829",
     // Avsenderadressen for e-post (for eksempel ordre@nettgata.no). BREVO_API_KEY settes som hemmelighet.
     // Uten begge lagres e-postene bare i loggen. Se docs/EPOST.md.
     "EMAIL_FROM": "ordre@nettgata.no",

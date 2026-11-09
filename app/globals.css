@@ -426,20 +426,15 @@ a.gata-facade:focus-visible {
     border-left: 1px solid var(--c-muted);
     padding-left: 1.25rem;
   }
-  [data-oppbygging="delt"] main > section:not(:first-child) .ng-container {
-    margin-left: 50%;
-    max-width: 50%;
-  }
-  [data-oppbygging="delt"] main > section:not(:first-child) ul.grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
   [data-oppbygging="sidemeny"] {
     display: grid;
     grid-template-columns: 13rem minmax(0, 1fr);
+    grid-template-rows: 1fr auto;
   }
   [data-oppbygging="sidemeny"] > header {
     grid-row: 1 / span 2;
     height: 100vh;
+    overflow-y: auto;
     position: sticky;
     top: 0;
     border-right: 1px solid color-mix(in srgb, var(--c-muted) 35%, transparent);
@@ -460,5 +455,16 @@ a.gata-facade:focus-visible {
   }
   [data-oppbygging="sidemeny"] > footer {
     grid-column: 2;
+  }
+}
+
+/* Delt: bare sider med delt toppbilde får teksten i høyre halvdel, og først når skjermen er bred nok. */
+@media (min-width: 1024px) {
+  [data-oppbygging="delt"] main:has(.ng-hero-split) section:not(.ng-hero-split) .ng-container {
+    margin-left: 50%;
+    max-width: 50%;
+  }
+  [data-oppbygging="delt"] main:has(.ng-hero-split) section:not(.ng-hero-split) ul.grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

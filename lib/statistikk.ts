@@ -125,7 +125,8 @@ export async function visitorHash(secret: Uint8Array, day: string, siteId: strin
   return Array.from(new Uint8Array(digest).slice(0, 16), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export type VisitInput = Hit & { host: string; ip: string; userAgent: string };
+/** siteId: bare for nettgata.no selv, som har et eget nettsted i studioet til tallene (PLATFORM_STATS_SITE_ID). */
+export type VisitInput = Hit & { host: string; ip: string; userAgent: string; siteId?: string };
 export type VisitResult = "telt" | "ukjent-nettsted" | "ikke-publisert" | "over-grensen";
 
 /**
@@ -134,16 +135,19 @@ export type VisitResult = "telt" | "ukjent-nettsted" | "ikke-publisert" | "over-
  * stoppes før dette, i ruten.
  */
 export async function recordVisit(db: Db, secret: Uint8Array, input: VisitInput, now = new Date()): Promise<VisitResult> {
-  const match = await resolveHost(db, input.host);
-  // Adresser som sendes videre til hovedadressen, telles der.
-  if (!match || match.redirectHost) return "ukjent-nettsted";
-  const siteId = match.site.id;
-  const [published] = await db
-    .select({ id: pages.id })
-    .from(pages)
-    .where(and(eq(pages.siteId, siteId), isNotNull(pages.publishedVersionId)))
-    .limit(1);
-  if (!published) return "ikke-publisert";
+  let siteId = input.siteId;
+  if (!siteId) {
+    const match = await resolveHost(db, input.host);
+    // Adresser som sendes videre til hovedadressen, telles der.
+    if (!match || match.redirectHost) return "ukjent-nettsted";
+    siteId = match.site.id;
+    const [published] = await db
+      .select({ id: pages.id })
+      .from(pages)
+      .where(and(eq(pages.siteId, siteId), isNotNull(pages.publishedVersionId)))
+      .limit(1);
+    if (!published) return "ikke-publisert";
+  }
 
   const day = osloDate(now);
   const hash = await visitorHash(secret, day, siteId, input.ip, input.userAgent);
@@ -236,6 +240,21 @@ export async function visitStats(db: Db, siteId: string, days: StatsPeriod, now 
     pages: pageRows.map((r) => ({ label: r.path, count: Number(r.count) })),
     sources: mergeSources(sourceRows.map((r) => ({ source: r.source, count: Number(r.count) }))),
   };
+}
+
+/** Besøkende og sidevisninger per måned. Besøkende er summen av hver dag, siden koden som skiller folk byttes daglig. */
+export async function visitsPerMonth(db: Db, siteId: string, firstDay: string) {
+  const rows = await db
+    .select({ day: visitDays.day, views: visitDays.views, visitors: visitDays.visitors })
+    .from(visitDays)
+    .where(and(eq(visitDays.siteId, siteId), gte(visitDays.day, firstDay)));
+  const months = new Map<string, { views: number; visitors: number }>();
+  for (const r of rows) {
+    const key = r.day.slice(0, 7);
+    const m = months.get(key) ?? { views: 0, visitors: 0 };
+    months.set(key, { views: m.views + r.views, visitors: m.visitors + r.visitors });
+  }
+  return months;
 }
 
 /** Slår sammen kilder med samme navn (google.no og google.com) og gir de ti største. */

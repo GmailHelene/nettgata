@@ -6,16 +6,14 @@ import { readSiteInfo, type SiteInfo } from "@/lib/site-info";
 import { readSiteLayout } from "@/lib/site-layout";
 
 /** Eksempelvarer, så nettbutikk-temaene viser varekort i galleriet. Finnes bare i forhåndsvisningen. */
-const demoProducts: CatalogProduct[] = [
-  ["Ullpledd", 89900],
-  ["Keramikkopp", 34900],
-  ["Lerretsveske", 24900],
-  ["Duftlys", 29900],
-  ["Skjerf i lin", 44900],
-  ["Notatbok", 19900],
-  ["Vase", 54900],
-  ["Glassett", 39900],
-].map(([name, priceOre], i) => ({
+const demoCatalogs: Record<string, [string, number][]> = {
+  klaer: [["Strikkegenser", 89900], ["Linskjorte", 69900], ["Jeans", 99900], ["Ullskjerf", 44900], ["Sommerkjole", 79900], ["Skinnbelte", 39900], ["Bomullstopp", 29900], ["Vårjakke", 149900]],
+  interior: [["Vase", 54900], ["Lysestake", 34900], ["Pute i lin", 44900], ["Veggspeil", 129900], ["Keramikkfat", 39900], ["Ullpledd", 89900], ["Duftlys", 29900], ["Krukke", 24900]],
+  lokalmat: [["Honning", 14900], ["Eplemost", 8900], ["Spekepølse", 12900], ["Geitost", 11900], ["Flatbrød", 6900], ["Bringebærsyltetøy", 9900], ["Poteter 2 kg", 5900], ["Egg, 12 stk", 7900]],
+  nettbutikk: [["Ullpledd", 89900], ["Keramikkopp", 34900], ["Lerretsveske", 24900], ["Duftlys", 29900], ["Skjerf i lin", 44900], ["Notatbok", 19900], ["Vase", 54900], ["Glassett", 39900]],
+};
+
+const demoProducts = (packKey: string): CatalogProduct[] => (demoCatalogs[packKey] ?? demoCatalogs.nettbutikk).map(([name, priceOre], i) => ({
   id: `eksempel-${i}`,
   name: name as string,
   slug: `eksempel-${i}`,
@@ -29,6 +27,19 @@ const demoProducts: CatalogProduct[] = [
   inStock: true,
   createdAt: new Date(2026, 9, 31 - i).toISOString(),
 }));
+
+/** Bytter «Skriv ...»-tekstene med ferdig eksempeltekst, så miniaturene på salgssidene ikke ser uferdige ut. */
+export function withDemoText<T>(value: T): T {
+  if (typeof value === "string") {
+    const text = value.trim();
+    if (!/^Skriv (?!til\b|en melding\b)/.test(text)) return value;
+    const filled = /pris/i.test(text) ? "Fra 490 kr" : /^Skriv navn/.test(text) ? "Kari Nordmann" : /^Skriv rolle/.test(text) ? "Daglig leder" : "Her står din egen tekst om bedriften.";
+    return filled as T;
+  }
+  if (Array.isArray(value)) return value.map(withDemoText) as T;
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, withDemoText(v)])) as T;
+  return value;
+}
 
 /**
  * Sidene og rammen til en bransjepakke slik de blir for akkurat denne bedriften, før noe er lagret.
@@ -51,7 +62,7 @@ export function packPreview(pack: Pack, input: { name: string; info: Partial<Sit
       preview: true,
       basePath: "",
       shop,
-      products: shop ? demoProducts : [],
+      products: shop ? demoProducts(pack.key) : [],
       layout: readSiteLayout(pack.layout ?? {}),
     },
   };

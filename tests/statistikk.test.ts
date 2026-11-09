@@ -165,6 +165,14 @@ describe("statistikk i databasen", () => {
     expect(await db.select().from(visitDays)).toHaveLength(0);
   });
 
+  it("nettgata.no telles på sitt eget nettsted, selv om det ikke er publisert", async () => {
+    const [user] = await db.select().from(users).limit(1);
+    const stats = await createSiteFromPack(db, { name: "Nettgata trafikk", packKey: "handverker", info: demoInfo, ownerId: user.id });
+    expect(await visit({ host: "nettgata.no", siteId: stats.id })).toBe("telt");
+    const rows = await db.select().from(visitDays);
+    expect(rows.find((r) => r.siteId === stats.id)?.visitors).toBe(1);
+  });
+
   it("slutter å telle en besøkende som sender urimelig mange visninger", async () => {
     const hash = await visitorHash(secret, "2026-11-02", siteId, "203.0.113.7", CHROME);
     await db.insert(visitHashes).values({ siteId, day: "2026-11-02", hash, views: MAX_VIEWS_PER_VISITOR });

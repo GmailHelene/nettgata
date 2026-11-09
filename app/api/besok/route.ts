@@ -16,7 +16,11 @@ const empty = () => new Response(null, { status: 204, headers: { "Cache-Control"
 export async function POST(request: Request) {
   const host = normalizeHost(request.headers.get("host"));
   const userAgent = request.headers.get("user-agent") ?? "";
-  if (!host || isPlatformHost(host) || isBot(userAgent)) return empty();
+  if (!host || isBot(userAgent)) return empty();
+  // nettgata.no selv telles på et eget nettsted i studioet. Andre plattformadresser (workers.dev) telles ikke.
+  const platformSite = process.env.PLATFORM_STATS_SITE_ID;
+  const isPlatform = isPlatformHost(host);
+  if (isPlatform && (!platformSite || host !== normalizeHost(process.env.PLATFORM_CANONICAL_HOST))) return empty();
 
   // Bare fra nettstedet selv. En annen side kan ikke sende besøk hit for å blåse opp tallene.
   const site = request.headers.get("sec-fetch-site");
@@ -31,7 +35,7 @@ export async function POST(request: Request) {
   }
 
   const parsed = parseHit(await request.text().catch(() => ""));
-  if (!parsed) return empty();
+  if (!parsed || (isPlatform && parsed.path.startsWith("/vis"))) return empty();
 
   const ip = clientIp(request.headers);
   after(async () => {
@@ -39,7 +43,7 @@ export async function POST(request: Request) {
       const db = await getDb();
       const secret = getSecret();
       if (!(await hit(db, `besok:${await clientKey(request.headers, secret)}`, rules.visitPerIp))) return;
-      await recordVisit(db, secret, { ...parsed, host, ip, userAgent });
+      await recordVisit(db, secret, { ...parsed, host, ip, userAgent, ...(isPlatform && { siteId: platformSite }) });
     } catch (err) {
       console.error("Besøkstellingen feilet", err);
     }

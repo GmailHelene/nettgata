@@ -265,7 +265,7 @@ function ThemeCard({
           <span className="text-xs text-[#47525c]">{palette.label}</span>
         </div>
         <div className="mt-auto flex flex-wrap gap-2 pt-1">
-          <button type="button" onClick={() => onPreview(choice)} className="min-h-10 rounded-lg border-2 border-[#173b6c] px-3.5 py-1.5 text-sm font-semibold text-[#173b6c] transition-colors hover:bg-[#eef3f9]">
+          <button type="button" onClick={() => onPreview(choice)} aria-label={`Forhåndsvis ${def.label}`} className="min-h-10 rounded-lg border-2 border-[#173b6c] px-3.5 py-1.5 text-sm font-semibold text-[#173b6c] transition-colors hover:bg-[#eef3f9]">
             Forhåndsvis
           </button>
           {!confirm && (
@@ -273,6 +273,7 @@ function ThemeCard({
               type="button"
               onClick={() => onChoose(choice)}
               aria-pressed={Boolean(selected)}
+              aria-label={`${selected ? "Valgt" : "Velg"} ${def.label}`}
               className="min-h-10 rounded-lg bg-[#173b6c] px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0f2c55] aria-pressed:bg-[#2f5a47]"
             >
               {selected ? "Valgt" : "Velg"}

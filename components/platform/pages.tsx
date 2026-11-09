@@ -4,7 +4,7 @@ import { preload } from "react-dom";
 import { heading, signType, StreetSign } from "@/components/brand";
 import { PageRenderer } from "@/components/sections";
 import { bransjeLabel, genres, lowerLabel } from "@/lib/genres";
-import { packPreview } from "@/lib/pack-preview";
+import { packPreview, withDemoText } from "@/lib/pack-preview";
 import { getPack } from "@/lib/packs";
 import {
   bransjeDetails,
@@ -86,7 +86,8 @@ function Thumb({ theme, palette, pack, name, width = THUMB }: { theme: string; p
     // data-nosnippet: teksten i miniatyren («Salongen», «Rørleggeren») skal ikke bli utdraget i Google.
     <div inert aria-hidden="true" data-nosnippet="" className="max-w-full overflow-hidden rounded-[3px] bg-white [&_header]:!static" style={{ width, height: Math.round(width * 0.6875) }}>
       <div style={{ width: 1280, zoom: width / 1280 }}>
-        <PageRenderer content={{ ...front.content, sections: front.content.sections.slice(0, 3) }} theme={t} ctx={ctx} embedded />
+        {/* De små kortene viser bare toppen av siden, så to deler holder, og siden blir lettere å laste. */}
+        <PageRenderer content={withDemoText({ ...front.content, sections: front.content.sections.slice(0, width > THUMB ? 3 : 2) })} theme={t} ctx={ctx} embedded />
       </div>
     </div>
   );

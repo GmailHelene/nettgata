@@ -57,7 +57,8 @@ export function plattformPersonvern(o: Valg = {}): PageContent {
 
     tekstSeksjon("besok", "Når du besøker nettgata.no", [
       "Serveren får IP-adressen din og vet hvilken nettleser du bruker. Det trengs for å vise sidene, og de samme opplysningene brukes til å stoppe angrep og spam. Tekniske logger slettes innen sju dager. Grunnlaget er min berettigede interesse i en trygg tjeneste som virker (personvernforordningen artikkel 6 nr. 1 bokstav f).",
-      "Jeg bruker ingen informasjonskapsler til statistikk. Det eneste som måles, er om annonsene virker, og det skjer bare hvis du sier ja. Det står mer om dette under Google Ads og Informasjonskapsler lenger ned.",
+      "Jeg teller besøk uten informasjonskapsler og uten å lagre noe i nettleseren din. Jeg ser hvor mange som besøker sidene, hvilke sider de leser og hvilken nettside de kom fra. For å skille besøkende fra hverandre lages en kode av IP-adressen og nettleseren med et salt som byttes hver dag, og koden slettes neste natt. IP-adressen lagres ikke, og det som blir igjen, er bare tall per dag. Grunnlaget er min berettigede interesse i å forstå om nettstedet virker (personvernforordningen artikkel 6 nr. 1 bokstav f).",
+      "Utenom dette måles bare om annonsene virker, og det skjer bare hvis du sier ja. Det står mer om dette under Google Ads og Informasjonskapsler lenger ned.",
     ]),
 
     tekstSeksjon("annonser", "Google Ads, bare med samtykke", [

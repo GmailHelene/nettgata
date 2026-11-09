@@ -170,7 +170,7 @@ function Hero({ section, isFirst, h1, basePath, arrangement = "standard", phone 
   // Oppbyggingen fra temaet går foran variantene, slik at temaene blir ulike i form og ikke bare i farge.
   if (arrangement === "delt" && bilde) {
     return (
-      <section className="grid md:grid-cols-2">
+      <section className="ng-hero-split grid md:grid-cols-2">
         <Img value={bilde} eager={isFirst && h1} sizes={imageSizes.half} className="h-72 w-full object-cover md:h-[38rem]" />
         <div className="flex min-w-0 items-center px-5 py-12 md:px-14">{text}</div>
       </section>

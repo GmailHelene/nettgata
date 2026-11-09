@@ -7,7 +7,7 @@ import { osloDate } from "@/lib/oslo-time";
 import { requireSiteAccess } from "@/lib/session";
 import { formatNok } from "@/lib/shop/money";
 import { periodReport } from "@/lib/shop/reports";
-import { inquiriesPerMonth, lastMonths, parsePeriod, STATS_PERIODS, visitStats, type Ranked } from "@/lib/statistikk";
+import { inquiriesPerMonth, lastMonths, parsePeriod, STATS_PERIODS, visitsPerMonth, visitStats, type Ranked } from "@/lib/statistikk";
 import { SiteNav } from "../site-nav";
 import { VisitChart } from "./visit-chart";
 
@@ -70,10 +70,11 @@ export default async function StatsPage({
   const now = new Date();
   const months = lastMonths(12, now);
   // Salget per måned regnes med samme funksjon som Rapporter, så tallene alltid er like.
-  const [stats, inquiryMonths, sales] = await Promise.all([
+  const [stats, inquiryMonths, sales, monthlyVisits] = await Promise.all([
     visitStats(db, site.id, days, now),
     inquiriesPerMonth(db, site.id, 12, now),
     shop ? periodReport(db, site.id, `${months[0]}-01`, osloDate(now)) : null,
+    visitsPerMonth(db, site.id, `${months[0]}-01`),
   ]);
   const salesByMonth = new Map((sales?.months ?? []).map((m) => [m.month, m]));
   const base = `/studio/nettsted/${site.id}/statistikk`;
@@ -133,12 +134,18 @@ export default async function StatsPage({
 
       <section className={`${ui.card} mb-6 overflow-x-auto p-5`}>
         <h2 className="mb-1 font-semibold">Per måned</h2>
-        <p className={`mb-3 text-sm ${ui.muted}`}>Siste tolv måneder. Henvendelser slettes etter tolv måneder, så tallene går ikke lenger tilbake.</p>
+        <p className={`mb-3 text-sm ${ui.muted}`}>Siste tolv måneder. Besøkende telles per dag, så en som kommer tilbake en annen dag, telles igjen. Henvendelser slettes etter tolv måneder, så tallene går ikke lenger tilbake.</p>
         <table className="w-full text-sm tabular-nums">
           <thead>
             <tr className="border-b text-left">
               <th scope="col" className="py-2 font-medium">
                 Måned
+              </th>
+              <th scope="col" className="py-2 text-right font-medium">
+                Besøkende
+              </th>
+              <th scope="col" className="py-2 text-right font-medium">
+                Sidevisninger
               </th>
               <th scope="col" className="py-2 text-right font-medium">
                 Henvendelser
@@ -161,6 +168,8 @@ export default async function StatsPage({
                 <th scope="row" className="py-2 text-left font-normal first-letter:uppercase">
                   {monthLabel(m.month)}
                 </th>
+                <td className="py-2 text-right">{whole.format(monthlyVisits.get(m.month)?.visitors ?? 0)}</td>
+                <td className="py-2 text-right">{whole.format(monthlyVisits.get(m.month)?.views ?? 0)}</td>
                 <td className="py-2 text-right">{whole.format(m.count)}</td>
                 {shop && (
                   <>
