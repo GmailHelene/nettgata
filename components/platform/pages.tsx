@@ -810,6 +810,11 @@ function Landing({ env }: { env: PlatformEnv }) {
       <Section id="priser" eyebrow="Priser" title="To abonnement. Alt er med." intro="Ingen pakker med skjulte begrensninger. Alle temaer og bransjepakker følger med uansett hva du velger.">
         <Pricing />
       </Section>
+      <Section eyebrow="Eksempel" title="Slik kan nettsiden din se ut" intro="En ekte side fra bransjepakken for elektrikere. Du bytter ut tekstene og bildene med dine egne.">
+        <div className="mx-auto max-w-[900px] overflow-hidden rounded-xl ring-1 ring-[#1b232b]/15">
+          <Thumb theme="vakt" pack="elektriker" name="Elektrikeren" width={900} />
+        </div>
+      </Section>
       <Section eyebrow="Bransjer" title="Finn bransjen din" intro="Hver bransjepakke har sidene, tekstene og prislisten bransjen trenger. Velg din, så ser du hva som ligger klart.">
         <GenreSigns />
         <div className="mt-10">

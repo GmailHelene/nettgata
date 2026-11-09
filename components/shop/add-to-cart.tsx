@@ -34,7 +34,9 @@ export function AddToCart({ siteId, product, cartHref }: { siteId: string; produ
   const soldOut = !variant || (variant.stock !== null && variant.stock <= 0);
   const add = () => {
     if (!variant) return;
-    addToCart(siteId, variant.id, quantity, { name: product.name, label: variant.label || undefined, priceOre: variant.priceOre });
+    // Bildet til det valgte alternativet hvis det har eget, ellers varens første bilde.
+    const image = product.options.map((o, i) => o.media?.[selected[i]]?.image).find(Boolean) ?? product.images[0]?.src;
+    addToCart(siteId, variant.id, quantity, { name: product.name, label: variant.label || undefined, priceOre: variant.priceOre, image });
     setAdded(true);
   };
   const max = variant?.stock === null || variant?.stock === undefined ? 99 : Math.max(1, Math.min(99, variant.stock));

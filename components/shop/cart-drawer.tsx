@@ -20,6 +20,7 @@ export function CartDrawer({ siteId, basePath }: { siteId: string; basePath: str
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<Data | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const imageOf = (variantId: string) => items.find((i) => i.variantId === variantId)?.seen?.image;
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   useModal(open, dialogRef, buttonRef);
@@ -153,7 +154,13 @@ export function CartDrawer({ siteId, basePath }: { siteId: string; basePath: str
                       <ul className="divide-y divide-[var(--c-muted)]/20">
                         {items.map((i) => (
                           <li key={i.variantId} className="flex justify-between gap-3 py-4">
-                            <span className="font-medium">
+                            <span aria-hidden="true" className="ng-art block h-14 w-14 shrink-0 overflow-hidden rounded-[var(--radius)]">
+                              {i.seen!.image && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={i.seen!.image} alt="" loading="lazy" className="h-full w-full object-cover" />
+                              )}
+                            </span>
+                            <span className="flex-1 font-medium">
                               {i.seen!.name}
                               {i.seen!.label && <span className="block text-sm font-normal text-[var(--c-muted)]">{i.seen!.label}</span>}
                               <span className="block text-sm font-normal text-[var(--c-muted)]">Antall: {i.quantity}</span>
@@ -172,7 +179,13 @@ export function CartDrawer({ siteId, basePath }: { siteId: string; basePath: str
                     {data.lines.map((l) => (
                       <li key={l.variantId} className="py-4">
                         <div className="flex justify-between gap-3">
-                          <span className="font-medium">
+                          <span aria-hidden="true" className="ng-art block h-14 w-14 shrink-0 overflow-hidden rounded-[var(--radius)]">
+                              {imageOf(l.variantId) && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={imageOf(l.variantId)} alt="" loading="lazy" className="h-full w-full object-cover" />
+                              )}
+                            </span>
+                          <span className="flex-1 font-medium">
                             {l.name}
                             {l.variantLabel && <span className="block text-sm font-normal text-[var(--c-muted)]">{l.variantLabel}</span>}
                           </span>

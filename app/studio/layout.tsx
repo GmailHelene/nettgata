@@ -5,6 +5,8 @@ import { isPlatformHost } from "@/lib/hosts";
 
 export const metadata: Metadata = {
   title: "Studio",
+  // Studioet kan legges på hjemskjermen. Bare her, så kundenes butikker ikke får Nettgata-ikonet.
+  manifest: "/studio.webmanifest",
   robots: { index: false, follow: false },
 };
 

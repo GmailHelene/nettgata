@@ -1,19 +1,20 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { mediaSrcPattern } from "@/lib/media-types";
 
 /**
  * Handlekurven ligger i nettleseren (localStorage), én per nettsted. Den inneholder variant-ID og antall, og et
  * øyeblikksbilde av navn og pris fra varesiden (seen), så kurven kan vises med en gang mens serveren svarer.
  * Pris, navn og lager som gjelder, hentes alltid fra serveren, og ordren regnes alltid ut der.
  */
-export type CartSeen = { name: string; label?: string; priceOre: number };
+export type CartSeen = { name: string; label?: string; priceOre: number; image?: string };
 export type CartItem = { variantId: string; quantity: number; seen?: CartSeen };
 
 function cleanSeen(raw: unknown): CartSeen | undefined {
   const s = raw as Partial<CartSeen> | null;
   if (!s || typeof s.name !== "string" || !Number.isInteger(s.priceOre)) return undefined;
-  return { name: s.name.slice(0, 120), label: typeof s.label === "string" ? s.label.slice(0, 120) : undefined, priceOre: s.priceOre as number };
+  return { name: s.name.slice(0, 120), label: typeof s.label === "string" ? s.label.slice(0, 120) : undefined, image: typeof s.image === "string" && mediaSrcPattern.test(s.image) ? s.image : undefined, priceOre: s.priceOre as number };
 }
 
 const EVENT = "kurv-endret";

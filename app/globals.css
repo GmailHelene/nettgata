@@ -396,10 +396,6 @@ a.gata-facade:focus-visible {
 [data-oppbygging="vakt"] section .ng-card {
   border-left: 6px solid var(--c-primary);
 }
-[data-oppbygging="avis"] section ul.grid > li + li {
-  border-left: 1px solid var(--c-muted);
-  padding-left: 1.25rem;
-}
 [data-oppbygging="avis"] section .ng-card {
   background: transparent;
   padding: 0;
@@ -419,7 +415,17 @@ a.gata-facade:focus-visible {
 [data-oppbygging="kontor"] section ul.grid {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
 }
+@media (max-width: 767px) {
+  /* Plass til den faste ringeknappen, så den ikke dekker bunnen av siden. */
+  [data-oppbygging="vakt"] {
+    padding-bottom: 3rem;
+  }
+}
 @media (min-width: 768px) {
+  [data-oppbygging="avis"] section ul.grid > li + li {
+    border-left: 1px solid var(--c-muted);
+    padding-left: 1.25rem;
+  }
   [data-oppbygging="delt"] main > section:not(:first-child) .ng-container {
     margin-left: 50%;
     max-width: 50%;
