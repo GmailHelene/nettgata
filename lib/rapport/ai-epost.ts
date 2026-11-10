@@ -16,7 +16,7 @@ export function weeklySuggestionsEmail(o: { siteName: string; count: number; url
   const what = o.count === 1 ? "ett nytt forslag" : `${o.count} nye forslag`;
   const subject = `${o.count === 1 ? "Ett nytt forslag" : `${o.count} nye forslag`} til ${o.siteName}`;
   const intro = `AI-teamet har sett gjennom ${o.siteName} denne uka og har ${what} til deg.`;
-  const how = "Les forslaget, og trykk Godkjenn hvis du vil bruke det. Endringen havner i kladden, og ingenting vises på nettstedet før du publiserer.";
+  const how = `${o.count === 1 ? "Les forslaget, og trykk Godkjenn hvis du vil bruke det" : "Les forslagene, og trykk Godkjenn på dem du vil bruke"}. Endringen havner i kladden, og ingenting vises på nettstedet før du publiserer.`;
   const footer =
     o.role === "owner"
       ? `Du får denne e-posten fordi du er eier av ${o.siteName}. Vil du ikke ha den, slår du den av under Innstillinger, Rapporter på e-post.`
