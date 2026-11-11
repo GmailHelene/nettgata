@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { heading } from "@/components/brand";
+import { SignupConversion } from "@/components/platform/consent";
 import { StudioTopBar } from "@/components/studio/top-bar";
 import { ui } from "@/components/studio/ui";
 import { getDb } from "@/db";
@@ -20,6 +21,9 @@ export default async function NewSitePage({ searchParams }: { searchParams: Prom
         <Link href="/studio" className={`text-sm ${ui.link}`}>
           Alle nettsteder
         </Link>
+        {(await searchParams).velkommen && (
+          <SignupConversion tagId={process.env.GOOGLE_ADS_TAG_ID?.trim() ?? ""} sendTo={process.env.GOOGLE_ADS_SIGNUP_SEND_TO?.trim() ?? ""} id={user.id} />
+        )}
         {(await searchParams).velkommen && (
           <p role="status" className={`${ui.success} mt-6 max-w-2xl`}>
             E-posten er bekreftet, og du er logget inn. Velkommen til Nettgata!

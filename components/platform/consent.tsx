@@ -73,6 +73,21 @@ export function trackLead(id: string, sendTo?: string) {
   if (sendTo) window.gtag?.("event", "conversion", { send_to: sendTo, transaction_id: id });
 }
 
+/**
+ * Ny konto bekreftet, sett fra Google Ads. Studioet har ikke banneret, men valget fra nettgata.no ligger i samme
+ * nettleser. Uten «Ja» der lastes ingenting. Brukerens id som transaction_id gjør at en ny lasting ikke telles to ganger.
+ */
+export function trackSignup(tagId: string, sendTo: string, id: string) {
+  if (!tagId || !sendTo || read() !== "ja") return;
+  loadTag(tagId);
+  window.gtag?.("event", "conversion", { send_to: sendTo, transaction_id: id });
+}
+
+export function SignupConversion({ tagId, sendTo, id }: { tagId: string; sendTo: string; id: string }) {
+  useEffect(() => trackSignup(tagId, sendTo, id), [tagId, sendTo, id]);
+  return null;
+}
+
 export function ConsentBanner({ tagId }: { tagId: string }) {
   const choice = useSyncExternalStore(subscribe, read, serverChoice);
   useEffect(() => {
