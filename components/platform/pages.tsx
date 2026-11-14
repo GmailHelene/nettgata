@@ -24,6 +24,7 @@ import { plattformDokument, type PlattformDokument } from "@/lib/legal/plattform
 import { GRONBERG, sideSomTekst } from "@/lib/legal/felles";
 import { ConsentBanner, ConsentReset } from "./consent";
 import { LeadForm } from "./lead-form";
+import { StartLink } from "./start-link";
 
 /*
  * Salgssidene på nettgata.no. Uttrykket er hentet fra en norsk småbygate: emaljeskilt i gateblått, trehusfasader
@@ -957,6 +958,9 @@ function ThemesPage({ env, crumbs }: { env: PlatformEnv; crumbs: Crumb[] }) {
                       </Link>
                     </p>
                   )}
+                  <StartLink pack={item.pack} theme={item.theme} className={`${button} mt-2 w-full justify-center`}>
+                    Prøv {def.label} gratis
+                  </StartLink>
                 </div>
               </li>
             );
@@ -1021,6 +1025,14 @@ const shopNotes: Record<string, string> = {
   lokalmat: "Kundene kan hente på gården og betale ved henting, eller få varene sendt med Bring etter vekt.",
 };
 
+/** Kreative bransjer der bildene er hovedsaken. Bare funksjoner som er bygget. */
+const creativeNotes: Record<string, string> = {
+  kunstner:
+    "Galleriet ligger klart som egen side, og forsiden viser utvalgte arbeider. Vil du selge originaler og trykk rett på siden, velger du nettbutikk i stedet, så får hvert verk sin egen vareside.",
+  fotograf:
+    "Galleriet ligger klart som egen side, og forsiden viser utvalgte bilder. Knappen «Sjekk dato» ber kunden skrive dato og hva de ønsker, så du får det du trenger i første melding.",
+};
+
 function BransjePage({ route, env, crumbs }: { route: Extract<PlatformRoute, { kind: "bransje" }>; env: PlatformEnv; crumbs: Crumb[] }) {
   const { match } = route;
   const { pack } = match;
@@ -1046,7 +1058,7 @@ function BransjePage({ route, env, crumbs }: { route: Extract<PlatformRoute, { k
         eyebrow={match.genre.label}
         crumbs={crumbs}
         title={`${title}, ferdig satt opp`}
-        text={`${title} med sidene, tekstene og prislisten klare fra start. Pakken dekker ${lowerLabel(pack.description.replace(/\.$/, ""))}. Du fyller inn det som er ditt, velger blant tolv temaer, og domenet står alltid i ditt navn.`}
+        text={`${title} med sidene, tekstene og prislisten klare fra start. Pakken dekker ${lowerLabel(pack.description.replace(/\.$/, ""))}. Du fyller inn det som er ditt, velger blant ${themes.length} temaer, og domenet står alltid i ditt navn.`}
       >
         <div className="gata-street flex justify-center pb-[23px]">
           <Facade shop={facade} index={0} width={420} />
@@ -1076,6 +1088,7 @@ function BransjePage({ route, env, crumbs }: { route: Extract<PlatformRoute, { k
           <figcaption className={`mt-6 text-sm ${muted}`}>Eksempeltekst fra pakken. Knappen viser hva den sier fra start.</figcaption>
         </figure>
         {shop && shopNotes[pack.key] && <p className="mt-8 max-w-3xl text-lg leading-relaxed">{shopNotes[pack.key]}</p>}
+        {creativeNotes[pack.key] && <p className="mt-8 max-w-3xl text-lg leading-relaxed">{creativeNotes[pack.key]}</p>}
       </Section>
 
       <Section eyebrow="Dette får du" title="Sidene som ligger klare">
@@ -1160,6 +1173,9 @@ function BransjePage({ route, env, crumbs }: { route: Extract<PlatformRoute, { k
                   <h3 className={`${heading} text-lg`}>{def.label}</h3>
                   <Swatches themeKey={key} />
                 </div>
+                <StartLink pack={pack.key} theme={key} className={`${button} mx-1 mb-1 mt-3 w-[calc(100%-0.5rem)] justify-center`}>
+                  Start med {def.label}
+                </StartLink>
               </li>
             );
           })}

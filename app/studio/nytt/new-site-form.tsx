@@ -11,6 +11,7 @@ import { bransjeLabel, findBransje, lowerLabel, suggestFromBrreg, type BransjeMa
 import { packPreview } from "@/lib/pack-preview";
 import { getPack } from "@/lib/packs";
 import { readSiteInfo, type SiteInfo } from "@/lib/site-info";
+import { takeStartValg } from "@/lib/startvalg";
 import { getThemeDef } from "@/lib/themes";
 import { createSiteAction, lookupOrgnrAction } from "../site-actions";
 
@@ -55,6 +56,18 @@ export function NewSiteForm() {
       if (def) setChoice({ theme: def.key, palette: def.palettes[0].key });
     }
   };
+
+  // Valgte den besøkende bransje eller tema på nettgata.no før registrering, starter veiviseren med det.
+  useEffect(() => {
+    const valg = takeStartValg();
+    if (!valg) return;
+    if (valg.pack && getPack(valg.pack)) setPackKey(valg.pack);
+    const def = valg.theme ? getThemeDef(valg.theme) : (valg.pack && getPack(valg.pack) ? getThemeDef(getPack(valg.pack)!.themes[0]) : undefined);
+    if (def) {
+      setChoice({ theme: def.key, palette: def.palettes[0].key });
+      if (valg.theme) setThemeTouched(true);
+    }
+  }, []);
 
   const fetchCompany = () =>
     startLookup(async () => {
