@@ -7,6 +7,7 @@ import { trackingUrl } from "@/lib/shop/tracking";
 import { readSiteInfo } from "@/lib/site-info";
 import { readAnswers } from "@/lib/content/form-fields";
 import { ordrebekreftelseTekster } from "@/lib/legal/angrerett";
+import { PLATFORM_SITE_SLUG } from "@/lib/platform-site";
 import { platformUrl, publicSiteUrl } from "@/lib/site-url";
 import { deliver, type EmailProvider } from "./send";
 import { newInquiryEmail, newOrderEmail, orderConfirmationEmail, orderShippedEmail, refundEmail, withdrawalNoticeEmail, withdrawalReceiptEmail, type OrderData, type ShopInfo } from "./templates";
@@ -199,7 +200,8 @@ export async function notifyInquiry(db: Db, provider: EmailProvider, inquiryId: 
   const email = newInquiryEmail({
     shop,
     inquiry: { name: inquiry.name, email: inquiry.email, phone: inquiry.phone, message: inquiry.message, pagePath: inquiry.pagePath, answers: readAnswers(inquiry.answers) },
-    siteUrl: await publicSiteUrl(db, site),
+    // Nettgatas eget skjema står på nettgata.no, ikke på adressen til nettstedet «plattform» i studioet.
+    siteUrl: site.slug === PLATFORM_SITE_SLUG ? platformUrl() : await publicSiteUrl(db, site),
     studioUrl: `${platformUrl()}/studio/nettsted/${site.id}/henvendelser`,
     imageCount,
   });

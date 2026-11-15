@@ -1,5 +1,6 @@
 "use server";
 
+import { looksLikeLeadSpam } from "@/lib/lead-spam";
 import { headers } from "next/headers";
 import { after } from "next/server";
 import { z } from "zod";
@@ -60,6 +61,9 @@ export async function submitLead(_prev: LeadState, formData: FormData): Promise<
   }
   const parsed = leadSchema.safeParse({ ...values, source: `${text("source", 200)}${query}` });
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message, values, field: String(parsed.error.issues[0].path[0] ?? "") || undefined };
+
+  // Roboter som fyller feltene med bare nettadresser, får samme svar som i honningkrukken, uten at noe lagres.
+  if (looksLikeLeadSpam(parsed.data)) return { ok: true, message: "Takk! Du hører fra meg innen én virkedag." };
 
   const db = await getDb();
   const site = await ensurePlatformSite(db);
