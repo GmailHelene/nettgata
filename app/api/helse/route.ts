@@ -12,7 +12,9 @@ export async function GET() {
     await Promise.race([db.execute(sql`select 1`), new Promise((_, reject) => setTimeout(() => reject(new Error("tidsavbrudd")), 5000))]);
     return Response.json({ status: "ok", ms: Date.now() - started }, { headers: { "cache-control": "no-store" } });
   } catch (err) {
-    console.error("Helsesjekken feilet", err);
+    // Drizzle pakker inn databasefeilen, så den egentlige årsaken ligger i `cause`. Bare navn, kode og melding logges.
+    const cause = (err as { cause?: { name?: string; code?: string; message?: string } })?.cause;
+    console.error("Helsesjekken feilet", cause ? `${cause.name ?? "Feil"} ${cause.code ?? ""}: ${cause.message ?? ""}` : err);
     return Response.json({ status: "feil" }, { status: 503, headers: { "cache-control": "no-store" } });
   }
 }
