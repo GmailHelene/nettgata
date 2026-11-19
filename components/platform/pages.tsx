@@ -381,6 +381,35 @@ function TrialLink() {
   );
 }
 
+/** Det folk spør om først: hva som er med i grunnprisen, og at de kan gå når de vil (spørsmål fra FB og LinkedIn, nov. 2026). */
+const included = [
+  "Bransjesider med tekster",
+  "Google: titler, sitemap og bransjedata",
+  "Kobling av eget domene, med https",
+  "Sikkerhetskopi hver natt",
+  "Besøkstall uten informasjonskapsler",
+];
+
+function IncludedStrip() {
+  return (
+    <div className="mt-8 max-w-4xl rounded-lg border border-[#d5dbe0] bg-white p-5">
+      <h2 className={`${heading} text-lg`}>Med i 199 kr</h2>
+      <ul className="mt-2 grid gap-x-6 gap-y-1.5 text-[0.95rem] sm:grid-cols-2 lg:grid-cols-3">
+        {included.map((item) => (
+          <li key={item} className="flex gap-2">
+            <span aria-hidden="true" className="text-[#2f5a47]">✓</span>
+            {item}
+          </li>
+        ))}
+      </ul>
+      <p className={`mt-3 text-sm ${muted}`}>
+        Domenet står i ditt navn, og «Last ned alt» gir deg sidene, tekstene, bildene, varene og ordrene i én fil. Du kan gå når du vil, uten å starte på
+        nytt.
+      </p>
+    </div>
+  );
+}
+
 /** Forsiden: overskrift og gata. */
 function StreetHero() {
   return (
@@ -411,6 +440,7 @@ function StreetHero() {
           </div>
           <p className={`text-sm ${muted}`}>{facts}</p>
         </div>
+        <IncludedStrip />
       </div>
       <div className="mt-12">
         <Street shops={street} width={196} label="Eksempler fra bransjepakkene, én butikk per bransje" />
@@ -575,7 +605,7 @@ function Features({ shop = false }: { shop?: boolean }) {
     ],
     butikk: ["Nettbutikk med Vipps og kort", "Varer, varianter, lager, rabattkoder og frakt. Betalingen går rett til deg gjennom dine egne avtaler."],
     bring: ["Frakt med Bring", "Med din egen Bring-avtale regnes frakten ut fra vekt og postnummer, og etiketten lager du rett fra ordren. Faste fraktpriser og henting går også."],
-    domene: ["Domenet er ditt", "Domenet registreres alltid i ditt navn. Har du et fra før, kobler vi det til sammen."],
+    domene: ["Domenet er ditt", "Domenet registreres alltid i ditt navn, og med «Last ned alt» tar du med deg innholdet hvis du vil flytte. Har du et domene fra før, kobler vi det til sammen."],
     lover: ["Lover og regler på plass", "Personvernerklæring og vilkår lages ut fra nettstedet ditt. Nettbutikken har angrerettskjema og opplysningene loven krever."],
     uu: ["Universell utforming", "Alle temaene holder kontrastkravene, og knapper og skjemaer virker med tastatur og skjermleser."],
     drift: ["Trygg drift", "Sikkerhetskopi hver natt, tofaktor-innlogging og ingen tillegg du må holde oppdatert. Databasen ligger i Frankfurt."],
