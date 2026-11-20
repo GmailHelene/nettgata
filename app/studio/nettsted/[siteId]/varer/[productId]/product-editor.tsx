@@ -184,7 +184,7 @@ export function ProductEditor({
 
   return (
     <SiteIdContext.Provider value={siteId}>
-      <div className="space-y-8" onInputCapture={() => setDirty(true)}>
+      <div className="space-y-8" onInput={() => setDirty(true)}>
         <section className="space-y-4 rounded-lg border bg-white p-5">
           <label className="block">
             <span className="mb-1 block text-sm font-medium">

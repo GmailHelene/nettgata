@@ -22,6 +22,7 @@ import { buildTheme, getThemeDef, themes } from "@/lib/themes";
 import type { Need } from "@/lib/leads";
 import { plattformDokument, type PlattformDokument } from "@/lib/legal/plattform";
 import { GRONBERG, sideSomTekst } from "@/lib/legal/felles";
+import { AdminFilm } from "./admin-film";
 import { ConsentBanner, ConsentReset } from "./consent";
 import { LeadForm } from "./lead-form";
 import { StartLink } from "./start-link";
@@ -873,6 +874,15 @@ function Landing({ env }: { env: PlatformEnv }) {
       >
         <Showcase keys={["klinikk", "galleri", "hytte", "puls", "nordlys", "fjord"]} />
       </Section>
+      <Section
+        eyebrow="Slik ser det ut"
+        title="En vanlig dag i nettbutikken"
+        intro="Et opptak fra studioet. En ordre blir merket som sendt, en ny vare kommer på plass, og månedens salg og MVA står klart."
+      >
+        <div className="max-w-4xl">
+          <AdminFilm />
+        </div>
+      </Section>
       <Section eyebrow="Trygt valg" title="Det er din bedrift, og det skal være din nettside">
         <ul className="grid gap-x-10 gap-y-9 md:grid-cols-3">
           {[
@@ -913,6 +923,15 @@ function ShopLanding({ env, crumbs }: { env: PlatformEnv; crumbs: Crumb[] }) {
       </Hero>
       <Section eyebrow="Inkludert" title="Det en norsk nettbutikk trenger" tone="kalk">
         <Features shop />
+      </Section>
+      <Section
+        eyebrow="Slik ser det ut"
+        title="En vanlig dag i nettbutikken"
+        intro="Et opptak fra studioet. En ordre blir merket som sendt, en ny vare kommer på plass, og månedens salg og MVA står klart."
+      >
+        <div className="max-w-4xl">
+          <AdminFilm />
+        </div>
       </Section>
       <Section
         eyebrow="Betaling"
