@@ -13,7 +13,7 @@ import { clientKey, hit, rules } from "@/lib/rate-limit";
 import { getSecret } from "@/lib/secret";
 import { needs, type Need } from "@/lib/leads";
 
-type Values = { name: string; email: string; phone: string; company: string; need: string; bransje: string; message: string };
+type Values = { name: string; email: string; phone: string; company: string; need: string; bransje: string; message: string; adresse: string; betaling: string };
 /** Ved feil sendes det som var skrevet tilbake, så skjemaet ikke tømmes. */
 /** `saved` og `id` bare når henvendelsen faktisk ble lagret, så roboter i honningkrukken aldri telles som konvertering. */
 export type LeadState = { ok: boolean; message: string; values?: Values; saved?: boolean; id?: string; field?: string } | null;
@@ -30,6 +30,10 @@ const leadSchema = z.object({
   need: z.enum(Object.keys(needs) as [Need, ...Need[]], { error: "Velg hva du trenger" }),
   bransje: z.string().trim().max(80),
   message: z.string().trim().max(3000, "Meldingen er for lang"),
+  /** Adressen til nettsiden som skal sjekkes. Bare i skjemaet for gratis sjekk. */
+  adresse: z.string().trim().max(200, "Adressen er for lang"),
+  /** Hva de kunne tenke seg å betale. Frivillig, og spørres om sist. */
+  betaling: z.string().trim().max(200, "Svaret om pris er for langt"),
   source: z.string().max(400),
 });
 
@@ -50,6 +54,8 @@ export async function submitLead(_prev: LeadState, formData: FormData): Promise<
     need: text("need", 20),
     bransje: text("bransje", 80),
     message: text("message", 3000),
+    adresse: text("adresse", 200),
+    betaling: text("betaling", 200),
   };
   // Spørringen fra adressen siden ble åpnet med (utm-parametrene fra annonsen), så innboksen viser hvor henvendelsen kom fra.
   let query = "";
@@ -61,6 +67,9 @@ export async function submitLead(_prev: LeadState, formData: FormData): Promise<
   }
   const parsed = leadSchema.safeParse({ ...values, source: `${text("source", 200)}${query}` });
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message, values, field: String(parsed.error.issues[0].path[0] ?? "") || undefined };
+  if (parsed.data.need === "sjekk" && parsed.data.adresse.length < 2) {
+    return { ok: false, message: "Skriv adressen til nettsiden eller navnet på bedriften", values, field: "adresse" };
+  }
 
   // Roboter som fyller feltene med bare nettadresser, får samme svar som i honningkrukken, uten at noe lagres.
   if (looksLikeLeadSpam(parsed.data)) return { ok: true, message: "Takk! Du hører fra meg innen én virkedag." };
@@ -78,6 +87,8 @@ export async function submitLead(_prev: LeadState, formData: FormData): Promise<
     `Ønsker: ${needs[d.need]}`,
     d.company && `Bedrift: ${d.company}`,
     d.bransje && `Bransje: ${d.bransje}`,
+    d.adresse && `Nettside som skal sjekkes: ${d.adresse}`,
+    d.betaling && `Kunne tenke seg å betale: ${d.betaling}`,
     `Kom fra: ${d.source || "/"}`,
     d.message && `\n${d.message}`,
   ]

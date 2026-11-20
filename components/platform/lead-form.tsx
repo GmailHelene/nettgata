@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useActionState, useEffect, useId, useRef } from "react";
 import { submitLead } from "@/app/actions/lead";
-import { needs, type Need } from "@/lib/leads";
+import { leadFormNeeds, needs, type Need } from "@/lib/leads";
 import { trackLead } from "./consent";
 
 const input =
@@ -54,7 +54,7 @@ export function LeadForm({ source, need = "nettside", bransje = "", sendTo }: { 
       <fieldset>
         <legend className="mb-2 font-semibold">Hva trenger du?</legend>
         <div className="flex flex-wrap gap-2">
-          {(Object.keys(needs) as Need[]).map((key) => (
+          {leadFormNeeds.map((key) => (
             <label
               key={key}
               className="cursor-pointer rounded-full border border-[#173b6c]/30 bg-white px-4 py-2 has-[:checked]:border-[#173b6c] has-[:checked]:bg-[#173b6c] has-[:checked]:text-white has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[#173b6c]"
@@ -105,6 +105,92 @@ export function LeadForm({ source, need = "nettside", bransje = "", sendTo }: { 
       <div className="flex flex-wrap items-center gap-4">
         <button disabled={pending} className="rounded-lg bg-[#173b6c] px-6 py-3 font-semibold text-white disabled:opacity-60">
           {pending ? "Sender..." : "Send, så tar jeg kontakt"}
+        </button>
+        <p className="text-sm text-[#47525c]">
+          Jeg bruker opplysningene bare til å svare deg.{" "}
+          <Link href="/personvern" className="underline">
+            Personvern
+          </Link>
+        </p>
+      </div>
+    </form>
+  );
+}
+
+/** Gratis sjekk på /gratis-sjekk: adressen først, prisen sist og frivillig. Havner i samme innboks som «Få nettside». */
+export function CheckForm({ sendTo }: { sendTo?: string }) {
+  const [state, action, pending] = useActionState(submitLead, null);
+  const v = state?.values;
+  const done = useRef<HTMLParagraphElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const alertRef = useRef<HTMLParagraphElement>(null);
+  const errorId = useId();
+  const invalid = (name: string) => (state && !state.ok && state.field === name ? { "aria-invalid": true, "aria-describedby": errorId } : {});
+
+  useEffect(() => {
+    if (state?.saved && state.id) trackLead(state.id, sendTo);
+    if (state?.ok) {
+      done.current?.scrollIntoView({ block: "center" });
+      done.current?.focus();
+    } else if (state) {
+      const field = state.field ? formRef.current?.querySelector<HTMLElement>(`[name="${state.field}"]`) : null;
+      (field ?? alertRef.current)?.focus();
+    }
+  }, [state, sendTo]);
+
+  if (state?.ok) {
+    return (
+      <p ref={done} tabIndex={-1} role="status" className="rounded-xl bg-[#e4ede8] p-6 text-lg font-semibold text-[#1e3d30] outline-none">
+        Takk! Jeg ser på nettsiden og sender deg tre ting jeg ville endret, innen én virkedag.
+      </p>
+    );
+  }
+
+  return (
+    <form ref={formRef} action={action} className="space-y-4" noValidate>
+      <input type="hidden" name="source" value="/gratis-sjekk" />
+      <input type="hidden" name="need" value="sjekk" />
+      {/* Skjult for mennesker, fanger opp roboter. */}
+      <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
+        <label>
+          Ikke fyll ut dette feltet
+          <input name="nettsted" tabIndex={-1} autoComplete="off" />
+        </label>
+      </div>
+      <label className="block">
+        <span className="mb-1 block font-medium">Adressen til nettsiden, eller navnet på bedriften</span>
+        <input name="adresse" required autoComplete="url" placeholder="dinbedrift.no" defaultValue={v?.adresse} className={input} {...invalid("adresse")} />
+      </label>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block">
+          <span className="mb-1 block font-medium">Navn</span>
+          <input name="name" required autoComplete="name" defaultValue={v?.name} className={input} {...invalid("name")} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block font-medium">E-post</span>
+          <input name="email" type="email" required autoComplete="email" defaultValue={v?.email} className={input} {...invalid("email")} />
+        </label>
+      </div>
+      <label className="block">
+        <span className="mb-1 block font-medium">
+          Er det noe spesielt du lurer på? <span className="font-normal text-[#47525c]">(valgfritt)</span>
+        </span>
+        <textarea name="message" rows={3} defaultValue={v?.message} className={input} {...invalid("message")} />
+      </label>
+      <label className="block">
+        <span className="mb-1 block font-medium">
+          Hva ville du betalt i måneden for en nettside som virker? <span className="font-normal text-[#47525c]">(valgfritt)</span>
+        </span>
+        <input name="betaling" defaultValue={v?.betaling} placeholder="For eksempel 200 kr, eller vet ikke" className={input} {...invalid("betaling")} />
+      </label>
+      {state && !state.ok && (
+        <p ref={alertRef} id={errorId} tabIndex={-1} role="alert" className="font-semibold text-[#9b1c1c] outline-none">
+          {state.message}
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-4">
+        <button disabled={pending} className="rounded-lg bg-[#173b6c] px-6 py-3 font-semibold text-white disabled:opacity-60">
+          {pending ? "Sender..." : "Send adressen"}
         </button>
         <p className="text-sm text-[#47525c]">
           Jeg bruker opplysningene bare til å svare deg.{" "}

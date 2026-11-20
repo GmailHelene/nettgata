@@ -10,6 +10,8 @@ import {
   bransjeDetails,
   bransjeHeading,
   bransjeMonthly,
+  DEMOS,
+  type Demo,
   landingBransjer,
   PLATFORM_DEFAULT_ORIGIN,
   platformBreadcrumbs,
@@ -24,7 +26,8 @@ import { plattformDokument, type PlattformDokument } from "@/lib/legal/plattform
 import { GRONBERG, sideSomTekst } from "@/lib/legal/felles";
 import { AdminFilm } from "./admin-film";
 import { ConsentBanner, ConsentReset } from "./consent";
-import { LeadForm } from "./lead-form";
+import { konkurrenter, SAMMENLIGNING_SJEKKET } from "@/lib/sammenligning";
+import { CheckForm, LeadForm } from "./lead-form";
 import { StartLink } from "./start-link";
 
 /*
@@ -833,6 +836,169 @@ function BransjeLinks({ packs, label }: { packs: string[]; label: string }) {
   );
 }
 
+const textLink = "font-semibold text-[#173b6c] underline underline-offset-4";
+
+/** Gratis sjekk og sammenligning, under eksemplene. */
+function MoreLinks() {
+  return (
+    <ul className="mt-8 flex flex-wrap gap-x-8 gap-y-3 text-lg">
+      <li>
+        <Link href="/gratis-sjekk" className={textLink}>
+          Har du nettside fra før? Få tre ting jeg ville endret, gratis
+        </Link>
+      </li>
+      <li>
+        <Link href="/sammenlign" className={textLink}>
+          Sammenlign med Wix, Shopify og Quickbutik
+        </Link>
+      </li>
+    </ul>
+  );
+}
+
+/** Kort til de ferdige eksempelsidene. Hele kortet er én lenke, og miniatyren er bare et bilde. */
+function DemoLinks({ exclude }: { exclude?: string }) {
+  return (
+    <ul className="grid grid-cols-1 justify-items-center gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      {DEMOS.filter((d) => d.pack !== exclude).map((d) => (
+        // Miniatyren har lenker inni seg, så lenken kan ikke ligge rundt den. Den dekker hele kortet med ::after i stedet.
+        <li key={d.pack} className="relative w-full max-w-[300px] rounded-xl bg-white p-3 ring-1 ring-[#1b232b]/15 hover:ring-2 hover:ring-[#173b6c]">
+          <Thumb theme={d.theme} pack={d.pack} name={d.name} width={274} />
+          <Link href={`/eksempler/${d.pack}`} className={`${heading} block px-1 pt-3 text-lg after:absolute after:inset-0 after:rounded-xl`}>
+            Eksempel på {d.what}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** En hel forside fra bransjepakken, til å se på uten å registrere seg. Lenkene inni går ingen steder, så eksempelet er inert. */
+function DemoPage({ demo, crumbs }: { demo: Demo; crumbs: Crumb[] }) {
+  const p = getPack(demo.pack);
+  const t = buildTheme(demo.theme);
+  if (!p || !t) return null;
+  const { pages, ctx } = packPreview(p, { name: demo.name, info: {} });
+  const front = pages.find((x) => x.path === "/") ?? pages[0];
+  return (
+    <>
+      <Breadcrumbs crumbs={crumbs} />
+      <section className={`${container} pb-8 pt-8`}>
+        <h1 className={`${heading} text-3xl leading-tight text-balance sm:text-4xl`}>Eksempel på {demo.what}</h1>
+        <p className={`mt-4 max-w-2xl text-lg leading-relaxed ${muted}`}>
+          Slik ser forsiden ut rett fra bransjepakken, med temaet {getThemeDef(demo.theme)?.label ?? demo.theme}. «{demo.name}», bildene og prisene er
+          bare eksempler. Lenkene i eksempelet går ingen steder, men alt du ser, kan du bytte ut med ditt eget.
+        </p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <StartLink pack={demo.pack} theme={demo.theme} className={button}>
+            Start med denne gratis
+          </StartLink>
+          <Link href={`/bransjer/${demo.pack}`} className={buttonGhost}>
+            Se hva som er med for {lowerLabel(demo.label)}
+          </Link>
+        </div>
+      </section>
+      <div className={`${container} pb-16`}>
+        <div inert className="overflow-hidden rounded-xl ring-1 ring-[#1b232b]/15 [&_header]:!static">
+          <PageRenderer content={withDemoText(front.content)} theme={t} ctx={ctx} embedded />
+        </div>
+      </div>
+      <Section eyebrow="Flere eksempler" title="Se et annet eksempel" tone="kalk">
+        <DemoLinks exclude={demo.pack} />
+      </Section>
+    </>
+  );
+}
+
+/** Nettgata mot Quickbutik, Shopify og Wix. Tallene til de andre står i lib/sammenligning.ts, med kilde og dato. */
+function ComparePage({ crumbs }: { crumbs: Crumb[] }) {
+  return (
+    <>
+      <Breadcrumbs crumbs={crumbs} />
+      <section className={`${container} pb-4 pt-8`}>
+        <h1 className={`${heading} max-w-4xl text-3xl leading-tight text-balance sm:text-5xl`}>Nettgata, Quickbutik, Shopify og Wix</h1>
+        <p className={`mt-5 max-w-3xl text-lg leading-relaxed ${muted}`}>
+          Jeg leste prissidene til de tre andre {SAMMENLIGNING_SJEKKET} og skrev av det som stod der. Prisene kan ha endret seg siden, så sjekk lenken før
+          du bestemmer deg. Alle fire har noe de er gode på. Her ser du hva du betaler, og hva som er med.
+        </p>
+      </section>
+      <Section title="Nettgata">
+        <ul className="max-w-3xl list-disc space-y-2 pl-5 text-lg leading-relaxed">
+          <li>Nettside: 199 kr/mnd, eller 169 kr/mnd når du betaler for et år. Nettbutikk: 399 kr/mnd, eller 339 kr/mnd for et år. Eks. mva.</li>
+          <li>Prisene er i norske kroner, og alle temaer og bransjepakker er med.</li>
+          <li>Vipps og kort betales rett til deg. Nettgata tar ingen andel av salget, du betaler bare gebyret til betalingsløsningen.</li>
+          <li>Ingen bindingstid. Domenet står i ditt navn, og du kan ta med deg innholdet.</li>
+          <li>Det er gratis å bygge og forhåndsvise. Du betaler først når siden skal publiseres.</li>
+        </ul>
+      </Section>
+      <Section title="De tre andre, slik prissidene viser det" tone="kalk">
+        <div className="grid gap-6 lg:grid-cols-3">
+          {konkurrenter.map((k) => (
+            <article key={k.navn} className="rounded-2xl bg-white p-6 ring-1 ring-[#1b232b]/15">
+              <h3 className={`${heading} text-2xl`}>{k.navn}</h3>
+              <p className="mt-3 font-semibold">{k.billigst}</p>
+              <ul className={`mt-4 list-disc space-y-2 pl-5 ${muted}`}>
+                {k.punkter.map((x) => (
+                  <li key={x}>{x}</li>
+                ))}
+              </ul>
+              <p className="mt-5 text-sm">
+                Kilde:{" "}
+                <a href={k.kilde} className="break-all text-[#173b6c] underline underline-offset-4" rel="noopener">
+                  {k.kilde.replace("https://", "")}
+                </a>
+                , lest {SAMMENLIGNING_SJEKKET}.
+              </p>
+            </article>
+          ))}
+        </div>
+      </Section>
+      <Section title="Når passer hvem?">
+        <div className="max-w-3xl space-y-4 text-lg leading-relaxed">
+          <p>
+            Skal du selge mye, til flere land, eller trenger du mange tillegg, er Shopify og Quickbutik laget for det. Wix har mange maler og passer hvis du
+            vil designe alt fritt selv.
+          </p>
+          <p>
+            Nettgata er for den lille norske bedriften som vil ha en ferdig side for bransjen sin, en fast pris i kroner og én person å skrive til. Er du
+            usikker, kan du sende meg adressen din, så får du en ærlig vurdering.
+          </p>
+          <p>
+            <Link href="/gratis-sjekk" className={textLink}>
+              Få en gratis sjekk av nettsiden
+            </Link>
+          </p>
+        </div>
+      </Section>
+    </>
+  );
+}
+
+/** Gratis sjekk: tre ting jeg ville endret. Inngangen til en prat, ikke et salgsskjema. Pris spørres om sist, og frivillig. */
+function CheckPage({ env, crumbs }: { env: PlatformEnv; crumbs: Crumb[] }) {
+  return (
+    <>
+      <Breadcrumbs crumbs={crumbs} />
+      <section className="pb-16 pt-8 sm:pb-24">
+        <div className={`${container} grid gap-10 lg:grid-cols-[1fr_1.2fr]`}>
+          <div>
+            <h1 className={`${heading} text-3xl leading-tight text-balance sm:text-5xl`}>Send meg adressen, så får du tre ting jeg ville endret</h1>
+            <div className={`mt-5 space-y-4 text-lg leading-relaxed ${muted}`}>
+              <p>Jeg ser på nettsiden din slik en kunde ser den, på mobil og PC, og sjekker hvordan den ser ut i Google.</p>
+              <p>Innen én virkedag får du en e-post med de tre tingene jeg ville rettet først. Det er gratis, og du trenger ikke kjøpe noe.</p>
+              <p>Har du ingen nettside ennå? Skriv navnet på bedriften i stedet, så ser jeg på hvordan du blir funnet i dag.</p>
+            </div>
+          </div>
+          <div className="rounded-2xl bg-white p-6 shadow-[0_24px_60px_-30px_rgb(23_59_108/0.35)] ring-1 ring-[#1b232b]/15 sm:p-8">
+            <CheckForm sendTo={env.sendTo} />
+          </div>
+        </div>
+      </section>
+      <Owner />
+    </>
+  );
+}
+
 function Landing({ env }: { env: PlatformEnv }) {
   return (
     <>
@@ -847,6 +1013,10 @@ function Landing({ env }: { env: PlatformEnv }) {
         <div className="mx-auto max-w-[900px] overflow-hidden rounded-xl ring-1 ring-[#1b232b]/15">
           <Thumb theme="vakt" pack="elektriker" name="Elektrikeren" width={900} />
         </div>
+      </Section>
+      <Section eyebrow="Prøv uten å spørre" title="Se ferdige eksempelsider" intro="Åpne et eksempel og se hele forsiden, slik den blir rett fra bransjepakken." tone="kalk">
+        <DemoLinks />
+        <MoreLinks />
       </Section>
       <Section eyebrow="Bransjer" title="Finn bransjen din" intro="Hver bransjepakke har sidene, tekstene og prislisten bransjen trenger. Velg din, så ser du hva som ligger klart.">
         <GenreSigns />
@@ -1239,6 +1409,10 @@ function BransjePage({ route, env, crumbs }: { route: Extract<PlatformRoute, { k
       <Section id="priser" eyebrow="Pris" title={`${bransjeMonthly(match)} kr i måneden for ${shop ? "nettbutikk" : "nettside"}`}>
         <Pricing shop={shop} />
       </Section>
+      <Section eyebrow="Eksempler" title="Se ferdige eksempelsider" intro="Hele forsider rett fra bransjepakkene, som du kan se uten å registrere deg.">
+        <DemoLinks exclude={pack.key} />
+        <MoreLinks />
+      </Section>
       {related.length > 0 && (
         <Section eyebrow={match.genre.label} title={`Andre bransjer i ${lowerLabel(match.genre.label)}`} tone="kalk">
           <BransjeLinks packs={related} label={`Andre bransjer i ${lowerLabel(match.genre.label)}`} />
@@ -1303,6 +1477,12 @@ export function renderPlatformPage(route: PlatformRoute, env: PlatformEnv): Reac
       <BransjerIndex env={env} crumbs={crumbs} />
     ) : route.kind === "bransje" ? (
       <BransjePage route={route} env={env} crumbs={crumbs} />
+    ) : route.kind === "sammenlign" ? (
+      <ComparePage crumbs={crumbs} />
+    ) : route.kind === "gratis-sjekk" ? (
+      <CheckPage env={env} crumbs={crumbs} />
+    ) : route.kind === "eksempel" ? (
+      <DemoPage demo={route.demo} crumbs={crumbs} />
     ) : route.kind === "juridisk" ? (
       <LegalPage doc={route.doc} crumbs={crumbs} />
     ) : null;

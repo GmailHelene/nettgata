@@ -14,6 +14,10 @@ import { getPack } from "@/lib/packs";
  * - /temaer            design og maler for nettside
  * - /bransjer          nettside for bransjen, oversikten
  * - /bransjer/<pakke>  nettside for <bransje> («nettside frisør», «hjemmeside rørlegger»)
+ * - /sammenlign        Nettgata mot Wix, Shopify og Quickbutik
+ * - /gratis-sjekk      gratis vurdering av nettsiden
+ * /eksempler/<pakke> er ferdige eksempelsider å se på. De har noindex og står ikke i sitemap, for teksten er den samme
+ * som på bransjesiden, og de skal ikke konkurrere med den i Google.
  * Sjangrene (håndverk, helse ...) har ingen egne sider. De er ankre på /bransjer, ellers ville «nettside for
  * håndverker» havnet både på sjangeren og på /bransjer/handverker.
  */
@@ -23,7 +27,19 @@ export type PlatformRoute =
   | { kind: "temaer" }
   | { kind: "bransjer" }
   | { kind: "bransje"; match: BransjeMatch }
+  | { kind: "sammenlign" }
+  | { kind: "gratis-sjekk" }
+  | { kind: "eksempel"; demo: Demo }
   | { kind: "juridisk"; doc: "personvern" | "vilkar" | "databehandleravtale" };
+
+/** Ferdige eksempelsider folk kan se uten å registrere seg. Generiske navn, så ingen forveksles med ekte bedrifter. */
+export const DEMOS = [
+  { pack: "frisor", theme: "atelier", name: "Salongen", label: "Frisør", what: "nettside for frisør" },
+  { pack: "rorlegger", theme: "verksted", name: "Rørleggeren", label: "Rørlegger", what: "nettside for rørlegger" },
+  { pack: "kafe", theme: "bistro", name: "Kafeen", label: "Kafé", what: "nettside for kafé" },
+  { pack: "klaer", theme: "boutique", name: "Klesbutikken", label: "Klesbutikk", what: "nettbutikk for klær" },
+] as const;
+export type Demo = (typeof DEMOS)[number];
 
 /** Hovedadressen når forespørselen ikke sier noe annet (strukturerte data og lokal utvikling). */
 export const PLATFORM_DEFAULT_ORIGIN = "https://nettgata.no";
@@ -52,13 +68,17 @@ export function platformRoute(segments: string[]): PlatformRoute | null {
   if (rest.length) return null;
   if (!first) return { kind: "landing" };
   if (second === undefined) {
-    if (first === "nettbutikk" || first === "temaer" || first === "bransjer") return { kind: first };
+    if (first === "nettbutikk" || first === "temaer" || first === "bransjer" || first === "sammenlign" || first === "gratis-sjekk") return { kind: first };
     if (first === "personvern" || first === "vilkar" || first === "databehandleravtale") return { kind: "juridisk", doc: first };
     return null;
   }
   if (first === "bransjer") {
     const match = landingBransjer().find((m) => m.bransje.pack === second);
     return match ? { kind: "bransje", match } : null;
+  }
+  if (first === "eksempler") {
+    const demo = DEMOS.find((d) => d.pack === second);
+    return demo ? { kind: "eksempel", demo } : null;
   }
   return null;
 }
@@ -74,6 +94,8 @@ export function platformPath(route: PlatformRoute): string {
       return "/";
     case "bransje":
       return `/bransjer/${route.match.bransje.pack}`;
+    case "eksempel":
+      return `/eksempler/${route.demo.pack}`;
     case "juridisk":
       return `/${route.doc}`;
     default:
@@ -88,6 +110,8 @@ function allRoutes(): PlatformRoute[] {
     { kind: "temaer" },
     { kind: "bransjer" },
     ...landingBransjer().map((match) => ({ kind: "bransje" as const, match })),
+    { kind: "sammenlign" },
+    { kind: "gratis-sjekk" },
     { kind: "juridisk", doc: "personvern" },
     { kind: "juridisk", doc: "vilkar" },
     { kind: "juridisk", doc: "databehandleravtale" },
@@ -222,7 +246,7 @@ export function bransjeDetails(m: BransjeMatch): BransjeDetails {
 
 const SITE = "Nettgata";
 
-const titles: Record<Exclude<PlatformRoute["kind"], "bransje" | "juridisk">, [string, string]> = {
+const titles: Record<Exclude<PlatformRoute["kind"], "bransje" | "juridisk" | "eksempel">, [string, string]> = {
   landing: [
     "Nettside for bedriften, fra 199 kr i måneden | Nettgata",
     "Lag nettside for bedriften med ferdige sider og tekster for 45 bransjer. Fra 199 kr i måneden eks. mva, uten bindingstid. Domenet står i ditt navn.",
@@ -238,6 +262,14 @@ const titles: Record<Exclude<PlatformRoute["kind"], "bransje" | "juridisk">, [st
   bransjer: [
     "Nettside for din bransje, 45 bransjepakker | Nettgata",
     "Ferdige nettsider for håndverkere, frisører, kafeer, regnskap, fotografer, idrettslag og mange flere. Sidene og tekstene er klare fra start.",
+  ],
+  sammenlign: [
+    "Nettgata, Wix, Shopify og Quickbutik: pris | Nettgata",
+    "Hva koster nettside og nettbutikk hos Nettgata, Wix, Shopify og Quickbutik, og hva er med? Prisene er hentet fra sidene deres, med dato.",
+  ],
+  "gratis-sjekk": [
+    "Gratis sjekk av nettsiden din | Nettgata",
+    "Send meg adressen til nettsiden din, så får du tre ting jeg ville endret, på e-post. Gratis, og du trenger ikke kjøpe noe.",
   ],
 };
 
@@ -282,6 +314,12 @@ function ogImageFor(route: PlatformRoute) {
 
 export function platformTitle(route: PlatformRoute): [string, string] {
   if (route.kind === "bransje") return bransjeTitle(route.match);
+  if (route.kind === "eksempel") {
+    return [
+      `Eksempel på ${route.demo.what} | ${SITE}`,
+      `Se et ferdig eksempel på ${route.demo.what}, rett fra bransjepakken. Navnet, bildene og prisene er bare eksempler.`,
+    ];
+  }
   if (route.kind === "juridisk") {
     const seo = plattformDokument(route.doc).seo ?? {};
     return [seo.title ?? SITE, seo.description ?? ""];
@@ -301,6 +339,7 @@ export function platformMetadata(route: PlatformRoute, origin: string): Metadata
     alternates: { canonical: url },
     openGraph: { siteName: SITE, locale: "nb_NO", type: "website", title, description, url, images },
     twitter: { card: "summary_large_image", title, description, images: [images[0].url] },
+    ...(route.kind === "eksempel" ? { robots: { index: false, follow: true } } : {}),
   };
 }
 
@@ -320,6 +359,12 @@ export function platformBreadcrumbs(route: PlatformRoute): Crumb[] {
       return [home, { name: "Temaer", path: "/temaer" }];
     case "bransjer":
       return [home, { name: "Bransjer", path: "/bransjer" }];
+    case "sammenlign":
+      return [home, { name: "Sammenlign", path: "/sammenlign" }];
+    case "gratis-sjekk":
+      return [home, { name: "Gratis sjekk", path: "/gratis-sjekk" }];
+    case "eksempel":
+      return [home, { name: `Eksempel: ${route.demo.label}`, path: platformPath(route) }];
     case "bransje":
       return [
         home,
