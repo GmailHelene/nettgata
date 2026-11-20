@@ -12,6 +12,7 @@ import {
   resetPasswordAction,
   type AccountState,
 } from "@/app/studio/registrer/actions";
+import { trackSignup } from "@/components/platform/consent";
 import { inputClass } from "./info-fields";
 import { ui } from "./ui";
 
@@ -108,13 +109,18 @@ function Submit({ pending, idle, busy }: { pending: boolean; idle: string; busy:
   );
 }
 
-export function RegisterForm({ siteKey }: { siteKey: string | null }) {
+export function RegisterForm({ siteKey, ads }: { siteKey: string | null; ads?: { tagId: string; sendTo: string } }) {
   const [state, action, pending] = useActionState(registerAction, null);
   const form = useRef<HTMLFormElement>(null);
   const message = useRef<HTMLParagraphElement>(null);
   const messageId = useId();
   const passwordHint = useId();
   useFocusOnResult(state, form, message);
+  // Registreringen måles her, i samme nettleser som annonseklikket. Bekreftelseslenken åpnes ofte i e-postappen,
+  // der verken samtykket eller klikket finnes. trackSignup gjør ingenting uten «Ja» til informasjonskapsler.
+  useEffect(() => {
+    if (state?.ok && state.ref && ads) trackSignup(ads.tagId, ads.sendTo, state.ref);
+  }, [state, ads]);
 
   if (state?.ok) {
     return (

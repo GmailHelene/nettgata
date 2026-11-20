@@ -36,7 +36,10 @@ export default async function RegisterPage() {
         </AccountLinks>
       }
     >
-      <RegisterForm siteKey={turnstileSiteKey()} />
+      <RegisterForm
+        siteKey={turnstileSiteKey()}
+        ads={{ tagId: process.env.GOOGLE_ADS_TAG_ID?.trim() ?? "", sendTo: process.env.GOOGLE_ADS_SIGNUP_SEND_TO?.trim() ?? "" }}
+      />
     </AuthShell>
   );
 }

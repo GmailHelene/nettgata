@@ -22,7 +22,11 @@ import { createSession, getCurrentUser } from "@/lib/session";
 import { platformUrl } from "@/lib/site-url";
 
 /** Svaret til skjemaene. `field` peker på feltet med feil, så skjemaet kan koble meldingen til det. */
-export type AccountState = { ok: boolean; message: string; field?: AccountError["field"]; email?: string } | null;
+/**
+ * `ref` er en tilfeldig referanse til Google Ads-målingen av registreringen (transaction_id). Den følger med hvert
+ * vellykkede svar, også når adressen finnes fra før, så svaret ikke avslører hvem som har konto.
+ */
+export type AccountState = { ok: boolean; message: string; field?: AccountError["field"]; email?: string; ref?: string } | null;
 
 const TOO_MANY = "For mange forsøk. Vent en time og prøv igjen.";
 const BOT_CHECK = "Sjekken av at du er et menneske gikk ikke gjennom. Last inn siden på nytt og prøv igjen.";
@@ -68,7 +72,7 @@ export async function registerAction(_prev: AccountState, formData: FormData): P
       name: text(formData, "name"),
       acceptedTerms: formData.get("terms") === "ja",
     });
-    return { ok: true, message: SENT_MESSAGE, email };
+    return { ok: true, message: SENT_MESSAGE, email, ref: crypto.randomUUID() };
   } catch (err) {
     return toState(err, email);
   }

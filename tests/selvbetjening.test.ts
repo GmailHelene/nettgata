@@ -150,7 +150,8 @@ describe("registrering", () => {
     const first = await registerAction(null, form(signup));
     ip.value = "198.51.100.9";
     const fresh = await registerAction(null, form({ ...signup, email: "ny@ullstua.no" }));
-    expect(first).toEqual({ ...fresh, email: "kari@ullstua.no" });
+    expect({ ...first, ref: undefined }).toEqual({ ...fresh, email: "kari@ullstua.no", ref: undefined });
+    expect(first?.ref).toMatch(/^[0-9a-f-]{36}$/);
     expect(first?.ok).toBe(true);
 
     const [unchanged] = await db.select().from(users).where(eq(users.id, existing.id));
