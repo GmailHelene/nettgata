@@ -926,7 +926,7 @@ function ComparePage({ crumbs }: { crumbs: Crumb[] }) {
         <ul className="max-w-3xl list-disc space-y-2 pl-5 text-lg leading-relaxed">
           <li>Nettside: 199 kr/mnd, eller 169 kr/mnd når du betaler for et år. Nettbutikk: 399 kr/mnd, eller 339 kr/mnd for et år. Eks. mva.</li>
           <li>Prisene er i norske kroner, og alle temaer og bransjepakker er med.</li>
-          <li>Vipps og kort betales rett til deg. Nettgata tar ingen andel av salget, du betaler bare gebyret til betalingsløsningen.</li>
+          <li>Ingen provisjon. Det kundene dine betaler, går rett til deg og forblir ditt. Du betaler bare gebyret til Vipps eller kortleverandøren.</li>
           <li>Ingen bindingstid. Domenet står i ditt navn, og du kan ta med deg innholdet.</li>
           <li>Det er gratis å bygge og forhåndsvise. Du betaler først når siden skal publiseres.</li>
         </ul>
